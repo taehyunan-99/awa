@@ -198,6 +198,8 @@ git commit -m "chore: 프로젝트 골격 + 의존성 zero 테스트 하니스"
 
 `lib.sh`는 `bin/`에 위치하며, 자신의 위치 기준으로 repo 루트를 계산한다. `target_of <idx>`는 페인 인덱스를 tmux target 문자열로, `boot_file <worker>`는 워커 부트스트랩 파일 경로를 돌려준다.
 
+> **중요:** `target_of`는 `SESSION` 변수를 우선 사용하고 없으면 `SESSION_DEFAULT`로 폴백한다(`${SESSION:-$SESSION_DEFAULT}`). 이로써 `team-up.sh`/`dispatch.sh`/`wait-worker.sh`가 `SESSION="${SESSION_OVERRIDE:-...}"`로 설정한 활성 세션을 존중하여 세션 오버라이드/멀티팀을 지원한다. `SESSION_DEFAULT` 하드코딩은 세션 오버라이드를 무시해 target 불일치를 일으키므로 금지.
+
 - [ ] **Step 1: 실패하는 테스트 작성**
 
 Create `tests/test-lib-paths.sh`:
@@ -215,8 +217,14 @@ assert_eq "$ROOT" "$REPO_ROOT" "REPO_ROOT 가 repo 루트"
 assert_eq "$ROOT/workspace" "$WORKSPACE" "WORKSPACE 경로"
 assert_eq "agents" "$SESSION_DEFAULT" "기본 세션명"
 
-assert_eq "agents:0.2" "$(target_of 2)" "페인 인덱스 2 → target"
+# SESSION 미설정 → SESSION_DEFAULT 폴백
+assert_eq "agents:0.2" "$(target_of 2)" "SESSION 미설정 → 기본 세션"
 assert_eq "agents:0.4" "$(target_of 4)" "페인 인덱스 4 → target"
+
+# SESSION 설정 → 활성 세션 존중 (세션 오버라이드/멀티팀)
+SESSION=myteam
+assert_eq "myteam:0.3" "$(target_of 3)" "SESSION 설정 → 활성 세션 존중"
+unset SESSION
 
 assert_eq "$ROOT/workspace/.boot/dev.md" "$(boot_file dev)" "boot_file 경로"
 
@@ -243,11 +251,12 @@ REPO_ROOT="$(cd "$_LIB_DIR/.." && pwd)"
 WORKSPACE="$REPO_ROOT/workspace"
 SESSION_DEFAULT="agents"
 
-# 페인 인덱스 → tmux target (session:window.pane). 윈도우는 0 고정.
-# pane 1 은 오케스트레이터, 워커는 2 부터.
+# 페인 인덱스 → tmux target (session:window.pane).
+# 활성 세션(SESSION 변수, 없으면 SESSION_DEFAULT) 기준 — 세션 오버라이드/멀티팀 지원.
+# 윈도우 0 고정. pane 1 은 오케스트레이터, 워커는 2 부터.
 target_of() {
   local idx="$1"
-  printf '%s:0.%s' "$SESSION_DEFAULT" "$idx"
+  printf '%s:0.%s' "${SESSION:-$SESSION_DEFAULT}" "$idx"
 }
 
 # 워커 이름 → 부트스트랩 합본 파일 경로
@@ -260,7 +269,7 @@ boot_file() {
 - [ ] **Step 4: 테스트 통과 확인**
 
 Run: `bash tests/test-lib-paths.sh`
-Expected: 6개 `ok:`, `ran=6 fail=0`, exit 0
+Expected: 7개 `ok:`, `ran=7 fail=0`, exit 0
 
 - [ ] **Step 5: 커밋**
 

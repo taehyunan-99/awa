@@ -9,11 +9,12 @@ WORKSPACE="$REPO_ROOT/workspace"
 SESSION_DEFAULT="agents"
 
 # 페인 인덱스 → tmux target (session:window.pane).
+# 활성 세션(SESSION 변수, 없으면 SESSION_DEFAULT) 기준 — 세션 오버라이드/멀티팀 지원.
 # 윈도우 0 고정 (team-up.sh가 세션 로컬 base-index=0 강제). pane은 1부터(pane-base-index=1).
 # pane 1 은 오케스트레이터, 워커는 2 부터.
 target_of() {
   local idx="$1"
-  printf '%s:0.%s' "$SESSION_DEFAULT" "$idx"
+  printf '%s:0.%s' "${SESSION:-$SESSION_DEFAULT}" "$idx"
 }
 
 # 세션 로컬로 인덱스 규약 고정. 전역 ~/.tmux.conf 설정에 비의존.

@@ -173,7 +173,9 @@ tmux wait-for done-<worker>-<id>
 
 | 스크립트 | 책임 | 핵심 동작 |
 |---|---|---|
-| `lib.sh` | 공통 함수 | `send_prompt()`, `target_of(worker)`, `boot_file(worker)`, 세션 존재 확인 |
+| `lib.sh` | 공통 함수 | `send_prompt()`, `target_of(idx)`, `boot_file(worker)`, 세션 존재 확인 |
+
+> `target_of`는 활성 세션(`SESSION` 변수, 없으면 `SESSION_DEFAULT`)을 존중하여 세션 오버라이드/멀티팀을 지원한다. `team-up.sh`/`dispatch.sh`/`wait-worker.sh`는 `SESSION="${SESSION_OVERRIDE:-...}"`를 설정한 뒤 `target_of`를 호출한다.
 | `team-up.sh [profile]` | 팀 생성 | 프로파일 source → 세션/페인 생성 → 부트스트랩 합본 작성·치환 → 각 페인에서 claude 실행 후 boot 파일 읽기 지시 주입 |
 | `dispatch.sh <worker> <id>` | 작업 배정 | `tasks/<id>.md` 존재 확인 → target 페인 존재 검증 → `TASK <id>` 주입 |
 | `wait-worker.sh <worker> [timeout]` | 완료 대기 | `timeout`으로 감싼 `tmux wait-for done-<worker>-<id>`; 타임아웃 시 capture-pane 덤프 |
