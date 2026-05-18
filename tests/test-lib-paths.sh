@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -uo pipefail
+cd "$(dirname "$0")"
+source ./assert.sh
+
+ROOT="$(cd .. && pwd)"
+source "$ROOT/bin/lib.sh"
+
+assert_eq "$ROOT" "$REPO_ROOT" "REPO_ROOT 가 repo 루트"
+assert_eq "$ROOT/workspace" "$WORKSPACE" "WORKSPACE 경로"
+assert_eq "agents" "$SESSION_DEFAULT" "기본 세션명"
+
+# SESSION 미설정 → SESSION_DEFAULT 폴백
+assert_eq "agents:0.2" "$(target_of 2)" "SESSION 미설정 → 기본 세션"
+assert_eq "agents:0.4" "$(target_of 4)" "페인 인덱스 4 → target"
+
+# SESSION 설정 → 활성 세션 존중 (세션 오버라이드/멀티팀)
+SESSION=myteam
+assert_eq "myteam:0.3" "$(target_of 3)" "SESSION 설정 → 활성 세션 존중"
+unset SESSION
+
+assert_eq "$ROOT/workspace/.boot/dev.md" "$(boot_file dev)" "boot_file 경로"
+
+test_summary
