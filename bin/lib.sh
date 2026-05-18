@@ -8,11 +8,22 @@ REPO_ROOT="$(cd "$_LIB_DIR/.." && pwd)"
 WORKSPACE="$REPO_ROOT/workspace"
 SESSION_DEFAULT="agents"
 
-# 페인 인덱스 → tmux target (session:window.pane). 윈도우는 0 고정.
+# 페인 인덱스 → tmux target (session:window.pane).
+# 윈도우 0 고정 (team-up.sh가 세션 로컬 base-index=0 강제). pane은 1부터(pane-base-index=1).
 # pane 1 은 오케스트레이터, 워커는 2 부터.
 target_of() {
   local idx="$1"
   printf '%s:0.%s' "$SESSION_DEFAULT" "$idx"
+}
+
+# 세션 로컬로 인덱스 규약 고정. 전역 ~/.tmux.conf 설정에 비의존.
+# 인자: 세션명. window base-index=0, pane-base-index=1 강제.
+fix_session_indexing() {
+  local s="$1"
+  tmux set-option -t "$s" base-index 0 2>/dev/null || true
+  tmux set-option -t "$s" pane-base-index 1 2>/dev/null || true
+  # 이미 만들어진 윈도우/페인에도 즉시 반영되도록 재정렬
+  tmux move-window -r -s "$s" 2>/dev/null || true
 }
 
 # 워커 이름 → 부트스트랩 합본 파일 경로
