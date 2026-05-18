@@ -1,0 +1,20 @@
+# 런타임 산출물 — 정의가 아닌 결과물
+workspace/tasks/
+workspace/results/
+workspace/.boot/
+
+# 설계/계획 문서 — git 추적 안 함
+docs/
+
+# 캐시 / OS / 에디터
+*.log
+.DS_Store
+.cache/
+__pycache__/
+*.py[cod]
+.venv/
+node_modules/
+.idea/
+.vscode/
+*.swp
+*~
