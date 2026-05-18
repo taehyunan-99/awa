@@ -49,22 +49,27 @@ fi
 
 tmux select-pane -t "$SESSION:0.1" -T "ORCHESTRATOR"
 
-# 워커 페인 분할
-idx=2
+# 워커 페인 분할.
+# select-layout 재배치로 pane_index 가 바뀌므로 split 직후 영속 pane_id(%N)를
+# -P -F 로 받아 식별한다. 표시용 title 은 셸 escape 로 덮이고 pane_index 는
+# layout 으로 흔들리므로, escape-불변 권위 식별자는 @worker(pane 옵션)로 한다.
+declare -a WORKER_PANE_IDS=()
 for entry in "${WORKERS[@]}"; do
   name="${entry%%:*}"
-  tmux split-window -t "$SESSION:0" -d
+  pid="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
   tmux select-layout -t "$SESSION:0" "$LAYOUT"
-  tmux select-pane -t "$(target_of "$idx")" -T "$name"
-  idx=$((idx + 1))
+  tmux select-pane -t "$pid" -T "$name"
+  tag_worker_pane "$pid" "$name"
+  WORKER_PANE_IDS+=("$pid")
 done
 tmux select-layout -t "$SESSION:0" "$LAYOUT"
 
 # continuum 오염 방지: 이 세션 자동저장 사실상 비활성화
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입
-idx=2
+# 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입.
+# 페인 지정은 split 때 받은 영속 pane_id 사용(pane_index 불안정).
+i=0
 for entry in "${WORKERS[@]}"; do
   name="${entry%%:*}"
   role="${entry##*:}"
@@ -72,12 +77,12 @@ for entry in "${WORKERS[@]}"; do
   cat "$REPO_ROOT/prompts/_common.md" "$REPO_ROOT/prompts/roles/$role.md" \
     | sed "s/{{WORKER_NAME}}/$name/g" > "$bf"
 
-  tgt="$(target_of "$idx")"
+  tgt="${WORKER_PANE_IDS[$i]}"
   tmux send-keys -t "$tgt" -l "$AGENT_CMD"
   tmux send-keys -t "$tgt" Enter
   sleep 0.2
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-  idx=$((idx + 1))
+  i=$((i + 1))
 done
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."

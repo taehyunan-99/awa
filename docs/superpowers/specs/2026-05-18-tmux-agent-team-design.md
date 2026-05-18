@@ -38,6 +38,7 @@ tmux 페인마다 Claude Code 인스턴스를 띄우고 각각에 역할/제약�
 - pane 2~N = 워커. 각각 대화형 `claude` 상주, 부트스트랩 규약 주입됨
 - target-pane은 공식 `session:window.pane` 형식 (`agents:0.<idx>`)
 - **인덱스 규약 (정정)**: 사용자 전역 `~/.tmux.conf`의 `base-index`/`pane-base-index` 설정(예: 둘 다 1)과 무관하게 동작하도록, `team-up.sh`가 세션 생성 직후 해당 세션에 한해 `base-index=0`, `pane-base-index=1`을 세션 로컬로 명시 고정한다(`set-option -t <세션>` + 이미 만들어진 윈도우는 `move-window -r`로 0으로 재정렬). 전역 설정은 절대 변경하지 않으며 다른 세션에 영향이 없다. 따라서 target 형식은 그대로 `<세션>:0.<pane>`, pane 1 = 오케스트레이터, 워커는 pane 2부터.
+- **워커 페인 식별 규약 (정정)**: 워커 페인은 영속 `pane_id`(`%N`)와 pane 사용자 옵션 `@worker=<워커명>`으로 식별한다. `pane_index`는 `select-layout` 재배치로 split 순서와 어긋나고(실측: split 순서 dev,review,test 가 pane_index 4,3,2 로 역전), `pane_title`은 워커 셸의 OSC 0/2 escape(호스트명 등)로 항상 덮인다. tmux의 `allow-rename`/`automatic-rename` 옵션은 **window-name 에만** 적용돼 `pane_title` 덮어쓰기를 막지 못함을 실측 확인했다(tmux 3.6a). 따라서 셸 출력·layout 양쪽에 불변인 `@worker` pane 옵션을 권위 식별자로 한다. `team-up.sh`가 split 직후 `split-window -P -F '#{pane_id}'`로 받은 pane_id 에 `set-option -p @worker <워커명>`을 부여하고, `dispatch.sh`/`wait-worker.sh`는 `tmux list-panes -f '#{==:#{@worker},<워커명>}'`로 pane_id 를 조회해 타깃한다. `select-pane -T <워커명>`은 가독성용 표시로만 유지(권위 아님). 전역 `~/.tmux.conf` 불변.
 - "에이전트"는 tmux 개념이 아님 — 페인에서 claude를 실행하고 역할 프롬프트를 주입해 만들어내는 개념. tmux가 아는 것은 세션/윈도우/페인뿐
 
 ### 3.2 Repo 구조
@@ -184,13 +185,14 @@ tmux wait-for done-<worker>-<id>
 ## 7. 에러 처리
 
 - 모든 스크립트 `set -euo pipefail` (조용한 실패 방지)
-- **워커 부재**: `dispatch.sh`가 `tmux list-panes`로 target 검증, 없으면 즉시 명확한 에러
+- **워커 부재**: `dispatch.sh`/`wait-worker.sh`가 `tmux list-panes -f '#{==:#{@worker},<워커명>}'`로 워커 pane_id 를 조회, 비면 즉시 명확한 에러. pane_title/pane_index 가 아닌 escape·layout 불변의 `@worker` pane 옵션으로 식별(§3.1 워커 페인 식별 규약 참조)
 - **wait-for 무한 대기**: 워커 사망 시 신호가 영영 안 옴 → `wait-worker.sh`를 `timeout` 명령으로 래핑. 타임아웃 시 `capture-pane -p`로 워커 화면 덤프 출력 후 실패 반환 → 오케가 판단
 - **race 안전**: 공식 cmd-wait-for.c 확인 — 워커가 먼저 `-S` 신호 보내도 누락 없음. 채널명을 작업별 유니크(`done-<worker>-<id>`)로 하여 신호 오매칭 방지
 - **결과 파일 없음**: 신호는 왔으나 `results/<id>.md` 부재 → 오케가 실패로 간주, capture-pane으로 원인 확인
 - **중복 실행**: `team-up.sh`가 기존 `agents` 세션 감지 시 중복 생성하지 않고 명확히 안내(attach 또는 team-down 권유)
 - **continuum 오염 방지**: `team-up.sh`가 세션 생성 직후 해당 세션 자동저장을 사실상 비활성화하여, 인터랙티브 claude를 복원 못 하는 resurrect 한계를 우회하고 스크립트를 유일 재생성 경로로 유지
 - **전역 tmux 인덱스 설정 비의존 (세션 로컬 옵션 고정)**: 사용자 전역 `base-index`/`pane-base-index` 값과 무관하게, `team-up.sh`가 세션 로컬로 `base-index=0`/`pane-base-index=1`을 강제하고 `move-window -r`로 기존 윈도우를 재정렬한다. 전역 conf 비침습, `target_of`의 `<세션>:0.<pane>` 가정과 항상 일치
+- **워커 식별 escape·layout 불변 (전제)**: 워커 페인 조회는 `pane_title`/`pane_index`에 의존하지 않는다. `pane_title`은 워커 셸의 OSC 0/2 escape 로 호스트명에 의해 항상 덮이고(tmux 의 allow-rename/automatic-rename 으로 막을 수 없음, window-name 전용 — 실측 확인), `pane_index`는 `select-layout` 재배치로 split 순서와 어긋난다. `team-up.sh`가 split 직후 영속 `pane_id`에 `@worker` pane 옵션을 부여하고, 모든 후속 조회/타깃을 그 식별자로 수행한다(§3.1 워커 페인 식별 규약). 전역 `~/.tmux.conf` 불변
 
 ## 8. 검증 (구현 후 8 케이스)
 
