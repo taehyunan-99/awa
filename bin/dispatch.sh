@@ -29,12 +29,12 @@ fi
 
 # 워커 → 페인 인덱스: pane title 로 찾는다 (team-up 이 title=워커명 설정)
 PANE_IDX=""
-while IFS=' ' read -r pidx ptitle; do
+while IFS=$'\t' read -r pidx ptitle; do
   if [ "$ptitle" = "$WORKER" ]; then
     PANE_IDX="$pidx"
     break
   fi
-done < <(tmux list-panes -t "$SESSION:0" -F '#{pane_index} #{pane_title}')
+done < <(tmux list-panes -t "$SESSION:0" -F $'#{pane_index}\t#{pane_title}')
 
 if [ -z "$PANE_IDX" ]; then
   echo "오류: 워커 '$WORKER' 페인을 찾을 수 없음. 활성 워커: $(tmux list-panes -t "$SESSION:0" -F '#{pane_title}' | tr '\n' ' ')" >&2

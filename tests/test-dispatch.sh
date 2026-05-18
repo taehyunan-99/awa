@@ -20,11 +20,12 @@ echo "# T1: 더미 작업" > "$ROOT/workspace/tasks/T1.md"
 SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/dispatch.sh" dev T1
 assert_eq "0" "$?" "정상 dispatch 성공"
 
-# dev 페인(cat)이 받은 입력 확인: capture-pane
+# dev 워커 페인(cat 더미)에 TASK T1 이 실제 주입됐는지 pane_id 로 확인
+DEV_ID="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{pane_title} #{pane_id}' | awk '$1=="dev"{print $2}')"
 sleep 0.3
-PANE="$(tmux capture-pane -p -t "$SESSION_OVERRIDE:0" -S -50 2>/dev/null || true)"
-# cat 더미라 입력 에코가 페인에 남음. TASK T1 문자열 확인은 pane title 매칭이 핵심이므로
-# 여기서는 종료코드 + 에러경로 위주로 검증한다.
+PANE="$(tmux capture-pane -p -t "$DEV_ID" -S -50 2>/dev/null || true)"
+if printf '%s' "$PANE" | grep -qF 'TASK T1'; then g=0; else g=1; fi
+assert_eq "0" "$g" "dev 페인에 TASK T1 주입 확인"
 
 # 존재하지 않는 작업 파일
 SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/dispatch.sh" dev NOPE
