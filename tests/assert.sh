@@ -31,13 +31,14 @@ assert_contains() {
 }
 
 assert_success() {
-  local msg="${1:-assert_success}"
+  # 직전 명령이 성공(0)했어야 함. 호출자가 $? 를 인자로 넘긴다: assert_success "$?" "메시지"
+  local rc="$1" msg="${2:-assert_success}"
   _TESTS_RUN=$((_TESTS_RUN + 1))
-  if [ "$?" -eq 0 ]; then
+  if [ "$rc" -eq 0 ]; then
     echo "  ok: $msg"
   else
     _TESTS_FAIL=$((_TESTS_FAIL + 1))
-    echo "  FAIL: $msg (exit non-zero)"
+    echo "  FAIL: $msg (expected zero exit, got $rc)"
   fi
 }
 

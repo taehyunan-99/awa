@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-set -uo pipefail
+# 각 test-*.sh 는 마지막에 test_summary 를 호출해 종료코드로 통과/실패를 전달해야 한다.
+set -euo pipefail
 cd "$(dirname "$0")"
 
 total_fail=0
 for t in test-*.sh; do
   [ -e "$t" ] || continue
   echo "=== $t ==="
-  bash "$t"
-  rc=$?
+  rc=0; bash "$t" || rc=$?
   [ "$rc" -ne 0 ] && total_fail=$((total_fail + 1))
 done
 
