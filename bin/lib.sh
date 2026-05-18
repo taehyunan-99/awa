@@ -27,26 +27,6 @@ fix_session_indexing() {
   tmux move-window -r -s "$s" 2>/dev/null || true
 }
 
-# 워커 페인에 escape-불변 식별자(@worker pane 옵션) 부여.
-# spec §6: dispatch/wait-worker 가 워커 페인을 조회한다. pane_title 은
-# 워커 셸의 OSC 0/2 escape(호스트명 등)로 항상 덮이며 tmux 의
-# allow-rename/automatic-rename 은 window-name 에만 적용돼 막을 수 없다(실측).
-# 따라서 셸 출력에 영향받지 않는 pane 사용자 옵션을 권위 식별자로 쓴다.
-# 전역 ~/.tmux.conf 불변.
-tag_worker_pane() {
-  local target="$1" name="$2"
-  tmux set-option -p -t "$target" @worker "$name" 2>/dev/null || true
-}
-
-# @worker 옵션으로 워커 페인의 영속 pane_id(%N) 조회. 없으면 빈 문자열.
-# pane_index 는 select-layout 으로 흔들리므로 pane_id 를 권위 타깃으로 쓴다.
-worker_pane() {
-  local s="${SESSION:-$SESSION_DEFAULT}" name="$1"
-  tmux list-panes -t "$s:0" \
-    -F '#{pane_id}' \
-    -f "#{==:#{@worker},$name}" 2>/dev/null | head -1
-}
-
 # 워커 이름 → 부트스트랩 합본 파일 경로
 boot_file() {
   local worker="$1"

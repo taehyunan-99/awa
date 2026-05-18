@@ -370,23 +370,6 @@ fix_session_indexing() {
   # 이미 만들어진 윈도우/페인에도 즉시 반영되도록 재정렬
   tmux move-window -r -s "$s" 2>/dev/null || true
 }
-
-# 워커 페인에 escape·layout 불변 식별자(@worker pane 옵션) 부여.
-# pane_title 은 워커 셸 OSC 0/2 로 항상 덮이고(allow-rename/automatic-rename
-# 은 window-name 전용이라 못 막음 — 실측), pane_index 는 select-layout 으로
-# split 순서와 어긋난다. 따라서 pane 사용자 옵션을 권위 식별자로 쓴다.
-tag_worker_pane() {
-  local target="$1" name="$2"
-  tmux set-option -p -t "$target" @worker "$name" 2>/dev/null || true
-}
-
-# @worker 옵션으로 워커 페인의 영속 pane_id(%N) 조회. 없으면 빈 문자열.
-worker_pane() {
-  local s="${SESSION:-$SESSION_DEFAULT}" name="$1"
-  tmux list-panes -t "$s:0" \
-    -F '#{pane_id}' \
-    -f "#{==:#{@worker},$name}" 2>/dev/null | head -1
-}
 ```
 
 - [ ] **Step 4: 테스트 통과 확인**
@@ -650,28 +633,6 @@ assert_eq "0" "$?" "세션 생성됨"
 N="$(tmux list-panes -t "$SESSION_OVERRIDE:0" | wc -l | tr -d ' ')"
 assert_eq "4" "$N" "페인 4개"
 
-# spec §3.1/§6 전제: 워커 페인을 escape·layout 불변 @worker 옵션으로 조회 가능해야 함.
-WTAGS="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{@worker}' | tr '\n' ',')"
-assert_contains "$WTAGS" "dev" "@worker 옵션에 dev 부여"
-assert_contains "$WTAGS" "review" "@worker 옵션에 review 부여"
-assert_contains "$WTAGS" "test" "@worker 옵션에 test 부여"
-
-# worker_pane() 로 워커명→영속 pane_id 조회 (dispatch/wait-worker 가 쓰는 경로)
-WP="$(SESSION="$SESSION_OVERRIDE" bash -c 'source "'"$ROOT"'/bin/lib.sh"; worker_pane dev')"
-case "$WP" in %[0-9]*) wpok=0 ;; *) wpok=1 ;; esac
-assert_eq "0" "$wpok" "worker_pane dev → 영속 pane_id(%N) 반환 ($WP)"
-assert_eq "dev" "$(tmux display -t "$WP" -p '#{@worker}')" "조회된 pane_id 의 @worker 가 dev"
-
-# 셸 OSC0 가 pane_title 을 덮어도 @worker 조회는 불변임을 결정적으로 입증.
-tmux respawn-pane -k -t "$WP" "bash --norc -i" 2>/dev/null
-sleep 0.4
-tmux set-option -p -t "$WP" @worker dev
-tmux send-keys -t "$WP" -l 'printf "\033]0;FAKEHOST\007"'; tmux send-keys -t "$WP" Enter
-sleep 0.4
-assert_eq "FAKEHOST" "$(tmux display -t "$WP" -p '#{pane_title}')" "셸 OSC0 가 pane_title 덮음(=title 권위 식별자 불가)"
-WP2="$(SESSION="$SESSION_OVERRIDE" bash -c 'source "'"$ROOT"'/bin/lib.sh"; worker_pane dev')"
-assert_eq "$WP" "$WP2" "title 덮인 뒤에도 @worker 로 dev 조회 정상(동일 pane_id)"
-
 # 부트스트랩 파일이 워커별로 생성되고 치환됨
 assert_eq "0" "$([ -f "$ROOT/workspace/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
 BOOT="$(cat "$ROOT/workspace/.boot/dev.md")"
@@ -757,27 +718,22 @@ fi
 
 tmux select-pane -t "$SESSION:0.1" -T "ORCHESTRATOR"
 
-# 워커 페인 분할.
-# select-layout 재배치로 pane_index 가 split 순서와 어긋나므로 split 직후
-# 영속 pane_id(%N)를 -P -F 로 받아 식별한다. pane_title 은 워커 셸 OSC escape 로
-# 덮이고 pane_index 는 layout 으로 흔들리므로 권위 식별자는 @worker(pane 옵션).
-declare -a WORKER_PANE_IDS=()
+# 워커 페인 분할
+idx=2
 for entry in "${WORKERS[@]}"; do
   name="${entry%%:*}"
-  pid="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+  tmux split-window -t "$SESSION:0" -d
   tmux select-layout -t "$SESSION:0" "$LAYOUT"
-  tmux select-pane -t "$pid" -T "$name"      # 표시용(셸 escape 로 덮일 수 있음)
-  tag_worker_pane "$pid" "$name"             # 권위 식별자(escape·layout 불변)
-  WORKER_PANE_IDS+=("$pid")
+  tmux select-pane -t "$(target_of "$idx")" -T "$name"
+  idx=$((idx + 1))
 done
 tmux select-layout -t "$SESSION:0" "$LAYOUT"
 
 # continuum 오염 방지: 이 세션 자동저장 사실상 비활성화
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입.
-# 페인 지정은 split 때 받은 영속 pane_id 사용(pane_index 불안정).
-i=0
+# 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입
+idx=2
 for entry in "${WORKERS[@]}"; do
   name="${entry%%:*}"
   role="${entry##*:}"
@@ -785,12 +741,12 @@ for entry in "${WORKERS[@]}"; do
   cat "$REPO_ROOT/prompts/_common.md" "$REPO_ROOT/prompts/roles/$role.md" \
     | sed "s/{{WORKER_NAME}}/$name/g" > "$bf"
 
-  tgt="${WORKER_PANE_IDS[$i]}"
+  tgt="$(target_of "$idx")"
   tmux send-keys -t "$tgt" -l "$AGENT_CMD"
   tmux send-keys -t "$tgt" Enter
   sleep 0.2
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-  i=$((i + 1))
+  idx=$((idx + 1))
 done
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
@@ -820,9 +776,9 @@ git commit -m "feat: team-up.sh 세션 생성 + 부트스트랩 주입"
 - Create: `bin/dispatch.sh`
 - Test: `tests/test-dispatch.sh`
 
-`dispatch.sh <worker> <id>`는 (1) `workspace/tasks/<id>.md` 존재 확인, (2) 세션 존재 확인, (3) 워커 이름 → 페인 매핑, (4) 해당 페인에 `TASK <id>` 주입.
+`dispatch.sh <worker> <id>`는 (1) `workspace/tasks/<id>.md` 존재 확인, (2) 세션 존재 확인, (3) 워커 이름 → 페인 인덱스 매핑(현재 활성 프로파일을 어떻게 알 것인가? → `workspace/.boot/<worker>.md` 존재로 워커 유효성 판단하고, 페인은 pane title로 찾는다), (4) 해당 페인에 `TASK <id>` 주입.
 
-> **전제 (정정):** 페인 조회는 `lib.sh`의 `worker_pane <워커명>`을 사용한다. 이는 `tmux list-panes -f '#{==:#{@worker},<워커명>}'`로 영속 `pane_id`를 돌려준다. `pane_title`/`pane_index` 기반 조회는 금지 — `pane_title`은 워커 셸 OSC escape 로 호스트명에 덮이고(tmux allow-rename/automatic-rename 으로 못 막음, window-name 전용 — 실측), `pane_index`는 `select-layout`으로 split 순서와 어긋난다. `team-up.sh`가 split 직후 영속 pane_id 에 `@worker` 옵션을 부여했음을 전제(§3.1 워커 페인 식별 규약, Task 5). 워커 유효성은 `workspace/.boot/<worker>.md` 존재로 보조 판단.
+페인 인덱스는 프로파일을 다시 읽지 않고 `tmux list-panes` + pane_title로 워커 이름을 찾아 동적 해석한다 (team-up이 pane title을 워커명으로 설정함).
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
@@ -854,7 +810,7 @@ assert_eq "0" "$?" "정상 dispatch 성공"
 # dev 페인(cat)이 받은 입력 확인: capture-pane
 sleep 0.3
 PANE="$(tmux capture-pane -p -t "$SESSION_OVERRIDE:0" -S -50 2>/dev/null || true)"
-# cat 더미라 입력 에코가 페인에 남음. 워커 페인 해석은 @worker 옵션 매칭이 핵심이므로
+# cat 더미라 입력 에코가 페인에 남음. TASK T1 문자열 확인은 pane title 매칭이 핵심이므로
 # 여기서는 종료코드 + 에러경로 위주로 검증한다.
 
 # 존재하지 않는 작업 파일
@@ -912,16 +868,23 @@ if [ ! -f "$TASK_FILE" ]; then
   exit 1
 fi
 
-# 워커 → 페인: escape·layout 불변 @worker 옵션으로 영속 pane_id 조회
-# (team-up 이 split 직후 tag_worker_pane 으로 @worker 부여, §3.1).
-TARGET="$(worker_pane "$WORKER")"
-if [ -z "$TARGET" ]; then
-  echo "오류: 워커 '$WORKER' 페인을 찾을 수 없음. 활성 워커: $(tmux list-panes -t "$SESSION:0" -F '#{@worker}' | tr '\n' ' ')" >&2
+# 워커 → 페인 인덱스: pane title 로 찾는다 (team-up 이 title=워커명 설정)
+PANE_IDX=""
+while IFS=' ' read -r pidx ptitle; do
+  if [ "$ptitle" = "$WORKER" ]; then
+    PANE_IDX="$pidx"
+    break
+  fi
+done < <(tmux list-panes -t "$SESSION:0" -F '#{pane_index} #{pane_title}')
+
+if [ -z "$PANE_IDX" ]; then
+  echo "오류: 워커 '$WORKER' 페인을 찾을 수 없음. 활성 워커: $(tmux list-panes -t "$SESSION:0" -F '#{pane_title}' | tr '\n' ' ')" >&2
   exit 1
 fi
 
+TARGET="$SESSION:0.$PANE_IDX"
 send_prompt "$TARGET" "TASK $TASK_ID"
-echo "배정 완료: 워커=$WORKER (pane $TARGET) ← TASK $TASK_ID"
+echo "배정 완료: 워커=$WORKER (pane $PANE_IDX) ← TASK $TASK_ID"
 ```
 
 - [ ] **Step 4: 테스트 통과 확인**
@@ -934,7 +897,7 @@ Expected: 모든 `ok:`, `fail=0`, exit 0
 ```bash
 chmod +x bin/dispatch.sh
 git add bin/dispatch.sh tests/test-dispatch.sh
-git commit -m "feat: dispatch.sh 작업 배정 (@worker 옵션 기반 워커 해석)"
+git commit -m "feat: dispatch.sh 작업 배정 (pane title 기반 워커 해석)"
 ```
 
 ---
@@ -1052,10 +1015,13 @@ else
   rc=$?
   echo "오류: 타임아웃(${TIMEOUT}s) — 채널 '$CHANNEL' 신호 없음 (워커=$WORKER)" >&2
   echo "---- capture-pane (워커 '$WORKER') ----" >&2
-  # 워커 페인 찾아 덤프: @worker 옵션 → 영속 pane_id (§3.1)
-  wp="$(worker_pane "$WORKER")"
-  if [ -n "$wp" ]; then
-    tmux capture-pane -p -t "$wp" -S -40 >&2 2>/dev/null || echo "(페인 캡처 실패)" >&2
+  # 워커 페인 찾아 덤프
+  pidx=""
+  while IFS=' ' read -r pi pt; do
+    [ "$pt" = "$WORKER" ] && { pidx="$pi"; break; }
+  done < <(tmux list-panes -t "$SESSION:0" -F '#{pane_index} #{pane_title}' 2>/dev/null || true)
+  if [ -n "$pidx" ]; then
+    tmux capture-pane -p -t "$SESSION:0.$pidx" -S -40 >&2 2>/dev/null || echo "(페인 캡처 실패)" >&2
   else
     echo "(워커 페인을 찾을 수 없음)" >&2
   fi
@@ -1406,6 +1372,6 @@ Expected: `workspace/results/M1.md`에 SUCCESS/요약 기록됨. spec §8 검증
 
 **2. Placeholder 스캔:** "TBD/TODO/적절히 처리" 없음. 모든 코드 스텝에 완전한 코드 포함. README의 백틱 이스케이프는 명시적 주석으로 처리.
 
-**3. 타입/이름 일관성:** `target_of`, `boot_file`, `send_prompt`, `session_exists`, `tag_worker_pane`, `worker_pane`, `SESSION_OVERRIDE`, `AGENT_CMD`, 채널명 `done-<worker>-<id>`, **@worker pane 옵션=워커명 규약** — Task 2~9 전반에서 동일하게 사용됨. team-up이 split 직후 영속 pane_id 에 부여한 `@worker`를 dispatch/wait-worker가 `worker_pane`로 동일 키 조회 → escape·layout 불변 일관(pane_title/pane_index 비의존, §3.1).
+**3. 타입/이름 일관성:** `target_of`, `boot_file`, `send_prompt`, `session_exists`, `SESSION_OVERRIDE`, `AGENT_CMD`, 채널명 `done-<worker>-<id>`, pane title=워커명 규약 — Task 2~9 전반에서 동일하게 사용됨. team-up이 설정한 pane title을 dispatch/wait-worker가 동일 키로 조회 → 일관.
 
 수정 사항 없음.
