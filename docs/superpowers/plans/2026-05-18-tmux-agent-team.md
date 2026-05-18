@@ -595,12 +595,37 @@ git commit -m "feat: 프로파일 3종 + 공통/역할 프롬프트 정의"
 ## Task 5: team-up.sh — 세션/페인 생성 + 부트스트랩 주입
 
 **Files:**
+- Modify: `bin/lib.sh` (`fix_session_titles()` 추가)
 - Create: `bin/team-up.sh`
 - Test: `tests/test-team-up.sh`
 
-`team-up.sh [profile]`은 (1) 프로파일 source, (2) 기존 세션 있으면 거부, (3) 오케 페인 1개로 세션 생성, (4) 워커 수만큼 페인 분할 + 레이아웃 적용, (5) 워커별 부트스트랩 합본을 `{{WORKER_NAME}}` 치환해 `workspace/.boot/<worker>.md`에 작성, (6) 각 워커 페인에서 claude 실행 후 boot 파일 읽기 지시 주입.
+`team-up.sh [profile]`은 (1) 프로파일 source, (2) 기존 세션 있으면 거부, (3) 오케 페인 1개로 세션 생성, (4) 세션 로컬 인덱스/title 고정(`allow-set-title off`), (5) 워커 수만큼 `split-window -P -F '#{pane_id}'`로 페인 분할하며 영속 pane_id 캡처 → 그 pane_id로 pane title=워커명 설정, 모든 split 후 레이아웃 1회 적용, (6) 워커별 부트스트랩 합본을 `{{WORKER_NAME}}` 치환해 `workspace/.boot/<worker>.md`에 작성, (7) 캡처한 pane_id 타겟으로 각 워커 페인에서 claude 실행 후 boot 파일 읽기 지시 주입. pane_id 기반이라 `select-layout`의 index 재배열에 면역(이전 index 기반 주소지정 버그 제거).
+
+`fix_session_titles()`(lib.sh)는 세션 로컬로 **`allow-set-title off`**(결정타: 워커 셸의 OSC `\e]0;..`/`\e]2;..` pane title escape 차단)를 고정하고, `allow-rename off`/`automatic-rename off`(window-name 전용 보강, 무해)도 함께 고정한다(전역 `~/.tmux.conf` 불변, 실측 검증: `allow-set-title off` 시 OSC0 escape 후에도 `pane_title` 보존됨). dispatch/wait-worker 의 title 기반 워커 조회(spec §6) 전제를 충족한다.
 
 claude 실행 명령은 환경변수 `AGENT_CMD`로 오버라이드 가능하게 한다(기본 `claude`, 테스트는 더미로 치환).
+
+- [ ] **Step 0: lib.sh 에 `fix_session_titles()` 추가**
+
+`fix_session_indexing()` 바로 다음 위치에 추가:
+
+```bash
+# 세션 로컬로 pane title 자동 리네임 비활성화. 전역 ~/.tmux.conf 불변.
+# spec §6: dispatch/wait-worker 가 pane title=워커명으로 워커를 조회하므로,
+# 워커 셸의 OSC title escape 가 select-pane -T 로 지정한 title 을
+# 덮어쓰지 못하도록 세션 로컬로 고정한다.
+# tmux 3.6a 실측 + man tmux 근거:
+#   - allow-rename  : \ek..\e\\ (window-name) 전용 — pane_title 에 무력
+#   - allow-set-title: \e]0;..\007 / \e]2;..\007 (pane title) 차단 ← 결정타
+# 따라서 pane_title 보존의 결정타는 allow-set-title off.
+# allow-rename/automatic-rename off 는 window-name 전용 보강(무해)으로 함께 고정.
+fix_session_titles() {
+  local s="$1"
+  tmux set-option -t "$s" allow-set-title off 2>/dev/null || true
+  tmux set-option -t "$s" allow-rename off 2>/dev/null || true
+  tmux set-option -t "$s" automatic-rename off 2>/dev/null || true
+}
+```
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 
@@ -632,6 +657,28 @@ assert_eq "0" "$?" "세션 생성됨"
 # 페인 4개 (오케1 + 워커3)
 N="$(tmux list-panes -t "$SESSION_OVERRIDE:0" | wc -l | tr -d ' ')"
 assert_eq "4" "$N" "페인 4개"
+
+# 워커 title 결정적 검증: split-window -P 로 캡처한 pane_id 로 title 설정하므로
+# select-layout 의 index 재배열과 무관하게 dev/review/test 가 정확히 걸려야 하고,
+# 호스트명/기본값 title 이 섞이지 않아야 함 (layout 무관, pane_id 기반).
+TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{pane_title}' | sort | tr '\n' ',')"
+assert_contains "$TITLES" "dev" "워커 title dev 설정됨(layout 무관, pane_id 기반)"
+assert_contains "$TITLES" "review" "워커 title review 설정됨"
+assert_contains "$TITLES" "test" "워커 title test 설정됨"
+assert_contains "$TITLES" "ORCHESTRATOR" "오케 title 설정됨"
+
+# title 보존 결정적 검증: 워커 페인을 실제 셸로 띄워 OSC0 escape 를 흘려도
+# allow-set-title off 덕에 select-pane -T 로 준 title 이 유지돼야 함 (spec §6 전제).
+# 주의: respawn 이 pane 을 갈아끼우므로 위 title 집합 검증보다 반드시 뒤에 둔다.
+TGT="$SESSION_OVERRIDE:0.2"
+tmux respawn-pane -k -t "$TGT" bash
+sleep 0.3
+tmux select-pane -t "$TGT" -T "dev"
+tmux send-keys -t "$TGT" -l 'printf "\033]0;HOSTNAME_FAKE\007"'
+tmux send-keys -t "$TGT" Enter
+sleep 0.5
+T2="$(tmux display-message -p -t "$TGT" '#{pane_title}')"
+assert_eq "dev" "$T2" "allow-set-title off: OSC title escape 후에도 pane_title 보존"
 
 # 부트스트랩 파일이 워커별로 생성되고 치환됨
 assert_eq "0" "$([ -f "$ROOT/workspace/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
@@ -716,24 +763,37 @@ if [ "$_w" != "0" ]; then
   exit 1
 fi
 
-tmux select-pane -t "$SESSION:0.1" -T "ORCHESTRATOR"
+# pane title 자동 리네임 세션 로컬 off: 워커 셸의 OSC title escape 가
+# select-pane -T 로 지정한 워커명 title 을 덮어쓰지 못하게 함 (spec §6 전제).
+fix_session_titles "$SESSION"
 
-# 워커 페인 분할
-idx=2
+# 오케스트레이터 페인의 영속 pane_id 캡처 후 id 로 title 설정.
+ORCH_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
+tmux select-pane -t "$ORCH_PID" -T "ORCHESTRATOR"
+
+# 워커 페인 분할.
+# split-window -P -F '#{pane_id}' 로 새 페인의 영속 pane_id(%N) 를 즉시 캡처.
+# pane_id 는 select-layout 의 pane index 재배열에도 불변이므로,
+# title 설정·부트스트랩 주입을 모두 이 id 로 수행해 index 재배열에 면역.
+# bash 3.2(macOS 기본) 는 연관배열 미지원 → 인덱스 정렬 일반 배열 2개 사용.
+WORKER_NAMES=()
+WORKER_PIDS=()
 for entry in "${WORKERS[@]}"; do
   name="${entry%%:*}"
-  tmux split-window -t "$SESSION:0" -d
-  tmux select-layout -t "$SESSION:0" "$LAYOUT"
-  tmux select-pane -t "$(target_of "$idx")" -T "$name"
-  idx=$((idx + 1))
+  pid="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+  tmux select-pane -t "$pid" -T "$name"
+  WORKER_NAMES+=("$name")
+  WORKER_PIDS+=("$pid")
 done
+# 모든 split 완료 후 layout 한 번만 적용 (pane_id 방식이라 순서 무관·안전).
 tmux select-layout -t "$SESSION:0" "$LAYOUT"
 
 # continuum 오염 방지: 이 세션 자동저장 사실상 비활성화
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입
-idx=2
+# 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입.
+# 타겟은 split 단계에서 캡처한 pane_id (index 재배열 면역).
+i=0
 for entry in "${WORKERS[@]}"; do
   name="${entry%%:*}"
   role="${entry##*:}"
@@ -741,12 +801,12 @@ for entry in "${WORKERS[@]}"; do
   cat "$REPO_ROOT/prompts/_common.md" "$REPO_ROOT/prompts/roles/$role.md" \
     | sed "s/{{WORKER_NAME}}/$name/g" > "$bf"
 
-  tgt="$(target_of "$idx")"
+  tgt="${WORKER_PIDS[$i]}"
   tmux send-keys -t "$tgt" -l "$AGENT_CMD"
   tmux send-keys -t "$tgt" Enter
   sleep 0.2
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-  idx=$((idx + 1))
+  i=$((i + 1))
 done
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
@@ -764,8 +824,8 @@ Expected: 모든 `ok:`, `fail=0`, exit 0
 
 ```bash
 chmod +x bin/team-up.sh
-git add bin/team-up.sh tests/test-team-up.sh
-git commit -m "feat: team-up.sh 세션 생성 + 부트스트랩 주입"
+git add bin/lib.sh bin/team-up.sh tests/test-team-up.sh
+git commit -m "feat: team-up.sh 세션 생성 + 부트스트랩 주입 (세션 로컬 rename off 포함)"
 ```
 
 ---
@@ -778,7 +838,7 @@ git commit -m "feat: team-up.sh 세션 생성 + 부트스트랩 주입"
 
 `dispatch.sh <worker> <id>`는 (1) `workspace/tasks/<id>.md` 존재 확인, (2) 세션 존재 확인, (3) 워커 이름 → 페인 인덱스 매핑(현재 활성 프로파일을 어떻게 알 것인가? → `workspace/.boot/<worker>.md` 존재로 워커 유효성 판단하고, 페인은 pane title로 찾는다), (4) 해당 페인에 `TASK <id>` 주입.
 
-페인 인덱스는 프로파일을 다시 읽지 않고 `tmux list-panes` + pane_title로 워커 이름을 찾아 동적 해석한다 (team-up이 pane title을 워커명으로 설정함).
+페인 인덱스는 프로파일을 다시 읽지 않고 `tmux list-panes` + pane_title로 워커 이름을 찾아 동적 해석한다. 전제: dispatch/wait-worker는 pane title=워커명으로 조회하며, team-up이 `allow-set-title off`로 title을 보존하고 `split-window -P`의 pane_id로 정확히 설정하므로 layout 재배열·OSC escape 와 무관하게 안정적이다.
 
 - [ ] **Step 1: 실패하는 테스트 작성**
 

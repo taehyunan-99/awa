@@ -38,6 +38,7 @@ tmux 페인마다 Claude Code 인스턴스를 띄우고 각각에 역할/제약�
 - pane 2~N = 워커. 각각 대화형 `claude` 상주, 부트스트랩 규약 주입됨
 - target-pane은 공식 `session:window.pane` 형식 (`agents:0.<idx>`)
 - **인덱스 규약 (정정)**: 사용자 전역 `~/.tmux.conf`의 `base-index`/`pane-base-index` 설정(예: 둘 다 1)과 무관하게 동작하도록, `team-up.sh`가 세션 생성 직후 해당 세션에 한해 `base-index=0`, `pane-base-index=1`을 세션 로컬로 명시 고정한다(`set-option -t <세션>` + 이미 만들어진 윈도우는 `move-window -r`로 0으로 재정렬). 전역 설정은 절대 변경하지 않으며 다른 세션에 영향이 없다. 따라서 target 형식은 그대로 `<세션>:0.<pane>`, pane 1 = 오케스트레이터, 워커는 pane 2부터.
+- **title 규약 (정정·실측 검증)**: 워커 식별 권위는 pane title=워커명. dispatch/wait-worker 가 pane title=워커명으로 워커를 조회한다(§6). `team-up.sh` 는 워커 페인을 `tmux split-window -P -F '#{pane_id}'` 로 만들면서 새 페인의 **영속 pane_id(`%N`)** 를 즉시 캡처하고, 그 pane_id 로 `select-pane -T <워커명>` title 설정과 부트스트랩 주입(`send-keys`)을 수행한다. pane_id 는 `select-layout` 의 pane index 재배열에도 불변이므로 layout 재배열에 면역이다(이전 index 기반 주소지정 버그를 제거). title 보존의 결정타는 `team-up.sh` 가 세션 생성 직후 세션 로컬로 고정하는 **`allow-set-title off`** — 워커 셸의 OSC `\e]0;..\007`/`\e]2;..` title escape 를 차단한다. `allow-rename off`/`automatic-rename off` 는 window-name 전용 보강(무해)으로 함께 고정. 전역 `~/.tmux.conf` 는 불변이며 다른 세션에 영향이 없다(실측 검증: `allow-set-title off` 시 OSC 0 escape 후에도 `pane_title` 보존됨).
 - "에이전트"는 tmux 개념이 아님 — 페인에서 claude를 실행하고 역할 프롬프트를 주입해 만들어내는 개념. tmux가 아는 것은 세션/윈도우/페인뿐
 
 ### 3.2 Repo 구조
@@ -173,10 +174,10 @@ tmux wait-for done-<worker>-<id>
 
 | 스크립트 | 책임 | 핵심 동작 |
 |---|---|---|
-| `lib.sh` | 공통 함수 | `send_prompt()`, `target_of(idx)`, `boot_file(worker)`, 세션 존재 확인 |
+| `lib.sh` | 공통 함수 | `send_prompt()`, `target_of(idx)`, `boot_file(worker)`, 세션 존재 확인, `fix_session_titles()`(세션 로컬 `allow-set-title off` 결정타 + rename off 보강) |
 
 > `target_of`는 활성 세션(`SESSION` 변수, 없으면 `SESSION_DEFAULT`)을 존중하여 세션 오버라이드/멀티팀을 지원한다. `team-up.sh`/`dispatch.sh`/`wait-worker.sh`는 `SESSION="${SESSION_OVERRIDE:-...}"`를 설정한 뒤 `target_of`를 호출한다.
-| `team-up.sh [profile]` | 팀 생성 | 프로파일 source → 세션/페인 생성 → 부트스트랩 합본 작성·치환 → 각 페인에서 claude 실행 후 boot 파일 읽기 지시 주입 |
+| `team-up.sh [profile]` | 팀 생성 | 프로파일 source → 세션 생성 → 인덱스 고정 → `fix_session_titles`(allow-set-title off) → `split-window -P -F '#{pane_id}'`로 워커 페인 생성·**영속 pane_id 캡처** → 그 pane_id로 title=워커명 설정·부트스트랩 합본 작성·치환·주입. pane_id 기반이라 `select-layout`의 index 재배열에 면역. dispatch/wait-worker는 pane title=워커명으로 워커를 조회한다(team-up이 allow-set-title off로 보존, pane_id로 정확 설정) |
 | `dispatch.sh <worker> <id>` | 작업 배정 | `tasks/<id>.md` 존재 확인 → target 페인 존재 검증 → `TASK <id>` 주입 |
 | `wait-worker.sh <worker> [timeout]` | 완료 대기 | `timeout`으로 감싼 `tmux wait-for done-<worker>-<id>`; 타임아웃 시 capture-pane 덤프 |
 | `team-down.sh` | 정리 | 세션 kill, `workspace/.boot/` 정리 |
@@ -191,6 +192,8 @@ tmux wait-for done-<worker>-<id>
 - **중복 실행**: `team-up.sh`가 기존 `agents` 세션 감지 시 중복 생성하지 않고 명확히 안내(attach 또는 team-down 권유)
 - **continuum 오염 방지**: `team-up.sh`가 세션 생성 직후 해당 세션 자동저장을 사실상 비활성화하여, 인터랙티브 claude를 복원 못 하는 resurrect 한계를 우회하고 스크립트를 유일 재생성 경로로 유지
 - **전역 tmux 인덱스 설정 비의존 (세션 로컬 옵션 고정)**: 사용자 전역 `base-index`/`pane-base-index` 값과 무관하게, `team-up.sh`가 세션 로컬로 `base-index=0`/`pane-base-index=1`을 강제하고 `move-window -r`로 기존 윈도우를 재정렬한다. 전역 conf 비침습, `target_of`의 `<세션>:0.<pane>` 가정과 항상 일치
+- **pane title 훼손 방지 (세션 로컬 `allow-set-title off`)**: dispatch/wait-worker 가 pane title=워커명으로 워커를 조회하므로, `team-up.sh`가 세션 로컬로 `allow-set-title off`(결정타: 워커 셸의 OSC `\e]0;..`/`\e]2;..` pane title escape 차단)를 고정한다. `allow-rename off`/`automatic-rename off`는 window-name 전용 보강(무해)으로 함께 고정. 전역 `~/.tmux.conf` 불변(실측 검증: `allow-set-title off` 시 OSC0 escape 후에도 `pane_title` 보존)
+- **layout 재배열 면역 (pane_id 기반 주소지정)**: `team-up.sh`가 워커 페인을 `split-window -P -F '#{pane_id}'`로 만들며 영속 pane_id를 캡처해 배열에 저장, title 설정·부트스트랩 주입을 모두 그 pane_id로 수행한다. `select-layout`이 pane index를 재배열해도 pane_id는 불변이므로 dev/review/test title이 정확한 페인에 안정적으로 걸린다(이전 index 기반 주소지정 버그 제거)
 
 ## 8. 검증 (구현 후 8 케이스)
 
