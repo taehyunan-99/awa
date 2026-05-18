@@ -20,3 +20,16 @@ boot_file() {
   local worker="$1"
   printf '%s/.boot/%s.md' "$WORKSPACE" "$worker"
 }
+
+# 세션 존재 여부. 존재하면 0, 아니면 비-0.
+session_exists() {
+  local s="${1:-$SESSION_DEFAULT}"
+  tmux has-session -t "$s" 2>/dev/null
+}
+
+# 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
+send_prompt() {
+  local target="$1" text="$2"
+  tmux send-keys -t "$target" -l "$text"
+  tmux send-keys -t "$target" Enter
+}
