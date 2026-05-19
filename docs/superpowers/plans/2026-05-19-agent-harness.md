@@ -39,7 +39,7 @@ git branch --show-current   # feat/agent-harness 확인
 | `prompts/roles/reviewer-{spec,quality,arch}.md` | 관점별 리뷰어 + `/loop`·커서 규약 | T10 |
 | `prompts/roles/orchestrator.md` | 책임 9개 + 워커 카탈로그 + 단계전이 금지 + `.harness-state` | T10 |
 | `prompts/loop/{orchestrator,reviewer}.md` | `/loop`에 주입할 dynamic 감시 프롬프트 본문 | T10 |
-| `workspace/.claude/settings.json` | PostToolUse hook 정의 | T6 |
+| `workspace/.claude/settings.json.tpl` | PostToolUse hook 정의 템플릿(team-up 이 `<repo>/.claude/settings.json` 으로 치환 생성) | T6 |
 | `tests/test-*.sh` (12 신규) | 메커니즘 검증 | 각 태스크 |
 | `tests/probes/probe-{loop,hook}.sh` | claude 기동 실측 | T1 |
 | `tests/run-all.sh` | 신규 스위트 등록 | 각 태스크 |
@@ -151,6 +151,16 @@ tmux send-keys -t "$S" Enter
 echo "[probe-hook] claude 기동 35s 대기..."
 sleep 35
 
+# cwd·CLAUDE_PROJECT_DIR 진단: settings.json 을 어디 둬야 claude 가 읽는지,
+# hook 안에서 CLAUDE_PROJECT_DIR 이 무엇으로 잡히는지 확인 (T6 경로 확정 근거).
+# hook command 가 진단도 같이 기록하도록 settings.json 에 PWD·CLAUDE_PROJECT_DIR echo 추가됨(위 JSON 의 echo 라인이 그 역할 — NOENV 자리에 진단 가능). 추가로:
+tmux send-keys -t "$S" -l "run: pwd; echo CLAUDE_PROJECT_DIR=\$CLAUDE_PROJECT_DIR"
+sleep 1
+tmux send-keys -t "$S" Enter
+sleep 8
+echo "[probe-hook] cwd·CLAUDE_PROJECT_DIR 진단 (pane 덤프):"
+tmux capture-pane -t "$S" -p | grep -E 'CLAUDE_PROJECT_DIR|/tmp/probe_hook' | tail -5
+
 tmux send-keys -t "$S" -l "make a file named hello.txt with content hi using the Write tool"
 sleep 1
 tmux send-keys -t "$S" Enter
@@ -160,12 +170,12 @@ sleep 60
 if grep -q "hello.txt" "$WS/events.log" 2>/dev/null; then
   echo "[probe-hook] events.log 기록됨:"; cat "$WS/events.log"
   if grep -q "probeworker" "$WS/events.log"; then
-    echo "[probe-hook] PASS (hook 적용 + HARNESS_WORKER 전달)"; exit 0
+    echo "[probe-hook] PASS (hook 적용 + HARNESS_WORKER 전달). 위 cwd·CLAUDE_PROJECT_DIR 진단을 T6 settings.json 경로에 반영하라."; exit 0
   else
-    echo "[probe-hook] PARTIAL — hook 적용되나 HARNESS_WORKER 미전달(NOENV). 폴백 설계 필요"; exit 2
+    echo "[probe-hook] PARTIAL — hook 적용되나 HARNESS_WORKER 미전달(NOENV). T6 에서 워커명을 pane title 조회로 대체"; exit 2
   fi
 else
-  echo "[probe-hook] FAIL — hook 미적용. spec §5.6 폴백 발동:"; tmux capture-pane -t "$S" -p | tail -30; exit 1
+  echo "[probe-hook] FAIL — hook 미적용(또는 settings.json 위치 부적합 — 위 cwd 진단 확인). spec §5.6 폴백 발동:"; tmux capture-pane -t "$S" -p | tail -30; exit 1
 fi
 ```
 
@@ -453,13 +463,13 @@ Expected: 기존 PASS (변경 전 기준선 확보)
 
 - [ ] **Step 2: `bin/dispatch.sh` 수정 — resolve_session + window 0/1 조회**
 
-`bin/dispatch.sh:7` 교체:
+`bin/dispatch.sh:7` (`SESSION="${SESSION_OVERRIDE:-$SESSION_DEFAULT}"`) 교체:
 
 ```bash
 SESSION="$(resolve_session)"
 ```
 
-`bin/dispatch.sh:31-42` (워커→페인 조회 블록)을 window 0·1 양쪽 조회로 교체:
+`bin/dispatch.sh:30-42` (`# 워커 → 페인 인덱스` 주석부터 `done < <(tmux list-panes ...)` 까지의 조회 블록)을 window 0·1 양쪽 조회로 교체:
 
 ```bash
 # 워커/리뷰어 → 페인: window 0(team)·1(review) 양쪽에서 pane title 로 찾는다.
@@ -484,17 +494,35 @@ if [ -z "$TARGET" ]; then
 fi
 ```
 
-`bin/dispatch.sh` 마지막의 `TARGET="$SESSION:0.$PANE_IDX"` 줄은 위 블록이 TARGET을 직접 만들므로 **삭제**. `send_prompt "$TARGET" "TASK $TASK_ID"`는 유지.
+`bin/dispatch.sh:44` 의 `TARGET="$SESSION:0.$PANE_IDX"` 와 `PANE_IDX=""`/`if [ -z "$PANE_IDX" ]...` 잔여 코드는 위 블록이 TARGET을 직접 만들므로 **삭제**(중복 조회·죽은 변수 제거). 마지막 `send_prompt "$TARGET" "TASK $TASK_ID"`와 `echo` 는 유지(단 echo 의 `pane $PANE_IDX` 표현은 `$TARGET` 으로 교체).
 
-- [ ] **Step 3: `bin/wait-worker.sh` 수정 — resolve_session**
+- [ ] **Step 3: `bin/wait-worker.sh` 수정 — resolve_session + capture-pane window 0/1 (이슈 1)**
 
-`bin/wait-worker.sh`에서 `SESSION="${SESSION_OVERRIDE:-$SESSION_DEFAULT}"` 형태의 줄을 찾아 다음으로 교체:
+`bin/wait-worker.sh:7` (`SESSION="${SESSION_OVERRIDE:-$SESSION_DEFAULT}"`) 교체:
 
 ```bash
 SESSION="$(resolve_session)"
 ```
 
-(wait-worker.sh는 wait-for 시그널만 쓰므로 window 조회 불필요 — 세션명 일치만 필요)
+**또한** `bin/wait-worker.sh:59-68` 의 타임아웃 시 capture-pane 블록도 `tmux list-panes -t "$SESSION:0"`(window 0 고정)을 쓴다 — 리뷰어(window 1) 대상 wait 시 pane 을 못 찾는다. 이 블록을 window 0·1 양쪽 조회로 교체:
+
+```bash
+  tgt=""
+  for win in 0 1; do
+    tmux list-windows -t "$SESSION" -F '#{window_index}' 2>/dev/null | grep -qx "$win" || continue
+    while IFS=$'\t' read -r pi pt; do
+      [ "$pt" = "$WORKER" ] && { tgt="$SESSION:$win.$pi"; break; }
+    done < <(tmux list-panes -t "$SESSION:$win" -F $'#{pane_index}\t#{pane_title}' 2>/dev/null || true)
+    [ -n "$tgt" ] && break
+  done
+  if [ -n "$tgt" ]; then
+    tmux capture-pane -p -t "$tgt" -S -40 >&2 2>/dev/null || echo "(페인 캡처 실패)" >&2
+  else
+    echo "(워커/리뷰어 페인을 찾을 수 없음)" >&2
+  fi
+```
+
+(기존 `pidx` 기반 블록 전체를 위로 대체. wait-for 시그널 자체는 세션 전역이라 window 무관 — capture-pane 만 window 조회 필요)
 
 - [ ] **Step 4: 회귀 + 신규 검증**
 
@@ -521,7 +549,7 @@ git commit -m "feat: dispatch/wait-worker resolve_session·2윈도우 조회 (�
 
 **Files:**
 - Create: `bin/log-event.sh`
-- Create: `workspace/.claude/settings.json`
+- Create: `workspace/.claude/settings.json.tpl` (git 커밋 템플릿; 런타임 `<repo>/.claude/settings.json` 은 T8 team-up 생성물·gitignore)
 - Test: `tests/test-log-event.sh`
 - Modify: `tests/run-all.sh`
 
@@ -603,7 +631,13 @@ printf '%s\t%s\t%s\t%s\t%s\n' "$ts" "$worker" "$task" "modify" "$rel" >> "$EVENT
 Run: `chmod +x bin/log-event.sh && bash tests/test-log-event.sh`
 Expected: PASS — `ran=5 fail=0`
 
-- [ ] **Step 5: `workspace/.claude/settings.json` 작성**
+- [ ] **Step 5: settings.json 위치·경로 확정 (T1 probe-hook 진단 반영)**
+
+**선결**: T1 probe-hook 의 "cwd·CLAUDE_PROJECT_DIR 진단" 출력을 확인한다. 두 가지가 settings.json 설계를 좌우한다:
+1. **claude 가 어느 `.claude/settings.json` 을 읽는가** — cwd 기준인가, 특정 루트인가. team-up.sh 가 워커 pane 을 띄울 때 **cwd 를 repo 루트로 명시**(`cd "$REPO_ROOT" && ... claude`)하면 `$REPO_ROOT/.claude/settings.json` 이 일관되게 적용된다. 1차 team-up.sh 는 cwd 미설정이므로 **T8 에서 워커·메인·리뷰어 기동 명령에 `cd "$REPO_ROOT" &&` 를 앞에 붙이는 수정이 필요**(이 Step 의 산물을 T8 이 사용).
+2. **`CLAUDE_PROJECT_DIR` 실측값** — probe 진단에서 이게 repo 루트로 잡히면 아래 경로 그대로, 아니면 진단값에 맞춰 `EVENTS_LOG`/`REPO_ROOT` 를 절대경로(team-up 이 settings.json 을 생성 시 `$REPO_ROOT` 치환)로 바꾼다.
+
+settings.json 위치는 **`<repo루트>/.claude/settings.json`** (workspace 아래가 아님 — cwd=repo루트 전제). 내용:
 
 ```json
 {
@@ -614,7 +648,7 @@ Expected: PASS — `ran=5 fail=0`
         "hooks": [
           {
             "type": "command",
-            "command": "EVENTS_LOG=\"$CLAUDE_PROJECT_DIR/../workspace/events.log\" REPO_ROOT=\"$CLAUDE_PROJECT_DIR/..\" bash \"$CLAUDE_PROJECT_DIR/../bin/log-event.sh\""
+            "command": "EVENTS_LOG=\"__REPO__/workspace/events.log\" REPO_ROOT=\"__REPO__\" bash \"__REPO__/bin/log-event.sh\""
           }
         ]
       }
@@ -623,7 +657,11 @@ Expected: PASS — `ran=5 fail=0`
 }
 ```
 
-주의: 실제 `EVENTS_LOG`/`REPO_ROOT` 경로는 T1 probe-hook에서 확인된 `CLAUDE_PROJECT_DIR` 실측값에 맞춘다. probe-hook이 PARTIAL이었으면 워커명을 `log-event.sh`가 `tmux display-message -p '#{pane_title}'`로 조회하도록 Step 3 스크립트에 분기 추가.
+`__REPO__` 는 team-up.sh 가 세션 가동 시 실제 `$REPO_ROOT` 절대경로로 치환해 `<repo루트>/.claude/settings.json` 으로 출력한다(`.claude/settings.json` 자체는 git 에 커밋하지 않고 team-up 이 생성 — 절대경로라 머신 의존). git 에는 템플릿 `workspace/.claude/settings.json.tpl` 로 `__REPO__` 플레이스홀더 형태를 커밋.
+
+- 파일 경로 정정: Create 대상은 `workspace/.claude/settings.json.tpl`(템플릿, git 커밋). 런타임 `<repo>/.claude/settings.json` 은 team-up 생성물(gitignore).
+- probe-hook 이 **PARTIAL**(HARNESS_WORKER 미전달)이면 `bin/log-event.sh` 가 워커명을 env 대신 `tmux display-message -p '#{pane_title}'` 로 조회하도록 Step 3 스크립트에 분기 추가.
+- probe-hook 이 **FAIL**(hook 미적용)이면 여기서 멈추고 BLOCKED 보고 — spec §5.6 폴백(워커 프롬프트 규칙 주경로 + 리뷰어 done 시 results diff 역추적)으로 T6·T7 재설계, 사용자 결정 대기.
 
 - [ ] **Step 6: run-all.sh 등록 + 회귀**
 
@@ -634,7 +672,8 @@ Expected: 전체 PASS
 - [ ] **Step 7: Commit**
 
 ```bash
-git add bin/log-event.sh workspace/.claude/settings.json tests/test-log-event.sh tests/run-all.sh
+git add bin/log-event.sh workspace/.claude/settings.json.tpl tests/test-log-event.sh tests/run-all.sh
+echo ".claude/settings.json" >> .gitignore && git add .gitignore
 git commit -m "feat: log-event.sh + PostToolUse hook events.log 결정적 기록 (이슈 6)"
 ```
 
@@ -738,11 +777,14 @@ trap cleanup EXIT
 
 # 임시 프로파일: WORKERS + REVIEWERS + 모델
 PROF="$(mktemp -d)/p.sh"
+# 역할명은 실존 프롬프트(dev/tester) 사용. 리뷰어 역할은 reviewer-quality
+# (T10 이전엔 roles/reviewer-quality.md 없음 → team-up 의 boot 합본은
+#  head -1 / cat 이 파일 없으면 빈 출력일 뿐 가동 자체는 성공해야 함).
 cat > "$PROF" <<EOF
 SESSION="$S"
 LAYOUT="tiled"
-WORKERS=("dev:dev:opus" "test:tester")
-REVIEWERS=("qual:quality:haiku")
+WORKERS=("dev:dev" "test:tester")
+REVIEWERS=("qual:reviewer-quality:haiku")
 ORCHESTRATOR_MODEL="opus"
 EOF
 
@@ -777,6 +819,21 @@ Expected: FAIL — review 윈도우 미생성, REVIEWERS 미처리
 # 프로파일이 정의한 SESSION 을 resolve_session 체인에 노출 (이슈 2, T2).
 export PROFILE_SESSION="${SESSION:-}"
 SESSION="$(resolve_session)"
+```
+
+- [ ] **Step 3b: `bin/team-up.sh` — settings.json 치환 생성 (T6 템플릿 → 런타임)**
+
+세션 생성 직후·pane 기동 전에, T6 템플릿을 repo 루트에 실경로로 치환 생성:
+
+```bash
+# PostToolUse hook 설정을 머신 절대경로로 치환해 생성 (T6, 이슈 6·7).
+# claude 는 cwd(=repo 루트, 아래 Step 7 에서 cd 보장) 기준 .claude/settings.json 을 읽음.
+if [ -f "$REPO_ROOT/workspace/.claude/settings.json.tpl" ]; then
+  mkdir -p "$REPO_ROOT/.claude"
+  sed "s#__REPO__#$REPO_ROOT#g" \
+    "$REPO_ROOT/workspace/.claude/settings.json.tpl" \
+    > "$REPO_ROOT/.claude/settings.json"
+fi
 ```
 
 - [ ] **Step 4: `bin/team-up.sh` — `pane:역할:모델` 파싱 헬퍼**
@@ -816,9 +873,12 @@ tmux send-keys -t "$tgt" Enter
 
 워커 split 루프·`select-layout` 다음, 부트스트랩 루프 전에 추가:
 
+team-up.sh:2 는 `set -euo pipefail`(set -u) 다. bash 3.2(macOS)에서 미정의/빈 배열 참조는 `set -u` 로 즉시 에러나므로, 가드는 **존재 확인을 먼저**(`${REVIEWERS+x}`) 한 뒤에만 `${#REVIEWERS[@]}` 를 평가해야 한다(단락 평가). `${#REVIEWERS[@]:-0}` 식은 bash 3.2 빈 배열에서 오작동 → 사용 금지.
+
 ```bash
-# review 윈도우(window 1) 생성 — REVIEWERS 정의 시에만.
-if [ "${#REVIEWERS[@]:-0}" -gt 0 ] 2>/dev/null && [ -n "${REVIEWERS+x}" ]; then
+# review 윈도우(window 1) 생성 — REVIEWERS 정의·비어있지 않을 때만.
+# 가드 순서 중요: 존재 확인(+x) 먼저, 그 다음에만 길이 평가 (set -u·bash3.2 안전).
+if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   tmux new-window -t "$SESSION" -n review
   # 1차 토대 함정 회귀: 새 윈도우에도 인덱스·title 고정 적용 (review 도 같은 세션이라 세션옵션 상속되나 명시 보강)
   REV_NAMES=(); REV_PIDS=()
@@ -843,26 +903,41 @@ fi
 Run: `bash tests/test-team-up-harness.sh`
 Expected: PASS — window 0·1, ORCHESTRATOR·dev·qual title 확인
 
-- [ ] **Step 7: 워커 카탈로그 + /loop 주입 (orchestrator·reviewer 부트스트랩)**
+- [ ] **Step 7: 부트스트랩 합본 분리 + 워커 카탈로그 + /loop 주입**
 
-부트스트랩 루프에서, ORCHESTRATOR pane 에 워커 카탈로그 + `/loop` 주입 로직 추가. 카탈로그는 `WORKERS` 배열 + 각 역할 첫 줄:
+**부트스트랩 합본 규칙 (변경 5 — 1차 합본 로직과 충돌 해소)**: 1차 team-up.sh:82-95 는 `WORKERS` 만 돌며 `cat _common.md roles/<역할>.md > boot_file` 합본을 만든다. `_common.md` 는 "너는 워커다"로 시작하므로 **메인·리뷰어에는 부적합**. 세 종류로 분리:
+
+- **워커**: 기존 1차 합본 그대로 (`_common.md` + `roles/<역할>.md`). 변경 없음.
+- **메인(ORCHESTRATOR)**: `_common.md` **제외**. `roles/orchestrator.md` + 워커 카탈로그만. 메인은 워커가 아니다.
+- **리뷰어**: `_common.md` **제외**(워커 사이클 규약 불필요). `roles/reviewer-<관점>.md` 만. 역할명은 프로파일 REVIEWERS 의 역할 필드(`reviewer-spec` 등, T9 와 매핑 일치).
+
+ORCHESTRATOR 부트스트랩 (워커 split·review 윈도우 생성 후, 부트스트랩 단계에서):
 
 ```bash
-# 워커 카탈로그 조립 (B-2): "dev(역할 dev): <roles/dev.md 첫 줄>" 식
+# 워커 카탈로그 조립 (B-2): "- dev (역할 dev): <roles/dev.md 첫 줄>"
 catalog=""
 for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
   desc="$(head -1 "$REPO_ROOT/prompts/roles/$ENTRY_ROLE.md" 2>/dev/null)"
   catalog+="- $ENTRY_NAME (역할 $ENTRY_ROLE): $desc"$'\n'
 done
-orch_boot="$REPO_ROOT/prompts/roles/orchestrator.md"
-{ cat "$orch_boot"; printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$(boot_file ORCHESTRATOR)"
+# 메인 부트: _common.md 제외, orchestrator.md + 카탈로그만
+{ cat "$REPO_ROOT/prompts/roles/orchestrator.md"
+  printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$(boot_file ORCHESTRATOR)"
+
+# 리뷰어 부트: _common.md 제외, roles/<리뷰어역할>.md 만
+if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
+  for entry in "${REVIEWERS[@]}"; do
+    parse_entry "$entry"
+    cat "$REPO_ROOT/prompts/roles/$ENTRY_ROLE.md" > "$(boot_file "$ENTRY_NAME")"
+  done
+fi
 ```
 
-ORCHESTRATOR·각 리뷰어 pane 기동 후 send-keys 로 `prompts/loop/orchestrator.md`·`prompts/loop/reviewer.md` 내용을 `/loop ...` 형태로 주입(프롬프트 본문은 T10에서 작성, 여기선 주입 메커니즘만; T10 전엔 빈 파일이라도 주입 코드는 둠). 주입 코드:
+각 pane 기동(claude 실행) 후, 메인엔 `prompts/loop/orchestrator.md`·리뷰어엔 `prompts/loop/reviewer.md` 내용을 `/loop ...` 로 주입(loop 본문은 T10 작성; T10 전이라도 주입 코드는 둔다 — 파일 없으면 no-op). 주입 헬퍼:
 
 ```bash
-inject_loop() {  # $1=pane_id $2=loop프롬프트파일
+inject_loop() {  # $1=pane_id(또는 target) $2=loop프롬프트파일
   local pid="$1" pf="$2"
   [ -f "$pf" ] || return 0
   tmux send-keys -t "$pid" -l "/loop $(tr '\n' ' ' < "$pf")"
@@ -870,6 +945,10 @@ inject_loop() {  # $1=pane_id $2=loop프롬프트파일
   tmux send-keys -t "$pid" Enter
 }
 ```
+
+**cwd 필수 (이슈 7)**: 모든 pane(워커·메인·리뷰어)의 claude 기동 명령 앞에 `cd "$REPO_ROOT" && ` 를 붙인다. 1차 team-up.sh:90 은 `tmux send-keys -t "$tgt" -l "$AGENT_CMD"` 로 cwd 미설정 — 이러면 claude 가 `.claude/settings.json`(Step 3b 가 repo 루트에 생성)을 못 읽어 hook 이 안 걸린다. 기동 명령을 `cd "$REPO_ROOT" && <agent_cmd_for 결과>` 로 조립. (단 `AGENT_CMD=cat` 테스트 시엔 `cd ... && cat` 이라 무해.)
+
+부트스트랩 send-keys 순서(메인·리뷰어 pane): (1) `export HARNESS_WORKER=<name>` (워커는 T8 Step4, 메인은 `HARNESS_WORKER=ORCHESTRATOR`, 리뷰어는 리뷰어명), (2) `cd "$REPO_ROOT" && <기동명령>`, (3) boot_file 읽기 지시 `send_prompt`, (4) `inject_loop`(메인·리뷰어만). 워커는 `/loop` 미주입(워커는 단발 TASK 응답 모델 — 1차 그대로).
 
 - [ ] **Step 8: run-all.sh 등록 + 전체 회귀**
 
@@ -888,8 +967,10 @@ git commit -m "feat: team-up review 윈도우·모델 차등·/loop·env·카탈
 
 ### Task 9: 프로파일 확장 — REVIEWERS·모델·ORCHESTRATOR_MODEL
 
+**방향성 결정 (사용자 확정)**: 1차 토대 프로파일의 `review:reviewer` 워커(워커 풀의 일반 리뷰 워커)는 하네스의 감시 리뷰어와 개념이 다르다. **워커 풀에서 reviewer를 제거하고 감시 리뷰어로 일원화**한다. 따라서: (a) 기존 프로파일 `WORKERS`에서 `review:reviewer` 줄 제거, (b) REVIEWERS 역할명은 `reviewer-spec`/`reviewer-quality`/`reviewer-arch`(T10이 만드는 `prompts/roles/reviewer-<관점>.md`와 매핑 일치 — 1차 `roles/reviewer.md`는 T10에서 삭제).
+
 **Files:**
-- Modify: `profiles/default.sh`, `profiles/code-review.sh`, `profiles/research.sh`
+- Modify: `profiles/default.sh`(WORKERS에서 review:reviewer 제거 + REVIEWERS 추가), `profiles/code-review.sh`, `profiles/research.sh`
 - Create: `profiles/feature-team.sh`
 - Test: `tests/test-profiles-harness.sh`
 - Modify: `tests/run-all.sh`
@@ -918,6 +999,20 @@ assert_contains "$out" "R_OK" "REVIEWERS 정의됨"
 assert_contains "$out" "ORCH=" "ORCHESTRATOR_MODEL 정의됨"
 assert_contains "$out" ":" "워커 엔트리에 역할 구분자(:) 존재"
 
+# 리뷰어 역할명은 reviewer-<관점> 형식 (1차 roles/reviewer.md 와 분리 — T10 신규 파일 매핑)
+( source "$ROOT/profiles/feature-team.sh"; printf '%s\n' "${REVIEWERS[@]}" ) > /tmp/rev_$$ 2>&1
+revout="$(cat /tmp/rev_$$)"; rm -f /tmp/rev_$$
+assert_contains "$revout" "reviewer-" "리뷰어 역할명이 reviewer-<관점> 형식"
+
+# 워커 풀에 reviewer 역할 워커 없음 (감시 리뷰어로 일원화)
+( source "$ROOT/profiles/default.sh"; printf '%s\n' "${WORKERS[@]}" ) > /tmp/w_$$ 2>&1
+wout="$(cat /tmp/w_$$)"; rm -f /tmp/w_$$
+if printf '%s' "$wout" | grep -q ':reviewer$'; then
+  assert_eq "no-reviewer-worker" "found-reviewer-worker" "default WORKERS 에 reviewer 워커 없어야 함"
+else
+  assert_eq "ok" "ok" "default WORKERS 에 reviewer 워커 없음(일원화)"
+fi
+
 test_summary
 ```
 
@@ -934,28 +1029,43 @@ Expected: FAIL — `profiles/feature-team.sh` 없음
 SESSION="agents"
 LAYOUT="tiled"
 WORKERS=("dev:dev:sonnet" "test:tester:haiku" "arch:researcher:sonnet")
-REVIEWERS=("spec-rev:reviewer:sonnet" "quality-rev:reviewer:haiku" "arch-rev:reviewer:opus")
+REVIEWERS=("spec-rev:reviewer-spec:sonnet" "quality-rev:reviewer-quality:haiku" "arch-rev:reviewer-arch:opus")
 ORCHESTRATOR_MODEL="opus"
 ```
 
-- [ ] **Step 4: 기존 3개 프로파일에 REVIEWERS·ORCHESTRATOR_MODEL 추가**
+역할명이 `reviewer-spec`/`reviewer-quality`/`reviewer-arch` — team-up이 `prompts/roles/reviewer-spec.md` 등을 읽도록(T10 신규 파일과 매핑 일치). `reviewer`(1차 워커용, T10에서 삭제)는 안 쓴다.
 
-`profiles/default.sh`·`code-review.sh`·`research.sh` 각 파일 끝에 추가(기존 WORKERS는 모델 생략형이라 sonnet 기본 — 하위호환):
+- [ ] **Step 4: 기존 3개 프로파일 — reviewer 워커 제거 + REVIEWERS·ORCHESTRATOR_MODEL 추가**
+
+`profiles/default.sh`: `WORKERS` 배열에서 `"review:reviewer"` 줄을 **삭제**(워커 풀에서 reviewer 제거 — 방향성 결정). 결과:
 
 ```bash
-REVIEWERS=("quality-rev:reviewer:haiku")
+WORKERS=(
+  "dev:dev"
+  "test:tester"
+)
+REVIEWERS=("quality-rev:reviewer-quality:haiku")
 ORCHESTRATOR_MODEL="opus"
 ```
+
+`profiles/code-review.sh`·`research.sh`: 각 WORKERS에 `reviewer` 역할 워커가 있으면 동일하게 제거하고, 각 파일 끝에 추가(기존 WORKERS 모델 생략형은 sonnet 기본 — 하위호환):
+
+```bash
+REVIEWERS=("quality-rev:reviewer-quality:haiku")
+ORCHESTRATOR_MODEL="opus"
+```
+
+(code-review.sh가 reviewer 중심 프로파일이면 REVIEWERS를 그 목적에 맞게 spec/quality/arch로 채울 것 — 단 역할명은 반드시 `reviewer-<관점>` 형식)
 
 - [ ] **Step 5: 통과 확인**
 
 Run: `bash tests/test-profiles-harness.sh`
-Expected: PASS — `ran=4 fail=0`
+Expected: PASS — `ran=6 fail=0`
 
 - [ ] **Step 6: 기존 프로파일 회귀 (team-up 가동)**
 
-Run: `S=pf_$$; AGENT_CMD=cat bash bin/team-up.sh default >/dev/null 2>&1; echo $?; tmux kill-session -t agents 2>/dev/null`
-Expected: `0` (기존 프로파일이 REVIEWERS 추가 후에도 정상 가동)
+Run: `AGENT_CMD=cat bash bin/team-up.sh default >/dev/null 2>&1; echo $?; tmux kill-session -t agents 2>/dev/null`
+Expected: `0` (reviewer 워커 제거 + REVIEWERS 추가 후에도 정상 가동)
 
 - [ ] **Step 7: run-all.sh 등록 + 전체 회귀**
 
@@ -978,6 +1088,7 @@ git commit -m "feat: 프로파일 REVIEWERS·모델 차등·ORCHESTRATOR_MODEL +
 - Create: `prompts/roles/orchestrator.md`
 - Create: `prompts/roles/reviewer-spec.md`, `reviewer-quality.md`, `reviewer-arch.md`
 - Create: `prompts/loop/orchestrator.md`, `prompts/loop/reviewer.md`
+- **Delete: `prompts/roles/reviewer.md`** (1차 워커용 — 워커 풀에서 reviewer 제거 결정[T9]으로 무용. 감시 리뷰어는 reviewer-<관점>.md 사용)
 - Test: `tests/test-role-prompts.sh`
 - Modify: `tests/run-all.sh`
 
@@ -1003,6 +1114,22 @@ assert_contains "$revl" ".review-cursor" "reviewer loop 커서 사용"
 
 orchl="$(cat "$ROOT/prompts/loop/orchestrator.md")"
 assert_contains "$orchl" "review/" "orchestrator loop 가 review/ 감시"
+
+# 관점별 리뷰어 프롬프트 존재 (프로파일 REVIEWERS 역할명과 매핑 일치)
+for r in spec quality arch; do
+  if [ -f "$ROOT/prompts/roles/reviewer-$r.md" ]; then
+    assert_eq "ok" "ok" "reviewer-$r.md 존재"
+  else
+    assert_eq "exists" "missing" "reviewer-$r.md 존재해야 함"
+  fi
+done
+
+# 1차 워커용 reviewer.md 는 삭제됨 (워커 풀 reviewer 일원화)
+if [ -f "$ROOT/prompts/roles/reviewer.md" ]; then
+  assert_eq "deleted" "still-exists" "1차 roles/reviewer.md 삭제돼야 함"
+else
+  assert_eq "ok" "ok" "1차 roles/reviewer.md 삭제됨"
+fi
 
 test_summary
 ```
@@ -1089,19 +1216,28 @@ done 라인 후 `workspace/results/<id>.md`·산출물·관련 설계 문서를 
 - [ ] **Step 7: 통과 확인**
 
 Run: `bash tests/test-role-prompts.sh`
-Expected: PASS — `ran=7 fail=0`
+Expected: PASS — `ran=13 fail=0`
+
+- [ ] **Step 7b: 1차 워커용 reviewer.md 삭제**
+
+```bash
+git rm prompts/roles/reviewer.md
+```
+
+(워커 풀에서 reviewer 제거 결정[T9] — 감시 리뷰어는 reviewer-spec/quality/arch.md 사용. 이 파일이 남아있으면 역할명 혼동 위험.)
 
 - [ ] **Step 8: run-all.sh 등록 + 전체 회귀**
 
 `tests/run-all.sh`에 `test-role-prompts.sh` 추가.
 Run: `bash tests/run-all.sh`
-Expected: 전체 PASS
+Expected: 전체 PASS (reviewer.md 삭제가 기존 테스트 회귀 안 깸 — 1차 test-profiles 가 reviewer 워커를 참조하면 T9에서 이미 정리됨)
 
 - [ ] **Step 9: Commit**
 
 ```bash
 git add prompts/roles/ prompts/loop/ tests/test-role-prompts.sh tests/run-all.sh
-git commit -m "feat: orchestrator·reviewer 역할/loop 프롬프트 (책임9·관점별·커서)"
+git rm --cached prompts/roles/reviewer.md 2>/dev/null || true
+git commit -m "feat: orchestrator·reviewer 역할/loop 프롬프트 + 1차 reviewer.md 삭제(일원화)"
 ```
 
 ---
@@ -1605,6 +1741,8 @@ git commit -m "feat: done_logged 시그널 유실 안전장치 (§6)"
 
 spec §8 `test-e2e-harness.sh`. claude 미기동 — dummy 워커/리뷰어가 파일·시그널만 흉내.
 
+**검증 범위 명시 (방향성 오해 방지)**: 이 E2E 는 **헬퍼들의 결합**(scope_match→cursor→review_verdict→done_logged 가 한 파이프라인에서 올바르게 맞물리는지)을 검증한다. **검증하지 않는 것**: 실제 리뷰어 claude 가 `/loop`+Monitor 로 그 일을 자율 수행하는지(이건 claude 기동 필요 — `tests/probes/probe-loop.sh` 가 담당, 수동). 즉 E2E 통과 = "메커니즘 배선 정상", **≠ "하네스 전체 동작 보장"**. 실제 리뷰어·메인 상주 동작은 T1/T17 의 수동 probe 로만 확인된다. 이 한계는 의도된 것(1차 토대의 claude 미기동 테스트 철학 계승)이며, 통합 동작 보장은 사용자가 실제 `team-up` 가동 + probe 로 확인하는 단계로 남긴다.
+
 **Files:**
 - Test: `tests/test-e2e-harness.sh`
 - Modify: `tests/run-all.sh`
@@ -1753,12 +1891,16 @@ git commit -m "docs: README 에이전트 하네스 섹션"
 
 ---
 
-## Self-Review (계획 작성자 점검)
+## Self-Review (계획 작성자 점검) — v2 (방향성 리뷰 7개 반영)
 
 **1. Spec coverage:**
 - §3.1 2윈도우 → T8 ✓ / §3.2 프로파일 고정 → T9 ✓ / §4.1 메인 책임 9개 → T10 orchestrator.md ✓ / §4.3 리뷰어 약한·강한 → T10 reviewer-*.md ✓ / §5.1 scope glob → T4 ✓ / §5.2 events.log 파싱 → T13 ✓ / §5.4 review 종합 → T14 ✓ / §5.5 디바운스 → T13 ✓ / §5.6 hook → T1·T6 ✓ / §5.7 커서 → T11 ✓ / §5.8 harness-state → T12 ✓ / §6 시그널 유실 → T15, 이슈1·2·3 → T2·T3·T5 ✓ / §7.1 모델 차등 → T8·T9 ✓ / §7.2 codex 분기점 → T8 agent_cmd_for ✓ / §8 테스트 12 → T2~T16 ✓ / §8.1 프로브 → T1 ✓
 - 갭 없음.
 
-**2. Placeholder scan:** "TODO/TBD/적절히" 없음. 모든 코드 step에 완전한 코드 블록. T6는 probe 결과 분기를 명시(가지치기 조건 구체화)했으므로 placeholder 아님.
+**v2 방향성 리뷰 반영 (7개):**
+- 방향성: (3·4) 워커 풀에서 reviewer 제거·감시 리뷰어 일원화 — T9 WORKERS 정리·REVIEWERS 역할명 `reviewer-<관점>`, T10 1차 reviewer.md 삭제 + 매핑 일치 검증. (8) E2E 검증 범위 명시(헬퍼 배선 검증 ≠ 하네스 동작 보장, 실제 리뷰어는 probe).
+- 잘못된 내용: (1) T5 wait-worker.sh:59-68 capture-pane window 0/1 조회 추가. (2) dispatch.sh 줄번호 정확화(7·30-42·44). (5) T8 메인=_common 제외·리뷰어=_common 제외 부트스트랩 분리. (6) bash3.2 `set -u` 빈배열 가드 `${REVIEWERS+x}` 먼저. (7) settings.json 템플릿화(`__REPO__` 치환)·cwd `cd "$REPO_ROOT"` 명시·probe-hook cwd 진단.
 
-**3. Type consistency:** `resolve_session`(T2)→`target_in`(T3)→dispatch(T5) 일관. `parse_entry`/`ENTRY_NAME/ROLE/MODEL`(T8) 일관. `cursor_read/new_lines/commit`(T11) ↔ e2e(T16) 시그니처 일치. `scope_match`(T4) ↔ reviewer.md(T10)·e2e(T16) 일치. `review_verdict`(T14) ↔ e2e 일치. `event_field/valid`(T13) ↔ e2e 일치. `done_logged`(T15) ↔ e2e 일치. 불일치 없음.
+**2. Placeholder scan:** "TODO/TBD/적절히" 없음. 모든 코드 step에 완전한 코드 블록. T6는 probe 결과 분기(PASS/PARTIAL/FAIL)를 구체 조건으로 명시했으므로 placeholder 아님.
+
+**3. Type consistency:** `resolve_session`(T2)→`target_in`(T3)→dispatch·wait-worker(T5) 일관. `parse_entry`/`ENTRY_NAME/ROLE/MODEL`·`agent_cmd_for`·`inject_loop`(T8) 일관. `cursor_read/new_lines/commit`(T11) ↔ e2e(T16) 시그니처 일치. `scope_match`(T4) ↔ reviewer loop(T10)·e2e(T16) 일치. `review_verdict`(T14) ↔ e2e 일치. `event_field/valid`/`debounce_pairs`(T13) ↔ e2e 일치. `done_logged`(T15) ↔ e2e 일치. 리뷰어 역할명 `reviewer-spec/quality/arch`: 프로파일 REVIEWERS(T9) ↔ roles 파일(T10) ↔ team-up 합본(T8) 전부 일치. `settings.json.tpl`/`__REPO__`: 파일표·T6·T8 Step3b 일관. 불일치 없음.
