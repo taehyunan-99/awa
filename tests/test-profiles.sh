@@ -8,11 +8,11 @@ ROOT="$(cd .. && pwd)"
 source "$ROOT/profiles/default.sh"
 assert_eq "agents" "$SESSION" "default SESSION"
 assert_eq "tiled" "$LAYOUT" "default LAYOUT"
-assert_eq "3" "${#WORKERS[@]}" "default 워커 3개"
+assert_eq "2" "${#WORKERS[@]}" "default 워커 2개(reviewer 워커 제거·일원화)"
 assert_eq "dev:dev" "${WORKERS[0]}" "default 첫 워커"
 
 source "$ROOT/profiles/code-review.sh"
-assert_eq "3" "${#WORKERS[@]}" "code-review 워커 3개"
+assert_eq "1" "${#WORKERS[@]}" "code-review 워커 1개(reviewer 워커 제거·일원화)"
 assert_contains "${WORKERS[*]}" "security" "code-review 에 security 포함"
 
 source "$ROOT/profiles/research.sh"
