@@ -116,7 +116,8 @@ state_get() {  # $1=key → value (없으면 빈문자열)
 }
 
 state_set() {  # $1=key $2=value (있으면 교체, 없으면 추가)
-  local f; f="$(_state_file)" key="$1" val="$2"
+  local f key val
+  f="$(_state_file)"; key="$1"; val="$2"
   touch "$f"
   if grep -q "^$key=" "$f" 2>/dev/null; then
     grep -v "^$key=" "$f" > "$f.tmp" || true; mv "$f.tmp" "$f"
