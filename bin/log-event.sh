@@ -26,4 +26,7 @@ case "$fpath" in
 esac
 
 ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-printf '%s\t%s\t%s\t%s\t%s\n' "$ts" "$worker" "$task" "modify" "$rel" >> "$EVENTS_LOG"
+# hook 안전성: 로깅 실패가 워커 claude 흐름을 막으면 안 됨.
+# 디렉터리 보장 + append 실패 흡수(둘 다 — 방어 깊이).
+mkdir -p "$(dirname "$EVENTS_LOG")" 2>/dev/null || true
+printf '%s\t%s\t%s\t%s\t%s\n' "$ts" "$worker" "$task" "modify" "$rel" >> "$EVENTS_LOG" 2>/dev/null || true
