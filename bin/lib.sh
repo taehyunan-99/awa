@@ -153,6 +153,19 @@ debounce_pairs() {  # $1=file → "worker\tpath" 유니크
   done < "$1" | awk '!seen[$0]++'
 }
 
+# 리뷰 종합 (spec §5.4·§6): review/<worker>-<id>.*.md 중 하나라도
+# VIOLATION 이면 VIOLATION, 전부 OK 면 OK, 파일 없으면 PENDING.
+review_verdict() {  # $1=review디렉터리 $2=worker $3=id
+  local dir="$1" w="$2" id="$3" f found=0 v
+  for f in "$dir/$w-$id."*.md; do
+    [ -f "$f" ] || continue
+    found=1
+    v="$(grep -m1 '^verdict:' "$f" | awk '{print $2}')"
+    if [ "$v" = "VIOLATION" ]; then printf 'VIOLATION'; return 0; fi
+  done
+  if [ "$found" = "1" ]; then printf 'OK'; else printf 'PENDING'; fi
+}
+
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
 send_prompt() {
   local target="$1" text="$2"
