@@ -14,17 +14,17 @@ rm -rf "$WS"; mkdir -p "$WS"
 # /tmp 새 워크스페이스는 "Is this a project you trust?" 프롬프트가 먼저 뜨므로
 # 그게 보이면 Enter(기본 "1. Yes, I trust") 로 통과시킨다. (고정 sleep 으로는
 # 머신/부하별 기동 편차를 못 잡아 FAIL — 폴링으로 견고화)
-wait_repl() {  # $1=session, 최대 ~90s
-  local s="$1" i dump trusted=0
-  for i in $(seq 1 45); do
+wait_repl() {  # $1=session, 최대 ~120s
+  local s="$1" i dump
+  for i in $(seq 1 60); do
     sleep 2
     dump="$(tmux capture-pane -t "$s" -p 2>/dev/null)"
-    if [ "$trusted" = 0 ] && printf '%s' "$dump" | grep -q 'trust this folder'; then
-      tmux send-keys -t "$s" Enter   # "1. Yes, I trust this folder"
-      trusted=1
+    # trust 화면이 보이면 매 폴링마다 Enter 재전송 (첫 전송 씹힘·재출현 대비).
+    if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust'; then
+      tmux send-keys -t "$s" Enter   # 기본 선택 "1. Yes, I trust this folder"
       continue
     fi
-    # REPL 프롬프트 라인(❯) + 입력 가능 상태
+    # 상태줄(bypass permissions on)이 뜨면 REPL 입력 가능 상태.
     if printf '%s' "$dump" | grep -q 'bypass permissions on'; then
       return 0
     fi

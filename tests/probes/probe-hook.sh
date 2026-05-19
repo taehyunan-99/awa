@@ -29,16 +29,17 @@ JSON
 sed -i.bak "s#\$WS#$WS#g" "$WS/.claude/settings.json" && rm -f "$WS/.claude/settings.json.bak"
 
 # claude REPL 준비 폴링 (trust 프롬프트 자동 통과 포함 — probe-loop 와 동일 사유).
-wait_repl() {  # $1=session, 최대 ~90s
-  local s="$1" i dump trusted=0
-  for i in $(seq 1 45); do
+wait_repl() {  # $1=session, 최대 ~120s
+  local s="$1" i dump
+  for i in $(seq 1 60); do
     sleep 2
     dump="$(tmux capture-pane -t "$s" -p 2>/dev/null)"
-    if [ "$trusted" = 0 ] && printf '%s' "$dump" | grep -q 'trust this folder'; then
-      tmux send-keys -t "$s" Enter   # "1. Yes, I trust this folder"
-      trusted=1
+    # trust 화면이 보이면 매 폴링마다 Enter 재전송 (첫 전송 씹힘·재출현 대비).
+    if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust'; then
+      tmux send-keys -t "$s" Enter   # 기본 선택 "1. Yes, I trust this folder"
       continue
     fi
+    # 상태줄(bypass permissions on)이 뜨면 REPL 입력 가능 상태.
     if printf '%s' "$dump" | grep -q 'bypass permissions on'; then
       return 0
     fi
