@@ -88,6 +88,23 @@ scope_match() {
   [[ "$path" =~ ^${re}$ ]]
 }
 
+# 리뷰 커서 (spec §5.7). claude 무상태 보완 — 리뷰어가 호출해 증분·멱등.
+_cursor_file() { printf '%s/.review-cursor.%s' "${WORKSPACE}" "$1"; }
+
+cursor_read() {  # $1=reviewer → 현재 커서(없으면 0)
+  local f; f="$(_cursor_file "$1")"
+  if [ -f "$f" ]; then cat "$f"; else echo 0; fi
+}
+
+cursor_new_lines() {  # $1=reviewer $2=events.log → 커서 이후 줄 출력 (커서 불변)
+  local n; n="$(cursor_read "$1")"
+  tail -n +"$((n + 1))" "$2" 2>/dev/null || true
+}
+
+cursor_commit() {  # $1=reviewer $2=새 커서값
+  printf '%s' "$2" > "$(_cursor_file "$1")"
+}
+
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
 send_prompt() {
   local target="$1" text="$2"
