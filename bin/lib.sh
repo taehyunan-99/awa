@@ -125,6 +125,34 @@ state_set() {  # $1=key $2=value (있으면 교체, 없으면 추가)
   printf '%s=%s\n' "$key" "$val" >> "$f"
 }
 
+# events.log 파싱 (spec §5.2). 탭 5필드: ts worker task action path.
+event_field() {  # $1=line $2=fieldno(1-5)
+  printf '%s' "$1" | awk -F'\t' -v n="$2" '{print $n}'
+}
+
+event_valid() {  # $1=line → 정확히 5필드면 0
+  local nf; nf="$(printf '%s' "$1" | awk -F'\t' '{print NF}')"
+  [ "$nf" = "5" ]
+}
+
+events_valid_count() {  # $1=file → valid 라인 수
+  local c=0 line
+  while IFS= read -r line; do
+    event_valid "$line" && c=$((c + 1))
+  done < "$1"
+  printf '%s' "$c"
+}
+
+# 디바운스 (spec §5.5): 처리 범위 내 유니크 (worker,path). valid 라인만.
+debounce_pairs() {  # $1=file → "worker\tpath" 유니크
+  local line w p
+  while IFS= read -r line; do
+    event_valid "$line" || continue
+    w="$(event_field "$line" 2)"; p="$(event_field "$line" 5)"
+    printf '%s\t%s\n' "$w" "$p"
+  done < "$1" | awk '!seen[$0]++'
+}
+
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
 send_prompt() {
   local target="$1" text="$2"
