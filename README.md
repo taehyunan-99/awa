@@ -75,6 +75,7 @@ bash tests/run-all.sh
 판단형 메인(프로젝트 관리자) + `/loop`·Monitor 상주 감시 리뷰어 + scope 사전차단 + 모델 차등.
 
 - 가동: `bin/team-up.sh feature-team` (워커 + review 윈도우 + 모델 차등)
+- 초회 가동 시 claude 가 폴더 신뢰를 1회 묻습니다 — team-up 이 자동 통과하나, 응답이 없으면 각 pane 에서 수동 Enter(트러스트 확인) 필요할 수 있습니다.
 - 메인은 단계 자동 전이 안 함 — 사용자가 PRD→Arch→구현 단계를 수동 진행
 - 감시: 약한 신호(scope, 즉시) / 강한 신호(done 후 의미 판정)
 - 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`

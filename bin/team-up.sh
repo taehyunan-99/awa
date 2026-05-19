@@ -133,6 +133,28 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   tmux select-layout -t "$SESSION:review" "${LAYOUT:-tiled}"
 fi
 
+# claude REPL 준비 대기: probe-loop.sh 검증 패턴 이식.
+# trust 화면("Is this a project you trust?") 자동 Enter 통과 + REPL 준비 폴링.
+# probe 는 세션명 인자였으나 team-up 은 pane_id/target 을 쓴다 — capture-pane/
+# send-keys 는 pane target 도 동작하므로 인자만 pane target 으로 일반화(로직 동일).
+wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
+  local s="$1" i dump
+  for i in $(seq 1 60); do
+    sleep 2
+    dump="$(tmux capture-pane -t "$s" -p 2>/dev/null)"
+    # trust 화면이 보이면 매 폴링마다 Enter 재전송 (첫 전송 씹힘·재출현 대비).
+    if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust'; then
+      tmux send-keys -t "$s" Enter   # 기본 선택 "1. Yes, I trust this folder"
+      continue
+    fi
+    # 상태줄(bypass permissions on)이 뜨면 REPL 입력 가능 상태.
+    if printf '%s' "$dump" | grep -q 'bypass permissions on'; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # /loop 주입 헬퍼: 프롬프트 파일이 있을 때만 (T10 전이면 no-op).
 inject_loop() {  # $1=pane_id(또는 target) $2=loop프롬프트파일
   local pid="$1" pf="$2"
@@ -157,7 +179,11 @@ for entry in "${WORKERS[@]}"; do
   tmux send-keys -t "$tgt" Enter
   tmux send-keys -t "$tgt" -l "cd \"$REPO_ROOT\" && $(agent_cmd_for "$ENTRY_MODEL")"
   tmux send-keys -t "$tgt" Enter
-  sleep 0.2
+  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+    wait_repl "$tgt" || echo "경고: $ENTRY_NAME pane REPL 준비 실패(trust/기동 확인 필요)" >&2
+  else
+    sleep 0.2
+  fi
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -177,7 +203,11 @@ tmux send-keys -t "$ORCH_PID" -l "export HARNESS_WORKER=ORCHESTRATOR"
 tmux send-keys -t "$ORCH_PID" Enter
 tmux send-keys -t "$ORCH_PID" -l "cd \"$REPO_ROOT\" && $(agent_cmd_for "${ORCHESTRATOR_MODEL:-opus}")"
 tmux send-keys -t "$ORCH_PID" Enter
-sleep 0.2
+if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+  wait_repl "$ORCH_PID" || echo "경고: ORCHESTRATOR pane REPL 준비 실패(trust/기동 확인 필요)" >&2
+else
+  sleep 0.2
+fi
 send_prompt "$ORCH_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$ORCH_PID" "$REPO_ROOT/prompts/loop/orchestrator.md"
 
@@ -193,7 +223,11 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     tmux send-keys -t "$rtgt" Enter
     tmux send-keys -t "$rtgt" -l "cd \"$REPO_ROOT\" && $(agent_cmd_for "$ENTRY_MODEL")"
     tmux send-keys -t "$rtgt" Enter
-    sleep 0.2
+    if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+      wait_repl "$rtgt" || echo "경고: $ENTRY_NAME(리뷰어) pane REPL 준비 실패(trust/기동 확인 필요)" >&2
+    else
+      sleep 0.2
+    fi
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$REPO_ROOT/prompts/loop/reviewer.md"
     j=$((j + 1))
