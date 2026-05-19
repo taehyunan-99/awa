@@ -1,18 +1,22 @@
 # 에이전트 하네스 — 설계 문서
 
 작성일: 2026-05-19
-개정: v2 — 구현 리뷰 8개 이슈 반영, `/loop`+Monitor 실측 검증 반영
+개정: v3 — 방향성 리뷰 반영 (메인=프로젝트 관리자 책임 9개, 약한신호=scope 한정, codex 워커 한정 등)
 상태: 설계 확정 (구현 전)
 선행: [2026-05-18-tmux-agent-team-design.md](2026-05-18-tmux-agent-team-design.md) (1차 토대, main 머지 완료)
 
-**v2 검증 이력**: 구현 관점 리뷰에서 8개 이슈 발견. 핵심 미검증 가정이던 "리뷰어 상시 감시"를 tmux pane 내 실측 프로브로 검증 — `/loop` dynamic 모드 + claude 자율 `Monitor` 도구 무장이 셸 watcher 없이 이벤트 구동 감시를 네이티브로 수행함을 확인(PASS). 설계를 이 검증 결과로 재작성함.
+**검증 이력**:
+- **v2** (구현 리뷰): 8개 이슈 발견. 핵심 미검증 가정 "리뷰어 상시 감시"를 tmux pane 실측 프로브로 검증 — `/loop` dynamic + claude 자율 `Monitor` 무장이 셸 watcher 없이 이벤트 구동 감시를 네이티브 수행함 확인(PASS).
+- **v3** (방향성 리뷰): 사용자 원래 구상과 정합화. (A) 약한 신호 = scope 차단만, 의미 판정은 강한 신호(done 후)로 일원화 — 미완성 코드의 의미 판단은 거짓 양성/음성 불가피하므로. (B) 메인 = 단순 분배자 아닌 **프로젝트 관리자**(책임 9개: 분담·완료수신·리뷰종합·개입·산출물연결·보고·진도추적·품질게이트·전체맥락유지), 단계 전이는 사용자 통제, 맥락은 `.harness-state` 파일 보존. (C) codex=워커 한정·리뷰어=claude 전용. (E·F) 디바운스 claude 무상태 정합·done 라인 주체 명확화.
 
 ## 1. 목적
 
 1차 토대(tmux 멀티 에이전트 팀: 통신·식별·동기화·생명주기)가 main에 머지된 상태에서, 그 위에 다음을 올린다:
 
-1. **판단형 디스패처 메인** — 사용자 자연어 명령을 받아 스스로 작업을 분해하고, 고정 워커 풀 안에서 적합한 워커에 scope와 함께 분배
-2. **준실시간 감시 리뷰어** — 워커가 올바른 방향으로 가는지(scope 준수, 안티패턴, 계획 준수) 감시. 약한 신호(진행 중 통지)로 사전 차단, 강한 신호(완료)로 결과 검사
+1. **판단형 메인 = 프로젝트 관리자** — 사용자 자연어 명령을 받아 작업 분해·워커 매칭·scope 결정을 판단하는 데 그치지 않고, 진도 추적·품질 게이트·전체 맥락 유지까지 관장한다(책임 9개, §4.1). 단계 전이는 사용자가 통제하며 메인은 자동 전이하지 않는다.
+2. **준실시간 감시 리뷰어** — 워커가 **올바른 방향으로 가는지** 감시. 두 신호로 역할을 분리한다:
+   - **약한 신호(진행 중) = scope 차단만**: events.log 라인은 "어느 파일을 건드렸나"만 알려주므로 *기계적으로 확실한* scope(허용/금지 경로) 위반만 즉시 잡아 사전 차단한다. 진행 중 파일은 미완성 상태라 내용 기반 의미 판단은 거짓 양성/음성을 피할 수 없어 **약한 신호에서 의미 검토를 하지 않는다**(노이즈 배제 — 설계 결정).
+   - **강한 신호(완료) = 의미 판정**: 워커 `done` 후 완성된 산출물을 리뷰어 claude가 읽어 task 의도 위배(예: JWT 검증을 평문 비교로 구현), 안티패턴, 계획 위배를 판정한다. 의미적 이탈을 *확실하게* 잡는 곳은 여기다 — 리뷰어가 claude인 본질적 이유.
 3. **기능별 모델 차등** — 작업 성격에 맞춰 opus/sonnet/haiku 배분
 4. **codex 연동 확장점** — 본격 구현은 후속이나 워커 계약을 명문화해 막지 않음
 
@@ -90,8 +94,8 @@ bin/team-up.sh profiles/<선택>.sh   ← 프로파일이 워커+리뷰어+모�
       Monitor(persistent) 자율 무장 + fallback heartbeat 자동 설정
     - events.log append 발생 → Monitor 발화 → claude 깨어남
     - .review-cursor 로 증분·멱등 처리 (마지막 검토 오프셋 보존)
-    - 약한 신호: scope 위반 라인 → review 파일 (사전 차단, 디바운스 예외)
-    - 강한 신호: done 라인 → 결과물 결정적 검사 → review 파일
+    - 약한 신호: scope(경로) 위반만 즉시 → review 파일 (기계적·확실, 사전 차단)
+    - 강한 신호: done 라인 → 완성 산출물 의미 판정(의도/안티패턴/계획) → review 파일
 
 [5] 메인 (orchestrator pane, /loop dynamic 모드로 상주):
     - bin/wait-worker.sh 로 done 수신 (+ events.log done 폴링 안전장치)
@@ -117,13 +121,30 @@ bin/team-up.sh profiles/<선택>.sh   ← 프로파일이 워커+리뷰어+모�
 
 세 컴포넌트는 파일(events.log/tasks/results/review) + tmux 시그널로만 결합한다 (느슨한 결합).
 
-### 4.1 메인 (orchestrator pane)
+### 4.1 메인 (orchestrator pane) — 프로젝트 관리자
 
-- **책임**: 자연어 수신 → 작업 분해 → scope 결정 → task 파일 작성 → 디스패치 → done 수신 → 리뷰 종합 → 통과/재지시/사용자보고 판단. 위반 시 워커 개입(send-keys)은 메인 독점.
+메인은 **단순 분배자가 아니라 프로젝트 관리자**다. 단발 명령을 워커에 던지는 게 아니라, 세션 전체의 진행·맥락·품질을 관리한다. 책임 9개:
+
+| # | 책임 | 구체 행동 |
+|---|---|---|
+| 1 | 업무 분담 | 명령 분해 → 워커 카탈로그 보고 매칭 → scope 결정 → `tasks/<id>.md` 작성 → `dispatch.sh` 호출 |
+| 2 | 완료 수신 | `wait-worker.sh`로 done 대기 + events.log done 라인 확인 |
+| 3 | 리뷰 종합 | `review/*.md` 읽고 OK/VIOLATION·severity 종합 판단 |
+| 4 | 개입 결정 | 위반 시 워커 pane에 send-keys로 중단/수정 주입·재지시 (**메인 독점**) |
+| 5 | 산출물 연결 | 사용자가 "이 PRD로 Architecture" 지시 시, 이전 산출물(`results/`·`docs/`)을 다음 task 입력으로 명시 |
+| 6 | 사용자 보고 | 진행·결과·에스컬레이션을 사용자에게 종합 보고 |
+| 7 | 진도 추적 | 여러 task가 떠 있을 때 진행/완료/대기 상태 관리, 사용자 조회 시 현황 보고 |
+| 8 | 품질 게이트 | 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 명령 시 "이전 단계 미통과" 경고·사용자 확인 요구 (강제 차단 아님 — 사용자 판단 존중) |
+| 9 | 전체 맥락 유지 | PRD→Arch→구현 단계의 결정·산출물 맥락을 세션 내내 보존, 뒤 단계에서 앞 단계 결정 참조 |
+
 - **입력**: 사용자 자연어 (orchestrator pane stdin) + `/loop`이 무장한 `review/` Monitor 발화
-- **출력/도구**: `tasks/<id>.md` 작성, `dispatch.sh`/`wait-worker.sh` 호출, `review/*.md` 읽기, 위반 시 워커 pane에 send-keys
+- **출력/도구**: `tasks/<id>.md` 작성, `dispatch.sh`/`wait-worker.sh` 호출, `review/*.md` 읽기, 위반 시 워커 pane에 send-keys, `.harness-state` 갱신
+- **워커 카탈로그**: 메인은 자기 팀을 알아야 매칭할 수 있다. `team-up.sh`가 기동 시 프로파일 `WORKERS` 목록 + 각 역할(`prompts/roles/<역할>.md`)의 한 줄 요약을 `orchestrator.md`에 주입한다(신규 만드는 게 아니라 기존 정의를 메인에게 보여주는 것).
+- **단계 전이는 사용자 통제**: 메인은 단계를 **자동 전이하지 않는다**. "PRD 다 됐으니 이제 구현 시작" 같은 판단 금지 — 산출물 보고 후 사용자의 다음 명령을 대기한다. 단계 순서·전이 결정은 전적으로 사용자.
+- **맥락 보존 = `.harness-state` 파일**: claude는 무상태이므로 진도·단계 결정·맥락을 컨텍스트가 아닌 `workspace/.harness-state`(§5.8)에 기록·갱신한다(리뷰어 커서와 같은 패턴). `/loop` 깨어남 사이 맥락이 파일로 보존됨.
 - **상주 방식**: 기동 시 `/loop`(dynamic) 주입 — 사용자 명령 처리와 `review/` 디렉터리 Monitor 감시(VIOLATION 파일 발화 시 개입 판단)를 한 루프에서. claude의 단발 모델을 `/loop`으로 상주화 (실측 검증됨, §3.3).
-- **역할 프롬프트**: `prompts/roles/orchestrator.md` (신규)
+- **단일 통제점**: 메인을 디스패처/코디네이터로 분리하지 않는다. 책임 9의 "전체 맥락 유지"가 맥락을 한 곳에 둘 것을 요구하므로(분리 시 맥락이 두 pane에 쪼개짐), 통합 메인이 A안 단일 통제점 철학과 정합한다.
+- **역할 프롬프트**: `prompts/roles/orchestrator.md` (신규 — 책임 9개 + 워커 카탈로그 + 단계 전이 금지 + `.harness-state` 규약)
 
 ### 4.2 워커 (team 윈도우 pane)
 
@@ -134,8 +155,8 @@ bin/team-up.sh profiles/<선택>.sh   ← 프로파일이 워커+리뷰어+모�
 
 ### 4.3 리뷰어 (review 윈도우 pane)
 
-- **책임**: events.log 변경 감시 → 약한 신호(scope 위반 즉시) → 강한 신호(done 후 결과 검사) → 위반을 review 파일에 기록. **워커 조종 안 함.**
-- **입력**: `events.log` (Monitor 발화로 깨어나 `.review-cursor` 오프셋부터 증분 read), `tasks/<id>.md` (scope 확인), `results/<id>.md` (결정적 검사)
+- **책임**: events.log 변경 감시 → **약한 신호: scope 위반만 즉시 감지·기록**(기계적·확실, 의미 판단 안 함) → **강한 신호: done 후 완성 산출물의 의미 판정**(task 의도 위배·안티패턴·계획 위배) → 위반을 review 파일에 기록. **워커 조종 안 함.** (§1의 2신호 분리 원칙: 진행 중 미완성 코드의 의미 판단은 거짓 양성/음성 불가피하므로 약한 신호에서 하지 않음)
+- **입력**: `events.log` (Monitor 발화로 깨어나 `.review-cursor` 오프셋부터 증분 read — scope 매칭용 경로만), `tasks/<id>.md` (scope·완료기준 확인), `results/<id>.md` (done 후 결정적 의미 검사)
 - **출력**: `review/<worker>-<id>.<reviewer>.md` 에만 기록 (메인만 읽음), `.review-cursor.<reviewer>` 갱신
 - **상주 방식**: 기동 시 `/loop`(dynamic) 주입 → claude가 `events.log`에 Monitor(persistent) 자율 무장 + fallback heartbeat. append 발생 시 깨어나 커서 이후만 검토 (실측 검증됨, §3.3). 리뷰어마다 독립 커서 파일 → 리뷰어 간 진행 간섭 없음.
 - **역할 프롬프트**: `prompts/roles/reviewer-{spec,quality,arch}.md` (신규, 1차 reviewer.md 분화 — 라인업은 프로파일별 디테일)
@@ -186,8 +207,9 @@ auth 로그인 핸들러 구현. JWT 검증 포함.
 ```
 
 - `action`: `write` | `modify` | `delete` | `done`
-- append는 워커가 `>>` (한 줄이 PIPE_BUF 이하라 동시 append 원자적; 경로는 repo 상대경로로 기록해 길이 억제)
-- `done` 라인은 시그널 유실 대비 안전장치 (5.5)
+- **기록 주체 구분 (F)**: `write`/`modify`/`delete`(파일 변경)는 **PostToolUse hook이 결정적 기록**(§5.6, 자기보고 탈피). `done`은 도구 사용이 아니라 워커의 "작업 끝" 선언이므로 hook으로 못 잡는다 → **워커가 명시적으로 기록**(완료 시그널 `tmux wait-for -S done-<w>-<id>`와 쌍). "자기보고 탈피" 원칙은 파일 변경 기록에만 적용되며, `done`은 시그널과 이중화되어 한쪽 누락 시 다른 쪽으로 복원되므로 자기보고여도 안전.
+- append는 `>>` (한 줄이 PIPE_BUF 이하라 동시 append 원자적; 경로는 repo 상대경로로 기록해 길이 억제)
+- `done` 라인은 시그널 유실 대비 안전장치 (§5.5, §6 시그널 유실 행)
 
 ### 5.3 tmux 시그널 (wait-for) — 1차 그대로
 
@@ -222,11 +244,12 @@ task 101 forbidden_paths(src/payment/**) 위반.
 
 ### 5.5 디바운스 (병렬 부하 흡수)
 
-리뷰어는 events.log를 읽되 메모리에서 `(worker, path)` → 최신 라인만 유지:
-- 같은 (dev, src/auth/login.ts) 4번 → 1개로 접음 (헛검사 방지)
-- **scope 위반 라인은 디바운스 예외** — `forbidden_paths` 매치 즉시 review 기록 (사전 차단)
+수정 A로 약한 신호는 **scope 매칭만** 한다(파일 내용 검토 없음). 따라서 디바운스는 "내용 검사 헛수고 방지"가 아니라 "scope 매칭·기록 중복 방지"로 단순해진다.
 
-확정 검사 트리거는 워커의 `done` 시그널. 병렬 워커가 N개여도 리뷰어는 각 워커 done 시 1회 검사 — 리소스가 워커 수에 비례 폭발하지 않음.
+- **claude 무상태 정합 (E)**: 리뷰어는 무상태이므로 디바운스 상태를 메모리에 유지할 수 없다(`/loop` 깨어남 사이 소실). 디바운스는 **Monitor 1회 깨어남의 처리 범위(`.review-cursor`~EOF) 내에서만** 적용 — 그 범위 안에 같은 `(worker, path)`가 여러 번이면 1회만 scope 판정. 범위를 넘는 상태는 커서로만 관리.
+- **scope 위반은 디바운스 무관 즉시 기록** — `forbidden_paths`/`allowed_paths` 밖 매치는 처리 범위 내 첫 발견 즉시 review 기록(사전 차단). 같은 위반 경로 반복은 1회만 기록(중복 보고 방지).
+
+강한 신호(의미 판정)의 확정 트리거는 워커 `done`. 병렬 워커 N개여도 리뷰어는 각 워커 done 시 1회 의미 검사 — 리소스가 워커 수에 비례 폭발하지 않음.
 
 ### 5.6 events.log 결정적 기록 — PostToolUse hook (이슈 6)
 
@@ -242,6 +265,28 @@ task 101 forbidden_paths(src/payment/**) 위반.
 
 생산자/소비자: 각 리뷰어 자신. claude는 무상태이므로 "events.log를 어디까지 검토했는가"를 파일로 보존해야 멱등·증분이 성립한다(실측 프로브에서 이 메커니즘으로 1차 3줄+2차 2줄=5줄 정확·중복0 확인). 리뷰어마다 별도 커서 → 리뷰어 간 진행 간섭 없음. `team-down.sh`가 events.log와 함께 정리.
 
+### 5.8 메인 상태 — `workspace/.harness-state` (B-4)
+
+생산자/소비자: 메인 자신. 메인 책임 7(진도 추적)·9(전체 맥락 유지)는 `/loop` 깨어남을 가로질러 상태가 보존돼야 성립한다. claude 무상태이므로 컨텍스트가 아닌 파일에 기록(리뷰어 `.review-cursor`와 동일 패턴). 내용:
+
+```
+---
+phase: architecture          # 현재 단계 (사용자가 통제, 메인은 기록만)
+tasks:
+  101: {worker: arch, status: done, review: OK}
+  102: {worker: dev, status: in_progress, review: pending}
+artifacts:
+  prd: docs/prd/auth.md       # 단계별 산출물 경로 (산출물 연결용)
+  architecture: docs/arch/auth.md
+decisions:
+  - "JWT 검증 방식 채택 (PRD §3 근거)"   # 뒤 단계에서 앞 단계 결정 참조
+---
+```
+
+- `phase`는 메인이 **기록만** 한다 — 단계 전이 판단은 사용자(§4.1 단계 전이 사용자 통제). 사용자가 "이제 구현" 명령 시 메인이 `phase: implementation`으로 갱신.
+- 메인은 매 명령 처리 전 `.harness-state`를 읽어 맥락 복원, 처리 후 갱신.
+- `team-down.sh`가 events.log·커서와 함께 정리(세션 일회용 철학).
+
 ## 6. 에러·엣지 처리
 
 | 케이스 | 감지 | 대응 | 자동/사용자 |
@@ -254,6 +299,8 @@ task 101 forbidden_paths(src/payment/**) 위반.
 | scope 위반(high) | forbidden 매치 | **메인이** send-keys로 중단 주입 | 자동 |
 | scope 위반(low) | forbidden 매치 | 기록, done 후 종합 | 자동 |
 | task 분해 오류 | spec 리뷰어 이의 | 메인 재검토, **재지시 2회 초과 시 사용자 에스컬레이션** | 사용자 |
+| 미통과 산출물로 다음 단계 시도 | 사용자 명령 시 메인이 `.harness-state`에서 이전 단계 review≠OK 확인 | **경고 + 사용자 확인 요구**(강제 차단 아님 — 사용자 판단 존중, B-5) | 사용자 |
+| 메인이 단계 자동 전이 시도 | (설계 금지 사항) | orchestrator.md가 자동 전이 금지·다음 명령 대기 규정 (B-3) | 사용자 |
 
 핵심 결정:
 - **리뷰어 다운 시 자동 통과 금지** — 리뷰어는 best-effort가 아니라 게이트. 감시 누락은 사용자 판단.
@@ -302,7 +349,9 @@ tmux pane은 프로세스 무관. 결합은 파일+시그널 규약뿐. codex �
 | 완료 시그널 | `tmux wait-for -S done-<w>-<id>` | 동일 명령 |
 | 산출 | `results/<id>.md` | 동일 경로 |
 
-이번 범위: codex 본격 구현 **안 함**(YAGNI). 단 (1) 워커 계약 4가지 명문화, (2) `team-up.sh`의 엔진 분기점을 `AGENT_CMD` 파싱 한 곳으로 격리 — codex 추가가 국소 변경이 되도록 보장.
+**codex는 워커로만, 리뷰어는 claude 전용 (C)**: 위 계약 4가지는 워커 전용이다. 리뷰어 계약은 `/loop`(dynamic) + `Monitor` 자율 무장 + fallback heartbeat에 의존하는데(§3.3, 실측 검증된 Claude Code 네이티브 기능), codex에 동등 기능이 있는지는 알 수 없다. 따라서 **codex 에이전트는 워커로만 편입 가능하며, 리뷰어는 claude 전용**이다. codex 리뷰어 대안(예: 외부 셸 watcher가 codex를 깨우는 구조)은 명시적으로 범위 밖 — 필요 시 별도 설계.
+
+이번 범위: codex 본격 구현 **안 함**(YAGNI). 단 (1) 워커 계약 4가지 명문화, (2) `team-up.sh`의 엔진 분기점을 `AGENT_CMD` 파싱 한 곳으로 격리 — codex 추가가 국소 변경이 되도록 보장, (3) codex=워커 한정·리뷰어=claude 전용 제약 명문화.
 
 ## 8. 테스트 전략
 
@@ -315,6 +364,7 @@ tmux pane은 프로세스 무관. 결합은 파일+시그널 규약뿐. codex �
 | `test-scope.sh` | `scope_match()` glob 매칭, 경계 오매치 방지(`src/auth` vs `src/authx/y`), `**`/`*` 의미 |
 | `test-debounce.sh` | (worker,path) 접힘, forbidden 디바운스 예외, 다른 worker 별개 |
 | `test-cursor.sh` | `.review-cursor.<reviewer>` 증분·멱등, 리뷰어별 독립 커서 |
+| `test-harness-state.sh` | `.harness-state` read/갱신 멱등, phase는 기록만(메인 자동전이 안 함), 산출물 경로 연결 |
 | `test-review-flow.sh` | 리뷰어 3 파일 덮어쓰기 없음, severity=high → 중단 종합, 전 OK → 통과 |
 | `test-signal-fallback.sh` | wait-for 선발화 시 done 라인 폴링 완료, 중복 멱등 |
 | `test-session-resolve.sh` | `resolve_session()` 단일화 — dispatch/wait-worker/team-up SESSION 일치(이슈 2) |
@@ -324,7 +374,7 @@ tmux pane은 프로세스 무관. 결합은 파일+시그널 규약뿐. codex �
 | `test-log-event.sh` | `bin/log-event.sh`: 도구 입력→5필드 라인 변환, repo 상대경로화, HARNESS_WORKER 식별 |
 | `test-e2e-harness.sh` | dummy로 디스패치→통지→감시→보고→종합 전 경로 + team-down 정리(results 보존) |
 
-`run-all.sh`에 신규 스위트 등록. 위 스위트는 전부 의존성 제로·claude 미기동(메커니즘 검증).
+`run-all.sh`에 신규 스위트 등록(총 12 신규). 위 스위트는 전부 의존성 제로·claude 미기동(메커니즘 검증).
 
 ### 8.1 실측 프로브 (구현 착수 전 필수 — claude 기동 필요)
 
@@ -337,19 +387,21 @@ tmux pane은 프로세스 무관. 결합은 파일+시그널 규약뿐. codex �
 
 | 파일 | 신규/확장 |
 |---|---|
-| `prompts/roles/orchestrator.md` | 신규 (메인 역할 + `/loop` 상주·`review/` Monitor 규약) |
+| `prompts/roles/orchestrator.md` | 신규 (책임 9개 + 워커 카탈로그 + 단계 전이 금지 + `.harness-state` 규약 + `/loop` 상주·`review/` Monitor) |
 | `prompts/roles/reviewer-{spec,quality,arch}.md` | 신규 (reviewer.md 분화 + `/loop` 상주·커서 규약, 라인업은 프로파일별) |
 | `prompts/roles/{dev,tester,researcher,security}.md` | 확장 (events.log·scope 규칙, hook 보조) |
 | `prompts/_common.md` | 확장 (events.log append 보조 규약 1줄) |
 | `prompts/loop/{orchestrator,reviewer}.md` | 신규 (`/loop`에 주입할 dynamic 감시 프롬프트 본문) |
 | `profiles/*.sh` | 확장 (`REVIEWERS=(...)`, `pane:역할:모델`, `ORCHESTRATOR_MODEL`) |
-| `bin/team-up.sh` | 확장 (review 윈도우 생성, 모델 파싱·`--model` 주입, `/loop` 프롬프트 주입, `HARNESS_WORKER` env 주입, 엔진 분기점 격리) |
+| `bin/team-up.sh` | 확장 (review 윈도우 생성, 모델 파싱·`--model` 주입, `/loop` 프롬프트 주입, `HARNESS_WORKER` env 주입, **워커 카탈로그를 orchestrator.md에 주입[B-2]**, 엔진 분기점 격리) |
 | `bin/dispatch.sh` | **확장 (이슈 1·2)** — window 0/1 양쪽 pane title 조회, `resolve_session` 사용 |
 | `bin/wait-worker.sh` | **확장 (이슈 2)** — `resolve_session` 사용으로 SESSION 일치 |
 | `bin/lib.sh` | 확장 (`resolve_session`, `target_*` window 0/1 지원[이슈 1·3], `scope_match` glob[이슈 8], events.log 파싱 헬퍼, review 윈도우 함정 적용 함수) |
 | `bin/log-event.sh` | **신규 (이슈 6)** — PostToolUse hook 스크립트, events.log 5필드 결정적 기록 |
 | `workspace/.claude/settings.json` | 신규 (PostToolUse hook 정의 — Edit/Write/MultiEdit) |
-| `tests/test-*.sh` (11 신규) | 신규 |
+| `workspace/.harness-state` | 신규 (B-4 — 메인 진도·맥락·단계 상태, 런타임 생성, team-down 정리) |
+| `tests/test-harness-state.sh` | 신규 (B-4 — `.harness-state` read/갱신 멱등, phase 사용자통제 기록만) |
+| `tests/test-*.sh` (12 신규) | 신규 |
 | `tests/probes/probe-{loop,hook}.sh` | 신규 (claude 기동 실측, run-all 비포함·수동) |
 
 ## 10. 범위 밖 (YAGNI)
