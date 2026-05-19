@@ -4,7 +4,7 @@ set -euo pipefail
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_DIR/lib.sh"
 
-SESSION="${SESSION_OVERRIDE:-$SESSION_DEFAULT}"
+SESSION="$(resolve_session)"
 
 if tmux has-session -t "$SESSION" 2>/dev/null; then
   tmux kill-session -t "$SESSION"
