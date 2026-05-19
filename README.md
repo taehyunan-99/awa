@@ -69,3 +69,13 @@ bash tests/run-all.sh
 - `prompts/` — 워커 규약 (커스텀 지점)
 - `workspace/` — 런타임 산출물 (git 제외)
 - `docs/` — 로컬 설계/계획 문서 (.gitignore, git 추적 안 함)
+
+## 에이전트 하네스 (2차)
+
+판단형 메인(프로젝트 관리자) + `/loop`·Monitor 상주 감시 리뷰어 + scope 사전차단 + 모델 차등.
+
+- 가동: `bin/team-up.sh feature-team` (워커 + review 윈도우 + 모델 차등)
+- 메인은 단계 자동 전이 안 함 — 사용자가 PRD→Arch→구현 단계를 수동 진행
+- 감시: 약한 신호(scope, 즉시) / 강한 신호(done 후 의미 판정)
+- 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`
+- 실측 프로브(claude 기동): `tests/probes/probe-{loop,hook}.sh` (수동)
