@@ -25,7 +25,7 @@ N="$(tmux list-panes -t "$SESSION_OVERRIDE:0" | wc -l | tr -d ' ')"
 assert_eq "3" "$N" "페인 3개"
 
 # 워커 title 결정적 검증: split-window -P 로 캡처한 pane_id 로 title 설정하므로
-# select-layout 의 index 재배열과 무관하게 dev/review/test 가 정확히 걸려야 하고,
+# select-layout 의 index 재배열과 무관하게 dev/test 가 정확히 걸려야 하고,
 # 호스트명/기본값 title 이 섞이지 않아야 함 (layout 무관, pane_id 기반).
 TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{pane_title}' | sort | tr '\n' ',')"
 assert_contains "$TITLES" "dev" "워커 title dev 설정됨(layout 무관, pane_id 기반)"
