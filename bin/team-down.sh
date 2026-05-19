@@ -20,7 +20,16 @@ if [ -d "$WORKSPACE/.boot" ]; then
 fi
 
 # 하네스 런타임 산출물(events.log·리뷰 커서·메인 상태·리뷰 결과)도 정리.
-# tasks/results 는 보존. 멱등 — 파일 없어도 || true 로 안전(set -e).
-rm -f "$WORKSPACE"/events.log "$WORKSPACE"/.review-cursor.* "$WORKSPACE"/.harness-state 2>/dev/null || true
-rm -rf "$WORKSPACE"/review 2>/dev/null || true
+# tasks/results 는 보존. 기존 .boot 정리 블록과 동일한 조건부 스타일 유지.
+if [ -f "$WORKSPACE/events.log" ]; then
+  rm -f "$WORKSPACE/events.log" || true
+fi
+if [ -f "$WORKSPACE/.harness-state" ]; then
+  rm -f "$WORKSPACE/.harness-state" || true
+fi
+# .review-cursor.* 글롭: nullglob 없는 bash 3.2 환경에서 2>/dev/null || true 로 안전 처리
+rm -f "$WORKSPACE"/.review-cursor.* 2>/dev/null || true
+if [ -d "$WORKSPACE/review" ]; then
+  rm -rf "${WORKSPACE:?WORKSPACE unset}/review" || true
+fi
 echo "하네스 런타임 산출물 정리 완료."
