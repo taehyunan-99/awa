@@ -105,6 +105,25 @@ cursor_commit() {  # $1=reviewer $2=새 커서값
   printf '%s' "$2" > "$(_cursor_file "$1")"
 }
 
+# 메인 상태 (spec §5.8, B-4). key=value 평문(파싱 단순·셸 친화). claude 무상태 보완.
+_state_file() { printf '%s/.harness-state' "${WORKSPACE}"; }
+
+state_get() {  # $1=key → value (없으면 빈문자열)
+  local f; f="$(_state_file)"
+  [ -f "$f" ] || return 0
+  local line; line="$(grep -m1 "^$1=" "$f" 2>/dev/null || true)"
+  printf '%s' "${line#*=}"
+}
+
+state_set() {  # $1=key $2=value (있으면 교체, 없으면 추가)
+  local f; f="$(_state_file)" key="$1" val="$2"
+  touch "$f"
+  if grep -q "^$key=" "$f" 2>/dev/null; then
+    grep -v "^$key=" "$f" > "$f.tmp" || true; mv "$f.tmp" "$f"
+  fi
+  printf '%s=%s\n' "$key" "$val" >> "$f"
+}
+
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
 send_prompt() {
   local target="$1" text="$2"
