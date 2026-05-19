@@ -27,8 +27,9 @@ fi
 if [ -f "$WORKSPACE/.harness-state" ]; then
   rm -f "$WORKSPACE/.harness-state" || true
 fi
-# .review-cursor.* 글롭: nullglob 없는 bash 3.2 환경에서 2>/dev/null || true 로 안전 처리
+# .review-cursor.*/.harness-task.* 글롭: nullglob 없는 bash 3.2 환경에서 2>/dev/null || true 로 안전 처리
 rm -f "$WORKSPACE"/.review-cursor.* 2>/dev/null || true
+rm -f "$WORKSPACE"/.harness-task.* 2>/dev/null || true
 if [ -d "$WORKSPACE/review" ]; then
   rm -rf "${WORKSPACE:?WORKSPACE unset}/review" || true
 fi

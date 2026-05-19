@@ -105,6 +105,13 @@ cursor_commit() {  # $1=reviewer $2=새 커서값
   printf '%s' "$2" > "$(_cursor_file "$1")"
 }
 
+# 현재 배정 task 기록 (R3). dispatch 가 워커별로 기록 → log-event hook 이
+# HARNESS_TASK env 부재 시 이 파일에서 task 를 읽어 events.log task필드를 채움.
+# claude 무상태·파일기반 (spec). 1워커=1현재task.
+write_harness_task() {  # $1=worker $2=task_id
+  printf '%s' "$2" > "${WORKSPACE}/.harness-task.$1"
+}
+
 # 메인 상태 (spec §5.8, B-4). key=value 평문(파싱 단순·셸 친화). claude 무상태 보완.
 _state_file() { printf '%s/.harness-state' "${WORKSPACE}"; }
 

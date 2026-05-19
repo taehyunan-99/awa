@@ -8,7 +8,12 @@ set -uo pipefail
 EVENTS_LOG="${EVENTS_LOG:-$HOME/.agent-harness-events.log}"
 REPO_ROOT="${REPO_ROOT:-$PWD}"
 worker="${HARNESS_WORKER:-unknown}"
-task="${HARNESS_TASK:--}"
+task="${HARNESS_TASK:-}"
+if [ -z "$task" ]; then
+  _htf="${REPO_ROOT}/workspace/.harness-task.${worker}"
+  if [ -f "$_htf" ]; then task="$(cat "$_htf" 2>/dev/null || true)"; fi
+fi
+[ -z "$task" ] && task="-"
 
 raw="$(cat)"
 # jq 있으면 사용, 없으면 grep 폴백 (의존성 최소화)

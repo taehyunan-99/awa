@@ -48,5 +48,6 @@ if [ -z "$TARGET" ]; then
   exit 1
 fi
 
+write_harness_task "$WORKER" "$TASK_ID"
 send_prompt "$TARGET" "TASK $TASK_ID"
 echo "배정 완료: 워커=$WORKER ($TARGET) ← TASK $TASK_ID"
