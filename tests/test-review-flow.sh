@@ -31,4 +31,17 @@ mkfile "test-2.spec-rev.md" OK low
 assert_eq "OK" "$(review_verdict "$RV" test 2)" "다른 task 격리"
 assert_eq "VIOLATION" "$(review_verdict "$RV" dev 1)" "기존 task 영향 없음"
 
+# 형식 변종 견고성 (T14 리뷰 Important — 프롬프트는 등호 지시, 파서 형식무관이어야)
+RV2="$TMP/review2"; mkdir -p "$RV2"
+printf -- 'verdict=VIOLATION, signal=weak, severity=high\n' > "$RV2/dev-1.spec-rev.md"
+assert_eq "VIOLATION" "$(review_verdict "$RV2" dev 1)" "등호 형식 verdict=VIOLATION 인식"
+printf -- 'verdict=OK\n' > "$RV2/test-2.spec-rev.md"
+assert_eq "OK" "$(review_verdict "$RV2" test 2)" "등호 형식 verdict=OK 인식"
+printf -- 'verdict:violation\n' > "$RV2/x-3.spec-rev.md"
+assert_eq "VIOLATION" "$(review_verdict "$RV2" x 3)" "콜론무공백·소문자 verdict 인식"
+printf -- '- verdict: OK (all checks passed)\n' > "$RV2/y-4.quality-rev.md"
+assert_eq "OK" "$(review_verdict "$RV2" y 4)" "마크다운 불릿+괄호주석 verdict 인식"
+printf -- 'verdict: VIOLATION\nseverity: high\n' > "$RV2/z-5.arch-rev.md"
+assert_eq "VIOLATION" "$(review_verdict "$RV2" z 5)" "YAML 형식 회귀(기존 형식도 여전히)"
+
 test_summary

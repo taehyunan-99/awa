@@ -160,7 +160,7 @@ review_verdict() {  # $1=review디렉터리 $2=worker $3=id
   for f in "$dir/$w-$id."*.md; do
     [ -f "$f" ] || continue
     found=1
-    v="$(grep -m1 '^verdict:' "$f" | awk '{print $2}')"
+    v="$(grep -m1 -i 'verdict' "$f" 2>/dev/null | grep -io 'VIOLATION\|OK' | head -1 | tr 'a-z' 'A-Z')"
     if [ "$v" = "VIOLATION" ]; then printf 'VIOLATION'; return 0; fi
   done
   if [ "$found" = "1" ]; then printf 'OK'; else printf 'PENDING'; fi
