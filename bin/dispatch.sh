@@ -4,7 +4,7 @@ set -euo pipefail
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_DIR/lib.sh"
 
-SESSION="${SESSION_OVERRIDE:-$SESSION_DEFAULT}"
+SESSION="$(resolve_session)"
 
 WORKER="${1:-}"
 TASK_ID="${2:-}"
@@ -27,20 +27,26 @@ if [ ! -f "$TASK_FILE" ]; then
   exit 1
 fi
 
-# 워커 → 페인 인덱스: pane title 로 찾는다 (team-up 이 title=워커명 설정)
-PANE_IDX=""
-while IFS=$'\t' read -r pidx ptitle; do
-  if [ "$ptitle" = "$WORKER" ]; then
-    PANE_IDX="$pidx"
-    break
+# 워커/리뷰어 → 페인: window 0(team)·1(review) 양쪽에서 pane title 로 찾는다.
+TARGET=""
+for win in 0 1; do
+  tmux has-session -t "$SESSION" 2>/dev/null || break
+  if ! tmux list-windows -t "$SESSION" -F '#{window_index}' | grep -qx "$win"; then
+    continue
   fi
-done < <(tmux list-panes -t "$SESSION:0" -F $'#{pane_index}\t#{pane_title}')
+  while IFS=$'\t' read -r pidx ptitle; do
+    if [ "$ptitle" = "$WORKER" ]; then
+      TARGET="$SESSION:$win.$pidx"
+      break
+    fi
+  done < <(tmux list-panes -t "$SESSION:$win" -F $'#{pane_index}\t#{pane_title}')
+  [ -n "$TARGET" ] && break
+done
 
-if [ -z "$PANE_IDX" ]; then
-  echo "오류: 워커 '$WORKER' 페인을 찾을 수 없음. 활성 워커: $(tmux list-panes -t "$SESSION:0" -F '#{pane_title}' | tr '\n' ' ')" >&2
+if [ -z "$TARGET" ]; then
+  echo "오류: 워커/리뷰어 '$WORKER' 페인을 찾을 수 없음 (window 0·1 조회)." >&2
   exit 1
 fi
 
-TARGET="$SESSION:0.$PANE_IDX"
 send_prompt "$TARGET" "TASK $TASK_ID"
-echo "배정 완료: 워커=$WORKER (pane $PANE_IDX) ← TASK $TASK_ID"
+echo "배정 완료: 워커=$WORKER ($TARGET) ← TASK $TASK_ID"

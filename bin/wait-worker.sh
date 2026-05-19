@@ -4,7 +4,7 @@ set -euo pipefail
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_DIR/lib.sh"
 
-SESSION="${SESSION_OVERRIDE:-$SESSION_DEFAULT}"
+SESSION="$(resolve_session)"
 
 WORKER="${1:-}"
 TASK_ID="${2:-}"
@@ -56,15 +56,19 @@ else
   rc=$?
   echo "오류: 타임아웃(${TIMEOUT}s) — 채널 '$CHANNEL' 신호 없음 (워커=$WORKER)" >&2
   echo "---- capture-pane (워커 '$WORKER') ----" >&2
-  # 워커 페인 찾아 덤프 (dispatch.sh 와 동일한 탭 구분 파싱)
-  pidx=""
-  while IFS=$'\t' read -r pi pt; do
-    [ "$pt" = "$WORKER" ] && { pidx="$pi"; break; }
-  done < <(tmux list-panes -t "$SESSION:0" -F $'#{pane_index}\t#{pane_title}' 2>/dev/null || true)
-  if [ -n "$pidx" ]; then
-    tmux capture-pane -p -t "$SESSION:0.$pidx" -S -40 >&2 2>/dev/null || echo "(페인 캡처 실패)" >&2
+  # 워커/리뷰어 페인 찾아 덤프: window 0(team)·1(review) 양쪽 조회
+  tgt=""
+  for win in 0 1; do
+    tmux list-windows -t "$SESSION" -F '#{window_index}' 2>/dev/null | grep -qx "$win" || continue
+    while IFS=$'\t' read -r pi pt; do
+      [ "$pt" = "$WORKER" ] && { tgt="$SESSION:$win.$pi"; break; }
+    done < <(tmux list-panes -t "$SESSION:$win" -F $'#{pane_index}\t#{pane_title}' 2>/dev/null || true)
+    [ -n "$tgt" ] && break
+  done
+  if [ -n "$tgt" ]; then
+    tmux capture-pane -p -t "$tgt" -S -40 >&2 2>/dev/null || echo "(페인 캡처 실패)" >&2
   else
-    echo "(워커 페인을 찾을 수 없음)" >&2
+    echo "(워커/리뷰어 페인을 찾을 수 없음)" >&2
   fi
   echo "---- end capture ----" >&2
   exit "$rc"
