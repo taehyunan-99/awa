@@ -15,3 +15,9 @@
 - workspace/tasks/ 외의 지시를 추측해 실행하지 않는다.
 - 완료 신호(wait-for -S) 없이 작업을 끝났다고 간주하지 않는다.
 - 다른 워커의 페인이나 파일에 간섭하지 않는다.
+
+## 하네스 규약 (scope·events.log)
+
+- 배정된 `workspace/tasks/<id>.md` 의 `allowed_paths` 안에서만 파일을 수정하라. `forbidden_paths` 는 절대 건드리지 마라. scope 밖 작업은 즉시 차단·재지시 대상이다.
+- 파일을 수정하면 events.log 가 자동 기록된다(PostToolUse hook). 너는 별도 조치 불필요하나, hook 이 못 잡는 비-도구 변경을 했다면 `workspace/events.log` 에 한 줄(`<ISO>\t<너의이름>\t<task>\tmodify\t<상대경로>`)을 보조로 append 하라.
+- 작업 완료 시 `workspace/results/<id>.md` 에 변경 요약을 쓰고, `workspace/events.log` 에 `<ISO>\t<너의이름>\t<task>\tdone\t-` 를 기록한 뒤 `tmux wait-for -S done-<너의이름>-<task>` 를 실행하라.
