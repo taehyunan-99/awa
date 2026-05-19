@@ -28,12 +28,35 @@ JSON
 # settings.json 안의 $WS 를 실제 경로로 치환 (heredoc 내 변수 미전개 대응)
 sed -i.bak "s#\$WS#$WS#g" "$WS/.claude/settings.json" && rm -f "$WS/.claude/settings.json.bak"
 
+# claude REPL 준비 폴링 (trust 프롬프트 자동 통과 포함 — probe-loop 와 동일 사유).
+wait_repl() {  # $1=session, 최대 ~90s
+  local s="$1" i dump trusted=0
+  for i in $(seq 1 45); do
+    sleep 2
+    dump="$(tmux capture-pane -t "$s" -p 2>/dev/null)"
+    if [ "$trusted" = 0 ] && printf '%s' "$dump" | grep -q 'trust this folder'; then
+      tmux send-keys -t "$s" Enter   # "1. Yes, I trust this folder"
+      trusted=1
+      continue
+    fi
+    if printf '%s' "$dump" | grep -q 'bypass permissions on'; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 tmux new-session -d -s "$S" -x 200 -y 50
 tmux set-option -t "$S" allow-set-title off 2>/dev/null || true
 tmux send-keys -t "$S" -l "cd $WS && HARNESS_WORKER=probeworker claude --dangerously-skip-permissions"
 tmux send-keys -t "$S" Enter
-echo "[probe-hook] claude 기동 35s 대기..."
-sleep 35
+echo "[probe-hook] claude REPL 준비 폴링(trust 자동 통과 포함)..."
+if ! wait_repl "$S"; then
+  echo "[probe-hook] FAIL — claude REPL 미준비. pane 덤프:"
+  tmux capture-pane -t "$S" -p | tail -30; exit 1
+fi
+echo "[probe-hook] REPL 준비 완료"
+sleep 3
 
 # cwd·CLAUDE_PROJECT_DIR 진단: settings.json 을 어디 둬야 claude 가 읽는지,
 # hook 안에서 CLAUDE_PROJECT_DIR 이 무엇으로 잡히는지 확인 (T6 경로 확정 근거).
