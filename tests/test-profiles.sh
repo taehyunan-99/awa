@@ -18,7 +18,7 @@ assert_contains "${WORKERS[*]}" "security" "code-review 에 security 포함"
 source "$ROOT/profiles/research.sh"
 assert_eq "3" "${#WORKERS[@]}" "research 워커 3개"
 
-for f in _common roles/dev roles/reviewer roles/tester roles/security roles/researcher; do
+for f in _common roles/dev roles/tester roles/security roles/researcher roles/orchestrator roles/reviewer-spec roles/reviewer-quality roles/reviewer-arch; do
   [ -f "$ROOT/prompts/$f.md" ]; assert_success "$?" "prompts/$f.md 존재"
 done
 
