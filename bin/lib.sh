@@ -166,6 +166,14 @@ review_verdict() {  # $1=review디렉터리 $2=worker $3=id
   if [ "$found" = "1" ]; then printf 'OK'; else printf 'PENDING'; fi
 }
 
+# 시그널 유실 안전장치 (spec §6). wait-for 가 메인 대기 전 발화해도
+# events.log 의 done 라인으로 완료를 확정 (멱등).
+done_logged() {  # $1=events.log $2=worker $3=id → done 라인 있으면 0
+  [ -f "$1" ] || return 1
+  awk -F'\t' -v w="$2" -v id="$3" \
+    '$2==w && $3==id && $4=="done"{f=1} END{exit f?0:1}' "$1"
+}
+
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
 send_prompt() {
   local target="$1" text="$2"
