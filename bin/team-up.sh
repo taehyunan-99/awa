@@ -5,7 +5,12 @@ _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$_DIR/lib.sh"
 
 PROFILE="${1:-default}"
-PROFILE_FILE="$REPO_ROOT/profiles/$PROFILE.sh"
+# $1 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
+if [ -f "$PROFILE" ]; then
+  PROFILE_FILE="$PROFILE"
+else
+  PROFILE_FILE="$REPO_ROOT/profiles/$PROFILE.sh"
+fi
 
 if [ ! -f "$PROFILE_FILE" ]; then
   echo "오류: 프로파일 없음 → $PROFILE_FILE" >&2
@@ -17,11 +22,33 @@ fi
 # shellcheck disable=SC1090
 source "$PROFILE_FILE"
 
-# 테스트/멀티팀용 세션명 오버라이드
-SESSION="${SESSION_OVERRIDE:-$SESSION}"
+# 프로파일이 정의한 SESSION 을 resolve_session 체인에 노출 (이슈 2, T2).
+export PROFILE_SESSION="${SESSION:-}"
+SESSION="$(resolve_session)"
 
 # 워커 명령 (기본 claude, 테스트는 AGENT_CMD 로 더미 치환)
 AGENT_CMD="${AGENT_CMD:-claude}"
+
+# "pane:역할[:모델]" 파싱. 모델 생략 시 sonnet. (spec §7.1)
+parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_MODEL 설정
+  local e="$1"
+  ENTRY_NAME="${e%%:*}"
+  local rest="${e#*:}"
+  ENTRY_ROLE="${rest%%:*}"
+  if [ "$rest" = "$ENTRY_ROLE" ]; then ENTRY_MODEL="sonnet"; else ENTRY_MODEL="${rest#*:}"; fi
+  [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
+  return 0
+}
+
+# 엔진 명령 조립: claude 는 --model, 그 외 엔진은 분기점 한 곳(codex 후속 확장지점, spec §7.2)
+agent_cmd_for() {  # $1=model → echo 실행 명령
+  local model="$1"
+  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+    printf 'claude --model %s' "$model"
+  else
+    printf '%s' "$AGENT_CMD"   # 테스트(cat/dummy) 또는 codex 등
+  fi
+}
 
 # 중복 세션 거부
 if tmux has-session -t "$SESSION" 2>/dev/null; then
@@ -30,6 +57,14 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
 fi
 
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results"
+
+# PostToolUse hook 설정을 머신 절대경로로 치환해 생성 (T6, 이슈 6·7).
+if [ -f "$REPO_ROOT/workspace/.claude/settings.json.tpl" ]; then
+  mkdir -p "$REPO_ROOT/.claude"
+  sed "s#__REPO__#$REPO_ROOT#g" \
+    "$REPO_ROOT/workspace/.claude/settings.json.tpl" \
+    > "$REPO_ROOT/.claude/settings.json"
+fi
 
 # 오케스트레이터 페인으로 세션 생성. 셸 유지.
 tmux new-session -d -s "$SESSION" -x 220 -y 50 -n team
@@ -64,10 +99,10 @@ tmux select-pane -t "$ORCH_PID" -T "ORCHESTRATOR"
 WORKER_NAMES=()
 WORKER_PIDS=()
 for entry in "${WORKERS[@]}"; do
-  name="${entry%%:*}"
+  parse_entry "$entry"
   pid="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
-  tmux select-pane -t "$pid" -T "$name"
-  WORKER_NAMES+=("$name")
+  tmux select-pane -t "$pid" -T "$ENTRY_NAME"
+  WORKER_NAMES+=("$ENTRY_NAME")
   WORKER_PIDS+=("$pid")
 done
 # 모든 split 완료 후 layout 한 번만 적용 (pane_id 방식이라 순서 무관·안전).
@@ -76,23 +111,94 @@ tmux select-layout -t "$SESSION:0" "$LAYOUT"
 # continuum 오염 방지: 이 세션 자동저장 사실상 비활성화
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
+# review 윈도우(window 1) 생성 — REVIEWERS 정의·비어있지 않을 때만.
+# 가드 순서 중요: 존재 확인(+x) 먼저, 그 다음에만 길이 평가 (set -u·bash3.2 안전).
+REV_NAMES=()
+REV_PIDS=()
+if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
+  tmux new-window -t "$SESSION" -n review
+  first=1
+  for entry in "${REVIEWERS[@]}"; do
+    parse_entry "$entry"
+    if [ "$first" = "1" ]; then
+      pid="$(tmux display-message -p -t "$SESSION:review" '#{pane_id}')"
+      first=0
+    else
+      pid="$(tmux split-window -t "$SESSION:review" -d -P -F '#{pane_id}')"
+    fi
+    tmux select-pane -t "$pid" -T "$ENTRY_NAME"
+    REV_NAMES+=("$ENTRY_NAME")
+    REV_PIDS+=("$pid")
+  done
+  tmux select-layout -t "$SESSION:review" "${LAYOUT:-tiled}"
+fi
+
+# /loop 주입 헬퍼: 프롬프트 파일이 있을 때만 (T10 전이면 no-op).
+inject_loop() {  # $1=pane_id(또는 target) $2=loop프롬프트파일
+  local pid="$1" pf="$2"
+  [ -f "$pf" ] || return 0
+  tmux send-keys -t "$pid" -l "/loop $(tr '\n' ' ' < "$pf")"
+  sleep 1
+  tmux send-keys -t "$pid" Enter
+}
+
 # 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입.
 # 타겟은 split 단계에서 캡처한 pane_id (index 재배열 면역).
+# 워커 boot 는 1차 그대로: _common.md + roles/<역할>.md + {{WORKER_NAME}} 치환.
 i=0
 for entry in "${WORKERS[@]}"; do
-  name="${entry%%:*}"
-  role="${entry##*:}"
-  bf="$(boot_file "$name")"
-  cat "$REPO_ROOT/prompts/_common.md" "$REPO_ROOT/prompts/roles/$role.md" \
-    | sed "s/{{WORKER_NAME}}/$name/g" > "$bf"
+  parse_entry "$entry"
+  bf="$(boot_file "$ENTRY_NAME")"
+  cat "$REPO_ROOT/prompts/_common.md" "$REPO_ROOT/prompts/roles/$ENTRY_ROLE.md" \
+    | sed "s/{{WORKER_NAME}}/$ENTRY_NAME/g" > "$bf"
 
   tgt="${WORKER_PIDS[$i]}"
-  tmux send-keys -t "$tgt" -l "$AGENT_CMD"
+  tmux send-keys -t "$tgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
+  tmux send-keys -t "$tgt" Enter
+  tmux send-keys -t "$tgt" -l "cd \"$REPO_ROOT\" && $(agent_cmd_for "$ENTRY_MODEL")"
   tmux send-keys -t "$tgt" Enter
   sleep 0.2
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
+
+# 메인(ORCHESTRATOR) 부트: _common.md 제외. orchestrator.md + 워커 카탈로그.
+catalog=""
+for entry in "${WORKERS[@]}"; do
+  parse_entry "$entry"
+  desc="$(head -1 "$REPO_ROOT/prompts/roles/$ENTRY_ROLE.md" 2>/dev/null || true)"
+  catalog+="- $ENTRY_NAME (역할 $ENTRY_ROLE): $desc"$'\n'
+done
+obf="$(boot_file ORCHESTRATOR)"
+{ cat "$REPO_ROOT/prompts/roles/orchestrator.md" 2>/dev/null || true
+  printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
+
+tmux send-keys -t "$ORCH_PID" -l "export HARNESS_WORKER=ORCHESTRATOR"
+tmux send-keys -t "$ORCH_PID" Enter
+tmux send-keys -t "$ORCH_PID" -l "cd \"$REPO_ROOT\" && $(agent_cmd_for "${ORCHESTRATOR_MODEL:-opus}")"
+tmux send-keys -t "$ORCH_PID" Enter
+sleep 0.2
+send_prompt "$ORCH_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
+inject_loop "$ORCH_PID" "$REPO_ROOT/prompts/loop/orchestrator.md"
+
+# 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
+if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
+  j=0
+  for entry in "${REVIEWERS[@]}"; do
+    parse_entry "$entry"
+    rbf="$(boot_file "$ENTRY_NAME")"
+    cat "$REPO_ROOT/prompts/roles/$ENTRY_ROLE.md" > "$rbf" 2>/dev/null || : > "$rbf"
+    rtgt="${REV_PIDS[$j]}"
+    tmux send-keys -t "$rtgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
+    tmux send-keys -t "$rtgt" Enter
+    tmux send-keys -t "$rtgt" -l "cd \"$REPO_ROOT\" && $(agent_cmd_for "$ENTRY_MODEL")"
+    tmux send-keys -t "$rtgt" Enter
+    sleep 0.2
+    send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
+    inject_loop "$rtgt" "$REPO_ROOT/prompts/loop/reviewer.md"
+    j=$((j + 1))
+  done
+fi
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
 echo "attach: tmux attach -t $SESSION"
