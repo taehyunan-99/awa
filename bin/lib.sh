@@ -8,6 +8,12 @@ REPO_ROOT="$(cd "$_LIB_DIR/.." && pwd)"
 WORKSPACE="$REPO_ROOT/workspace"
 SESSION_DEFAULT="agents"
 
+# SESSION 결정 단일화. 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION_DEFAULT.
+# dispatch.sh/wait-worker.sh/team-up.sh 가 모두 이 함수로 세션명을 얻어 불일치 제거(이슈 2).
+resolve_session() {
+  printf '%s' "${SESSION_OVERRIDE:-${PROFILE_SESSION:-$SESSION_DEFAULT}}"
+}
+
 # 페인 인덱스 → tmux target (session:window.pane).
 # 활성 세션(SESSION 변수, 없으면 SESSION_DEFAULT) 기준 — 세션 오버라이드/멀티팀 지원.
 # 윈도우 0 고정 (team-up.sh가 세션 로컬 base-index=0 강제). pane은 1부터(pane-base-index=1).
