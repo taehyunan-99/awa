@@ -6,7 +6,7 @@ ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
 # 기본: 인자 없고 env 없으면 SESSION_DEFAULT
-unset SESSION_OVERRIDE PROFILE_SESSION 2>/dev/null || true
+unset SESSION_OVERRIDE PROFILE_SESSION SESSION 2>/dev/null || true
 assert_eq "agents" "$(resolve_session)" "기본 → SESSION_DEFAULT"
 
 # PROFILE_SESSION 우선 (team-up: 프로파일 SESSION)

@@ -5,7 +5,7 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
-unset SESSION_OVERRIDE PROFILE_SESSION 2>/dev/null || true
+unset SESSION_OVERRIDE PROFILE_SESSION SESSION 2>/dev/null || true
 
 # target_in <window> <pane> → session:window.pane (resolve_session 사용)
 assert_eq "agents:0.2" "$(target_in 0 2)" "window 0 pane 2"
