@@ -11,16 +11,19 @@ SESSION_DEFAULT="agents"
 # SESSION 결정 단일화. 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION_DEFAULT.
 # dispatch.sh/wait-worker.sh/team-up.sh 가 모두 이 함수로 세션명을 얻어 불일치 제거(이슈 2).
 resolve_session() {
-  printf '%s' "${SESSION_OVERRIDE:-${PROFILE_SESSION:-$SESSION_DEFAULT}}"
+  printf '%s' "${SESSION_OVERRIDE:-${PROFILE_SESSION:-${SESSION:-$SESSION_DEFAULT}}}"
 }
 
-# 페인 인덱스 → tmux target (session:window.pane).
-# 활성 세션(SESSION 변수, 없으면 SESSION_DEFAULT) 기준 — 세션 오버라이드/멀티팀 지원.
-# 윈도우 0 고정 (team-up.sh가 세션 로컬 base-index=0 강제). pane은 1부터(pane-base-index=1).
-# pane 1 은 오케스트레이터, 워커는 2 부터.
+# 윈도우·페인 인덱스 → tmux target. 세션명은 resolve_session().
+# 2윈도우(team=0, review=1) 도입으로 window 고정 불가 → window 인자화(이슈 1·3).
+target_in() {
+  local win="$1" pane="$2"
+  printf '%s:%s.%s' "$(resolve_session)" "$win" "$pane"
+}
+
+# 하위호환: 기존 호출부(window 0 가정)는 그대로. 내부적으로 target_in 위임.
 target_of() {
-  local idx="$1"
-  printf '%s:0.%s' "${SESSION:-$SESSION_DEFAULT}" "$idx"
+  target_in 0 "$1"
 }
 
 # 세션 로컬로 인덱스 규약 고정. 전역 ~/.tmux.conf 설정에 비의존.
