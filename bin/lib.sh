@@ -66,6 +66,28 @@ session_exists() {
   tmux has-session -t "$s" 2>/dev/null
 }
 
+# glob 경로 매칭. bash [[ == ]] 는 ** 재귀를 지원 안 함 → 정규식 변환(spec §5.1, 이슈 8).
+#   **  → .*           (디렉터리 경계 넘는 재귀)
+#   *   → [^/]*         (단일 세그먼트, / 안 넘음)
+#   .   → \.            (literal)
+# 전체 앵커(^...$)로 부분일치(authx vs auth) 차단.
+# 반환: 매치 0, 불일치 1.
+scope_match() {
+  local path="$1" pat="$2" re=""
+  local i ch
+  for (( i=0; i<${#pat}; i++ )); do
+    ch="${pat:i:1}"
+    case "$ch" in
+      '*')
+        if [ "${pat:i+1:1}" = '*' ]; then re+='.*'; i=$((i+1)); else re+='[^/]*'; fi ;;
+      '.') re+='\.' ;;
+      '/') re+='/' ;;
+      *) re+="$ch" ;;
+    esac
+  done
+  [[ "$path" =~ ^${re}$ ]]
+}
+
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
 send_prompt() {
   local target="$1" text="$2"
