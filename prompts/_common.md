@@ -27,4 +27,4 @@
 
 - 도구 — `{{HARNESS_ROOT}}/bin/`. 항상 절대경로로 호출하라.
 - 산출물 — `$PWD/.agent-harness/` (= PROJECT_ROOT 안).
-- PROJECT_ROOT 안에서 도구를 찾지 마라. `bin/dispatch.sh` 같은 상대경로 호출 금지.
+- PROJECT_ROOT 안에서 도구를 찾지 마라. "bin/dispatch.sh" 식으로 백틱+상대경로로 호출 금지.
