@@ -56,7 +56,7 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   exit 1
 fi
 
-mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results"
+mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 
 # PostToolUse hook 설정을 머신 절대경로로 치환해 생성 (T6, 이슈 6·7).
 if [ -f "$REPO_ROOT/workspace/.claude/settings.json.tpl" ]; then
