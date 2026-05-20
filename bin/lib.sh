@@ -45,9 +45,6 @@ case "$PROJECT_ROOT" in
 esac
 
 WORKSPACE="$PROJECT_ROOT/.agent-harness"
-# 마이그레이션 호환 별칭 — T11 에서 제거. spec §5.1 의 "REPO_ROOT 변수 사라진다"
-# 는 최종 상태. 그 전까지 기존 25 스위트의 'workspace/' 참조 호환 위해 유지.
-REPO_ROOT="$HARNESS_ROOT"
 
 # basename sanitize: tmux 세션명 규칙([A-Za-z0-9_-]).
 # bash 3.2 ${var//pattern} 의 glob/정규식 모호성 회피 위해 sed (D3).

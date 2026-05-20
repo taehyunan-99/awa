@@ -6,8 +6,8 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
-assert_eq "$ROOT" "$REPO_ROOT" "REPO_ROOT 가 repo 루트"
-assert_eq "$ROOT/workspace" "$WORKSPACE" "WORKSPACE 경로"
+assert_eq "$ROOT" "$HARNESS_ROOT" "HARNESS_ROOT 가 하네스 루트"
+assert_eq "$PROJECT_ROOT/.agent-harness" "$WORKSPACE" "WORKSPACE 경로"
 assert_eq "agents" "$SESSION_DEFAULT" "기본 세션명"
 
 # SESSION 미설정 → 자동명 폴백 (T3): agents-<basename of PROJECT_ROOT>
@@ -20,6 +20,6 @@ SESSION=myteam
 assert_eq "myteam:0.3" "$(target_of 3)" "SESSION 설정 → 활성 세션 존중"
 unset SESSION
 
-assert_eq "$ROOT/workspace/.boot/dev.md" "$(boot_file dev)" "boot_file 경로"
+assert_eq "$PROJECT_ROOT/.agent-harness/.boot/dev.md" "$(boot_file dev)" "boot_file 경로"
 
 test_summary
