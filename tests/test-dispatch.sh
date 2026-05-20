@@ -7,14 +7,21 @@ ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="dp_$$"
 export AGENT_CMD="cat"
 
-cleanup() { tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true; rm -rf "$ROOT/workspace/.boot"; rm -f "$ROOT/workspace/tasks/T1.md"; }
+TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
+export HARNESS_PROJECT="$TMP_PROJ"
+mkdir -p "$TMP_PROJ/.agent-harness/tasks"
+
+cleanup() {
+  tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
+  rm -rf "$TMP_PROJ"
+}
 trap cleanup EXIT
 
 bash "$ROOT/bin/team-up.sh" default >/dev/null
 sleep 0.3
 
 # 작업 파일 준비
-echo "# T1: 더미 작업" > "$ROOT/workspace/tasks/T1.md"
+echo "# T1: 더미 작업" > "$TMP_PROJ/.agent-harness/tasks/T1.md"
 
 # 정상 dispatch
 SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/dispatch.sh" dev T1
