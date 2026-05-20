@@ -76,4 +76,14 @@ assert_fail "$?" "없는 프로파일 → 실패"
 tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
 # TMP_PROJ 정리는 EXIT trap 이 일괄 수행.
 
+# 4) 5차 리뷰 I1 회귀: .gitignore 부재 git repo → 안내 발화 (보호 강도 역전 차단).
+#    spec L216: 룰 누락 안내. 파일 부재는 더 큰 누락 — 침묵 금지.
+TMP_GI="$(mktemp -d)"; ( cd "$TMP_GI" && git init -q )
+out="$(HARNESS_PROJECT="$TMP_GI" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" default 2>&1 >/dev/null)"
+assert_contains "$out" ".gitignore 파일이 없습니다" ".gitignore 부재 안내 발화"
+# cleanup: agents-* 세션 (HARNESS_PROJECT 가 SESSION_OVERRIDE 없는 호출이므로 autoname 사용)
+_safe_gi="$(printf '%s' "$(basename "$TMP_GI")" | sed 's/[^A-Za-z0-9_-]/_/g')"
+tmux kill-session -t "agents-$_safe_gi" 2>/dev/null || true
+rm -rf "$TMP_GI"
+
 test_summary

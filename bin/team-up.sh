@@ -103,8 +103,11 @@ if [ -f "$HARNESS_ROOT/templates/settings.json.tpl" ]; then
 fi
 
 # .gitignore 안내 (E5: git repo 일 때만, D5: settings.json 룰은 안내 X).
-if [ "$PROJECT_ROOT_IS_GIT" = "1" ] && [ -f "$PROJECT_ROOT/.gitignore" ]; then
-  if ! grep -q '^\.agent-harness/' "$PROJECT_ROOT/.gitignore" 2>/dev/null; then
+# spec L216: 룰 누락 시 stderr 1회. 파일 자체 부재는 더 큰 누락 — 별도 안내 (5차 리뷰 I1).
+if [ "$PROJECT_ROOT_IS_GIT" = "1" ]; then
+  if [ ! -f "$PROJECT_ROOT/.gitignore" ]; then
+    echo "안내: $PROJECT_ROOT/.gitignore 파일이 없습니다. '.agent-harness/' 룰 추가 권장 ('.claude/.agent-harness-marker' 도)" >&2
+  elif ! grep -q '^\.agent-harness/' "$PROJECT_ROOT/.gitignore" 2>/dev/null; then
     echo "안내: $PROJECT_ROOT/.gitignore 에 '.agent-harness/' 룰 추가 권장" >&2
   fi
 fi
