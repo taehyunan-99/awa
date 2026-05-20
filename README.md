@@ -81,6 +81,16 @@ SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
 - 결과 전달: `<PROJECT_ROOT>/.agent-harness/results/<id>.md` 파일
 - 디버그: `tmux capture-pane -p`
 - 워커 식별: pane title=워커명 (team-up 이 split-window -P 의 pane_id 로 정확히 설정하고 `allow-set-title off` 로 셸 escape 로부터 보존)
+- 부트 프롬프트는 `{{HARNESS_ROOT}}` 토큰을 통해 도구 절대경로를 박는다. team-up 이 sed 치환으로 실제 경로로 변환. 워커는 항상 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 도구 호출.
+
+## 환경변수
+
+| 이름 | 기본 | 의미 |
+|---|---|---|
+| `SHELL_READY_TIMEOUT` | 15 (초) | pane 셸 ready 폴링 timeout. conda init 등 느린 환경에서 늘림. |
+| `BOOT_REPL_CHECK_DELAY` | 5 (초) | claude 명령 송신 후 trust/REPL 검출 매치 윈도우. (timeout 아님 — 검사 대기.) |
+| `HARNESS_PROJECT` | (없음) | PROJECT_ROOT 강제 지정. 기본은 git toplevel 또는 PWD 폴백. |
+| `PROMPTS_DIR` | `$HARNESS_ROOT/prompts` | 부트 프롬프트 디렉터리 override (주로 테스트 fixture 용). |
 
 ## 테스트
 
