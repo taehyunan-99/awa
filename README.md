@@ -15,25 +15,50 @@ tmux 페인마다 Claude Code 인스턴스를 띄우고 역할/제약을 부여�
 
 ## 사용법
 
+작업하려는 프로젝트의 디렉터리에서 호출한다(자동감지). 또는 어디서든 `--project /path` 로 명시.
+
 ```bash
-# 1) 팀 가동 (기본 프로파일: dev/review/test)
-bin/team-up.sh default
-tmux attach -t agents
+# 1) 프로젝트로 이동 후 팀 가동 (작업 대상 = 현재 cwd 의 git toplevel)
+cd ~/work/projectA
+~/Desktop/Repo/Practice/tmux-agent-team/bin/team-up.sh feature-team
+# 또는 어디서든:
+#   ~/.../bin/team-up.sh --project ~/work/projectA feature-team
+
+tmux attach -t agents-projectA   # 세션명은 basename 기반 자동
 
 # 2) 작업 지시 작성
-echo "# T1: 로그인 버그 수정" > workspace/tasks/T1.md
+echo "# T1: 로그인 버그 수정" > ~/work/projectA/.agent-harness/tasks/T1.md
 
-# 3) 워커에 배정
-bin/dispatch.sh dev T1
+# 3) 워커에 배정 (메인 pane 이 dispatch 호출하는 게 일반적)
+~/.../bin/dispatch.sh dev T1
+# 외부 셸에서:  ~/.../bin/dispatch.sh --project ~/work/projectA dev T1
 
-# 4) 완료 대기 (기본 300초, 변경 가능)
-bin/wait-worker.sh dev T1 300
+# 4) 완료 대기
+~/.../bin/wait-worker.sh dev T1 300
 
 # 5) 결과 확인
-cat workspace/results/T1.md
+cat ~/work/projectA/.agent-harness/results/T1.md
 
-# 6) 팀 정리
-bin/team-down.sh
+# 6) 팀 정리 (tasks/results 는 보존, 런타임만 정리)
+~/.../bin/team-down.sh   # cwd=projectA 기준
+# 또는:  ~/.../bin/team-down.sh --project ~/work/projectA
+```
+
+## 멀티 프로젝트 동시 가동
+
+서로 다른 프로젝트라면 동시에 가동 가능. SESSION 은 `agents-<basename>` 자동.
+
+```bash
+# 셸 1
+cd ~/work/projectA && ~/.../bin/team-up.sh default
+# 셸 2
+cd ~/work/projectB && ~/.../bin/team-up.sh default
+# → tmux 에 agents-projectA·agents-projectB 두 세션 공존
+```
+
+basename 충돌 시(둘 다 `auth/`) 후행 가동만 거부. 회피:
+```bash
+SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
 ```
 
 ## 프로파일
@@ -51,7 +76,7 @@ bin/team-down.sh
 
 - 명령 주입: `tmux send-keys -l` (텍스트/Enter 분리)
 - 완료 동기화: `tmux wait-for` (폴링 없는 블로킹, race-safe)
-- 결과 전달: `workspace/results/<id>.md` 파일
+- 결과 전달: `<PROJECT_ROOT>/.agent-harness/results/<id>.md` 파일
 - 디버그: `tmux capture-pane -p`
 - 워커 식별: pane title=워커명 (team-up 이 split-window -P 의 pane_id 로 정확히 설정하고 `allow-set-title off` 로 셸 escape 로부터 보존)
 
@@ -63,12 +88,13 @@ bash tests/run-all.sh
 
 외부 의존성 없음. 실제 tmux 세션을 띄우되 워커 명령을 `AGENT_CMD` 환경변수로 더미 치환해 검증한다.
 
-## 디렉토리
+## 디렉터리
 
-- `bin/` — 고정 로직 (수정 거의 불필요)
-- `profiles/` — 팀 구성 정의 (커스텀 지점)
-- `prompts/` — 워커 규약 (커스텀 지점)
-- `workspace/` — 런타임 산출물 (git 제외)
+- **HARNESS_ROOT** (이 repo) — `bin/`·`profiles/`·`prompts/`·`templates/`. 정의 자산. 모든 프로젝트 공유.
+- **PROJECT_ROOT** (각자 프로젝트) — `.agent-harness/{tasks,results,review,events.log,.harness-state,...}`, `.claude/settings.json`, `.claude/.agent-harness-marker`. 일시 산출물.
+
+`.agent-harness/` 와 `.claude/.agent-harness-marker` 는 프로젝트 `.gitignore` 에 추가 권장(가동 시 안내).
+
 - `docs/` — 로컬 설계/계획 문서 (.gitignore, git 추적 안 함)
 
 ## 에이전트 하네스 (2차)
@@ -81,3 +107,4 @@ bash tests/run-all.sh
 - 감시: 약한 신호(scope, 즉시) / 강한 신호(done 후 의미 판정)
 - 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`
 - 실측 프로브(claude 기동): `tests/probes/probe-{loop,hook}.sh` (수동)
+- 3차(PROJECT_ROOT 분리): 임의 프로젝트 작업·동시 가동 지원. 설계: `docs/superpowers/specs/2026-05-20-project-root-separation-design.md`
