@@ -7,14 +7,23 @@ ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="ww_$$"
 export AGENT_CMD="cat"
 
-cleanup() { tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true; rm -rf "$ROOT/workspace/.boot"; }
+# T9: HARNESS_PROJECT 격리 — wait-worker.sh 가 cwd 가 git repo 인지 검사하므로
+# 임시 PROJECT_ROOT 를 지정 (echo cwd 의 git repo 영향 차단).
+TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
+export HARNESS_PROJECT="$TMP_PROJ"
+
+cleanup() {
+  tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
+  rm -rf "$TMP_PROJ"
+}
 trap cleanup EXIT
 
 bash "$ROOT/bin/team-up.sh" default >/dev/null
 sleep 0.3
 
 # 신호가 먼저 와 있는 경우: 즉시 반환 (race 안전, spec §4.2)
-tmux wait-for -S done-dev-PRE
+# T9(E1): CHANNEL=done-$SESSION-$WORKER-$TASK_ID 로 SESSION prefix 필수.
+tmux wait-for -S "done-$SESSION_OVERRIDE-dev-PRE"
 START=$(date +%s)
 SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/wait-worker.sh" dev PRE 5
 rc=$?
@@ -23,7 +32,7 @@ assert_eq "0" "$rc" "선신호 → 즉시 0 종료"
 [ $((END - START)) -le 2 ]; assert_eq "0" "$?" "선신호 → 2초 이내 반환"
 
 # 신호를 나중에 보내는 경우: 백그라운드에서 1초 후 신호
-( sleep 1; tmux wait-for -S done-dev-LATER ) &
+( sleep 1; tmux wait-for -S "done-$SESSION_OVERRIDE-dev-LATER" ) &
 START=$(date +%s)
 SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/wait-worker.sh" dev LATER 5
 rc=$?
