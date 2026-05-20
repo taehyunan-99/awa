@@ -14,7 +14,8 @@ export HARNESS_PROJECT="$TMP_PROJ"
 
 cleanup() {
   tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
-  rm -rf "$TMP_PROJ"
+  # TMP_PROJ 가 이미 지워졌거나 비어 있어도 rm -rf 는 no-op (idempotent).
+  [ -n "${TMP_PROJ:-}" ] && rm -rf "$TMP_PROJ"
 }
 trap cleanup EXIT
 
@@ -65,12 +66,14 @@ assert_eq "1" "$r" "미치환 토큰 없음"
 bash "$ROOT/bin/team-up.sh" default
 assert_fail "$?" "기존 세션 존재 시 중복 생성 거부"
 
-cleanup
-trap - EXIT
+# 케이스 간 tmux 세션만 정리 — TMP_PROJ 는 EXIT trap 까지 살려둔다
+# (HARNESS_PROJECT 가 가리키는 디렉터리가 사라진 비결정 상태 방지).
+tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
 
 # 3) 없는 프로파일 → 실패
 bash "$ROOT/bin/team-up.sh" nonexistent_profile
 assert_fail "$?" "없는 프로파일 → 실패"
 tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
+# TMP_PROJ 정리는 EXIT trap 이 일괄 수행.
 
 test_summary

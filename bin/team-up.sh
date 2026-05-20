@@ -96,6 +96,7 @@ if [ -f "$HARNESS_ROOT/templates/settings.json.tpl" ]; then
     exit 1
   fi
   mkdir -p "$PROJECT_ROOT/.claude"
+  # sed # 구분자 안전성: T2 path validation 의 [A-Za-z0-9/._-] 가 # 제외 보장.
   sed -e "s#__PROJECT_ROOT__#$PROJECT_ROOT#g" \
       -e "s#__HARNESS_ROOT__#$HARNESS_ROOT#g" \
       "$HARNESS_ROOT/templates/settings.json.tpl" \
