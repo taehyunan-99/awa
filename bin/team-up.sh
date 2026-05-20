@@ -32,6 +32,15 @@ done
 source "$_DIR/lib.sh"
 [ "$PROJECT_ROOT_VALID" = "1" ] || exit 1
 
+# P1 §2.2: HARNESS_ROOT validation. sed `#` 구분자 안전성 보장.
+# {{HARNESS_ROOT}} 치환에서 절대경로의 `/` 가 sed 구분자 `/` 와 충돌하므로 `#` 사용.
+# `#` 자체가 HARNESS_ROOT 안에 들어가면 깨지므로 사전 거부 (T1 _validate_path_chars).
+# lib.sh 가 이미 stderr 에 오류 사유를 발화함 — 여기선 단순 exit 만 (메시지 책임 일원화, Minor #4).
+[ "${HARNESS_ROOT_VALID:-0}" = "1" ] || exit 1
+
+# prompts 디렉터리 — 기본 $HARNESS_ROOT/prompts, 테스트 fixture 용 PROMPTS_DIR env override.
+PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
+
 PROFILE="${1:-default}"
 # $1 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
 if [ -f "$PROFILE" ]; then
@@ -65,6 +74,14 @@ parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_MODEL 설정
   ENTRY_ROLE="${rest%%:*}"
   if [ "$rest" = "$ENTRY_ROLE" ]; then ENTRY_MODEL="sonnet"; else ENTRY_MODEL="${rest#*:}"; fi
   [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
+  # ENTRY_NAME 은 path 아닌 워커 이름 — sed `#` 구분자·tmux pane title·boot 파일명에 쓰이므로
+  # 좁게 [A-Za-z0-9_-] 만 허용 (메타문자 사전 차단, T3 Important 2).
+  case "$ENTRY_NAME" in
+    ""|*[!A-Za-z0-9_-]*)
+      echo "오류: 워커 이름 '$ENTRY_NAME' 허용 문자 외 ([A-Za-z0-9_-] 만)" >&2
+      exit 1
+      ;;
+  esac
   return 0
 }
 
@@ -221,8 +238,18 @@ i=0
 for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
   bf="$(boot_file "$ENTRY_NAME")"
-  cat "$HARNESS_ROOT/prompts/_common.md" "$HARNESS_ROOT/prompts/roles/$ENTRY_ROLE.md" \
-    | sed -e "s/{{WORKER_NAME}}/$ENTRY_NAME/g" -e "s/{{SESSION}}/$SESSION/g" > "$bf"
+  # sed 구분자 `#`: {{HARNESS_ROOT}} 치환 시 절대경로의 `/` 충돌 회피.
+  # HARNESS_ROOT_VALID 게이트가 `#` 포함을 사전 차단함.
+  cat "$PROMPTS_DIR/_common.md" "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" \
+    | sed -e "s#{{WORKER_NAME}}#$ENTRY_NAME#g" \
+          -e "s#{{SESSION}}#$SESSION#g" \
+          -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" > "$bf"
+  # 토큰 잔존 검증 (P1 §3 에러 매트릭스): 하네스 예약 토큰만 화이트리스트로 fail (Minor #5).
+  # 정상 prompt 의 `{{example}}` 등은 무시 — WORKER_NAME/SESSION/HARNESS_ROOT 셋만 검사.
+  if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$bf"; then
+    echo "오류: $bf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$bf" | sort -u | tr '\n' ' ')" >&2
+    exit 1
+  fi
 
   tgt="${WORKER_PIDS[$i]}"
   tmux send-keys -t "$tgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
@@ -242,12 +269,22 @@ done
 catalog=""
 for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
-  desc="$(head -1 "$HARNESS_ROOT/prompts/roles/$ENTRY_ROLE.md" 2>/dev/null || true)"
+  desc="$(head -1 "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" 2>/dev/null || true)"
   catalog+="- $ENTRY_NAME (역할 $ENTRY_ROLE): $desc"$'\n'
 done
 obf="$(boot_file ORCHESTRATOR)"
-{ cat "$HARNESS_ROOT/prompts/roles/orchestrator.md" 2>/dev/null || true
+{ cat "$PROMPTS_DIR/roles/orchestrator.md" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
+# 오케 boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
+_tmp_obf="$obf.tmp"
+sed -e "s#{{SESSION}}#$SESSION#g" \
+    -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
+    "$obf" > "$_tmp_obf" && mv "$_tmp_obf" "$obf"
+# 화이트리스트 검증 (Minor #5): 하네스 예약 토큰만 fail.
+if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf"; then
+  echo "오류: $obf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf" | sort -u | tr '\n' ' ')" >&2
+  exit 1
+fi
 
 tmux send-keys -t "$ORCH_PID" -l "export HARNESS_WORKER=ORCHESTRATOR"
 tmux send-keys -t "$ORCH_PID" Enter
@@ -259,7 +296,7 @@ else
   sleep 0.2
 fi
 send_prompt "$ORCH_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-inject_loop "$ORCH_PID" "$HARNESS_ROOT/prompts/loop/orchestrator.md"
+inject_loop "$ORCH_PID" "$PROMPTS_DIR/loop/orchestrator.md"
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
@@ -267,8 +304,17 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   for entry in "${REVIEWERS[@]}"; do
     parse_entry "$entry"
     rbf="$(boot_file "$ENTRY_NAME")"
-    cat "$HARNESS_ROOT/prompts/roles/$ENTRY_ROLE.md" \
-      | sed -e "s/{{SESSION}}/$SESSION/g" > "$rbf" 2>/dev/null || : > "$rbf"
+    # sed `#` 구분자 (HARNESS_ROOT 절대경로의 `/` 충돌 회피).
+    cat "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" \
+      | sed -e "s#{{SESSION}}#$SESSION#g" \
+            -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" > "$rbf" 2>/dev/null || : > "$rbf"
+    # `[ -s "$rbf" ]` 가드: 리뷰어 역할 파일이 없거나 비어있으면 빈 boot 허용 (의도된 묵살).
+    # 워커 boot 와 일관성은 X — 리뷰어는 선택적 컴포넌트라 strict 미적용 (Minor #3).
+    # 화이트리스트 검증 (Minor #5).
+    if [ -s "$rbf" ] && grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$rbf"; then
+      echo "오류: $rbf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$rbf" | sort -u | tr '\n' ' ')" >&2
+      exit 1
+    fi
     rtgt="${REV_PIDS[$j]}"
     tmux send-keys -t "$rtgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
     tmux send-keys -t "$rtgt" Enter
@@ -280,7 +326,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       sleep 0.2
     fi
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-    inject_loop "$rtgt" "$HARNESS_ROOT/prompts/loop/reviewer.md"
+    inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))
   done
 fi
