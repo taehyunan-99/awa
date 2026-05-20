@@ -357,3 +357,14 @@ fi
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
 echo "attach: tmux attach -t $SESSION"
+
+# P2 §2.3: SKIPPED_PANES 가시화. bootstrap_pane 에서 skip 시 누적된 변수.
+# 성공 메시지 직후에 출력해 사용자가 success/주의를 함께 인지.
+if [ -n "${SKIPPED_PANES:-}" ]; then
+  # leading space 정리: SKIPPED_PANES 누적은 `${var:-} $wname` 패턴이라 항상 앞 공백 포함.
+  echo "주의: REPL 준비 실패한 pane: ${SKIPPED_PANES# }" >&2
+  echo "  - shell_ready_wait timeout 또는 send-keys 실패 가능성." >&2
+  # 두 env 역할 분리: SHELL_READY_TIMEOUT 은 셸 ready timeout, BOOT_REPL_CHECK_DELAY 는
+  # capture 직전 sleep 길이 (timeout 아님 — 큰 값은 부팅 지연).
+  echo "  - SHELL_READY_TIMEOUT (셸 ready timeout) 또는 BOOT_REPL_CHECK_DELAY (REPL 검사 대기) env 로 조정 가능." >&2
+fi
