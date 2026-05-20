@@ -217,7 +217,7 @@ for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
   bf="$(boot_file "$ENTRY_NAME")"
   cat "$HARNESS_ROOT/prompts/_common.md" "$HARNESS_ROOT/prompts/roles/$ENTRY_ROLE.md" \
-    | sed "s/{{WORKER_NAME}}/$ENTRY_NAME/g" > "$bf"
+    | sed -e "s/{{WORKER_NAME}}/$ENTRY_NAME/g" -e "s/{{SESSION}}/$SESSION/g" > "$bf"
 
   tgt="${WORKER_PIDS[$i]}"
   tmux send-keys -t "$tgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
@@ -262,7 +262,8 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   for entry in "${REVIEWERS[@]}"; do
     parse_entry "$entry"
     rbf="$(boot_file "$ENTRY_NAME")"
-    cat "$HARNESS_ROOT/prompts/roles/$ENTRY_ROLE.md" > "$rbf" 2>/dev/null || : > "$rbf"
+    cat "$HARNESS_ROOT/prompts/roles/$ENTRY_ROLE.md" \
+      | sed -e "s/{{SESSION}}/$SESSION/g" > "$rbf" 2>/dev/null || : > "$rbf"
     rtgt="${REV_PIDS[$j]}"
     tmux send-keys -t "$rtgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
     tmux send-keys -t "$rtgt" Enter

@@ -24,7 +24,7 @@ done
 
 COMMON="$(cat "$ROOT/prompts/_common.md")"
 assert_contains "$COMMON" '{{WORKER_NAME}}' "_common 에 치환 토큰"
-assert_contains "$COMMON" 'wait-for -S done-{{WORKER_NAME}}' "_common 에 완료 신호 규약"
-assert_contains "$COMMON" 'workspace/tasks/' "_common 에 tasks 읽기 규약"
+assert_contains "$COMMON" 'wait-for -S done-{{SESSION}}-{{WORKER_NAME}}' "_common 에 완료 신호 규약"
+assert_contains "$COMMON" '.agent-harness/tasks/' "_common 에 tasks 읽기 규약"
 
 test_summary

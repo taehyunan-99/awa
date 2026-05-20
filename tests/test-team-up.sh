@@ -57,7 +57,7 @@ assert_eq "dev" "$T2" "allow-set-title off: OSC title escape 후에도 pane_titl
 assert_eq "0" "$([ -f "$TMP_PROJ/.agent-harness/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
 BOOT="$(cat "$TMP_PROJ/.agent-harness/.boot/dev.md")"
 assert_contains "$BOOT" "워커 이름: dev" "{{WORKER_NAME}} → dev 치환됨"
-assert_contains "$BOOT" "done-dev-" "신호 채널명 치환됨"
+assert_contains "$BOOT" "done-$SESSION_OVERRIDE-dev-" "신호 채널명 SESSION+WORKER 치환됨"
 assert_contains "$BOOT" "역할: 개발자" "역할 프롬프트 합쳐짐"
 if printf '%s' "$BOOT" | grep -qF '{{WORKER_NAME}}'; then r=0; else r=1; fi
 assert_eq "1" "$r" "미치환 토큰 없음"
