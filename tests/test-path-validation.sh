@@ -29,7 +29,6 @@ set +e
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh" 2>/dev/null
 rc=$?
-set -e
 assert_eq "0" "$rc" "source 자체는 exit 0 (F1)"
 assert_eq "0" "$PROJECT_ROOT_VALID" "공백 포함 VALID=0"
 cd "$ORIG_PWD"
