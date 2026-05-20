@@ -33,4 +33,7 @@ rm -f "$WORKSPACE"/.harness-task.* 2>/dev/null || true
 if [ -d "$WORKSPACE/review" ]; then
   rm -rf "${WORKSPACE:?WORKSPACE unset}/review" || true
 fi
+# .claude/settings.json — team-up 이 __REPO__ 치환해 생성한 런타임 산출물.
+# 세션 일회용 철학상 정리(다음 team-up 이 다시 생성). .gitignore 됨.
+rm -f "$REPO_ROOT/.claude/settings.json" 2>/dev/null || true
 echo "하네스 런타임 산출물 정리 완료."
