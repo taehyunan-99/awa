@@ -40,11 +40,12 @@ bin/team-down.sh
 
 `profiles/*.sh` 로 팀 구성을 정의. `bin/team-up.sh <프로파일명>` 으로 선택.
 
-- `default` — dev / review / test
-- `code-review` — reviewer×2 / security
-- `research` — researcher×3
+- `default` — 워커: dev / test, 리뷰어: quality-rev
+- `code-review` — 워커: security, 리뷰어: spec-rev / quality-rev / arch-rev
+- `research` — 워커: researcher×3, 리뷰어: quality-rev
+- `feature-team` — 워커: dev / test / arch, 리뷰어: spec-rev / quality-rev / arch-rev (모델 차등)
 
-새 팀: `profiles/<name>.sh` 추가 (`SESSION`, `LAYOUT`, `WORKERS=("이름:역할" ...)`), 필요 시 `prompts/roles/<역할>.md` 추가. `bin/` 은 수정 불필요.
+새 팀: `profiles/<name>.sh` 추가 (`SESSION`, `LAYOUT`, `WORKERS=("이름:역할[:모델]" ...)`, 선택 `REVIEWERS=(...)`, `ORCHESTRATOR_MODEL`), 필요 시 `prompts/roles/<역할>.md` 추가. `bin/` 은 수정 불필요.
 
 ## 통신 메커니즘
 
