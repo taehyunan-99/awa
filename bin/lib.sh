@@ -49,10 +49,20 @@ WORKSPACE="$PROJECT_ROOT/.agent-harness"
 # 는 최종 상태. 그 전까지 기존 25 스위트의 'workspace/' 참조 호환 위해 유지.
 REPO_ROOT="$HARNESS_ROOT"
 
-# SESSION 결정 단일화. 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION_DEFAULT.
-# dispatch.sh/wait-worker.sh/team-up.sh 가 모두 이 함수로 세션명을 얻어 불일치 제거(이슈 2).
+# basename sanitize: tmux 세션명 규칙([A-Za-z0-9_-]).
+# bash 3.2 ${var//pattern} 의 glob/정규식 모호성 회피 위해 sed (D3).
+_session_autoname() {
+  local b safe
+  b="$(basename "$PROJECT_ROOT")"
+  safe="$(printf '%s' "$b" | sed 's/[^A-Za-z0-9_-]/_/g')"
+  printf 'agents-%s' "$safe"
+}
+
+# SESSION 결정 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION env > 자동명.
+# 자동명은 PROJECT_ROOT basename 기반이라 멀티 프로젝트 동시 가동 시 자연 격리.
+# SESSION_DEFAULT 와 session_exists() 는 호환 위해 유지 (Q9, 후속 cleanup).
 resolve_session() {
-  printf '%s' "${SESSION_OVERRIDE:-${PROFILE_SESSION:-${SESSION:-$SESSION_DEFAULT}}}"
+  printf '%s' "${SESSION_OVERRIDE:-${PROFILE_SESSION:-${SESSION:-$(_session_autoname)}}}"
 }
 
 # 윈도우·페인 인덱스 → tmux target. 세션명은 resolve_session().

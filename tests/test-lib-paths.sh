@@ -10,9 +10,10 @@ assert_eq "$ROOT" "$REPO_ROOT" "REPO_ROOT 가 repo 루트"
 assert_eq "$ROOT/workspace" "$WORKSPACE" "WORKSPACE 경로"
 assert_eq "agents" "$SESSION_DEFAULT" "기본 세션명"
 
-# SESSION 미설정 → SESSION_DEFAULT 폴백
-assert_eq "agents:0.2" "$(target_of 2)" "SESSION 미설정 → 기본 세션"
-assert_eq "agents:0.4" "$(target_of 4)" "페인 인덱스 4 → target"
+# SESSION 미설정 → 자동명 폴백 (T3): agents-<basename of PROJECT_ROOT>
+sess_auto="agents-$(basename "$PROJECT_ROOT")"
+assert_eq "${sess_auto}:0.2" "$(target_of 2)" "SESSION 미설정 → 자동명 폴백"
+assert_eq "${sess_auto}:0.4" "$(target_of 4)" "페인 인덱스 4 → target"
 
 # SESSION 설정 → 활성 세션 존중 (세션 오버라이드/멀티팀)
 SESSION=myteam
