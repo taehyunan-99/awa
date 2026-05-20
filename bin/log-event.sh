@@ -5,8 +5,11 @@
 # 자기보고 아님 — claude 가 Edit/Write 쓰면 hook 이 무조건 실행됨(이슈 6).
 set -uo pipefail
 
-EVENTS_LOG="${EVENTS_LOG:-$HOME/.agent-harness-events.log}"
 REPO_ROOT="${REPO_ROOT:-$PWD}"
+# 기본값을 workspace/events.log 로 — spec §5.2 단일 로그 위치와 정합.
+# settings.json.tpl 이 EVENTS_LOG 를 명시 주입하므로 정상 경로에선 무영향.
+# 직접 실행(테스트·디버그) 시 사용자 홈으로 새지 않도록 안전 기본값.
+EVENTS_LOG="${EVENTS_LOG:-$REPO_ROOT/workspace/events.log}"
 worker="${HARNESS_WORKER:-unknown}"
 task="${HARNESS_TASK:-}"
 if [ -z "$task" ]; then
