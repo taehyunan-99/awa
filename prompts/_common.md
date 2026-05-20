@@ -22,3 +22,9 @@
 - 배정된 `.agent-harness/tasks/<id>.md` 의 `allowed_paths` 안에서만 파일을 수정하라. `forbidden_paths` 는 절대 건드리지 마라. scope 밖 작업은 즉시 차단·재지시 대상이다.
 - 파일을 수정하면 events.log 가 자동 기록된다(PostToolUse hook). 너는 별도 조치 불필요하나, hook 이 못 잡는 비-도구 변경을 했다면 `.agent-harness/events.log` 에 한 줄을 보조로 append 하라. 필드는 **탭 문자**로 구분한다(리터럴 `\t` 문자열이 아니라 실제 탭). 예: `printf '%s\t%s\t%s\tmodify\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" "<상대경로>" >> .agent-harness/events.log`
 - 작업 완료 시 `.agent-harness/results/<id>.md` 에 변경 요약을 쓰고, `.agent-harness/events.log` 에 done 라인을 기록한 뒤 `tmux wait-for -S done-{{SESSION}}-{{WORKER_NAME}}-<task>` 를 실행하라. done 라인 예: `printf '%s\t%s\t%s\tdone\t-\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" >> .agent-harness/events.log` (필드=탭, 5필드: ts/이름/task/done/-)
+
+## 도구 위치 (3차 PROJECT_ROOT 분리 이후)
+
+- 도구 — `{{HARNESS_ROOT}}/bin/`. 항상 절대경로로 호출하라.
+- 산출물 — `$PWD/.agent-harness/` (= PROJECT_ROOT 안).
+- PROJECT_ROOT 안에서 도구를 찾지 마라. `bin/dispatch.sh` 같은 상대경로 호출 금지.
