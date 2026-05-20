@@ -222,6 +222,54 @@ wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
   return 1
 }
 
+# P2 §2.2: pane 부트스트랩 — 셸 ready 폴링 + Enter-만 재전송 안전망.
+# 세 경로(워커/오케스트레이터/리뷰어)에 동일한 흐름을 일원화.
+#   $1=pane_id  $2=worker_name(HARNESS_WORKER 값)  $3=실행할 agent_cmd  $4=역할 라벨(메시지용)
+# 흐름:
+#   1) shell_ready_wait 로 셸·claude PATH 준비 확인 (claude 분기). timeout 시 SKIPPED_PANES 누적·return 0.
+#   2) export HARNESS_WORKER + cd && cmd 송신 (1차, 정상 흐름).
+#   3) BOOT_REPL_CHECK_DELAY(기본 5초) 후 capture 검사. claude REPL 흔적 미검출 시
+#      Enter 만 1회 재전송 — 명령은 들어갔으나 Enter 만 사라진 케이스 보강.
+#      새 명령 재송신 안 함 (REPL 입력란 박힘 차단).
+#   4) wait_repl 로 trust 통과 + REPL ready 폴링 (기존 동작).
+# cat 더미 분기는 claude PATH 없어 shell_ready_wait 가 timeout 되므로 skip,
+# 기존 sleep 0.2 흐름 유지 (테스트 호환).
+# SKIPPED_PANES 누적 → T5 (team-up 끝부분 가시화) 가 소비. 본 함수 단독으론 변수만 누적.
+# shell_ready_wait 의 timeout 동작은 tests/test-shell-ready-wait.sh 가 단위 커버 (T2.2·T2.3).
+#   본 함수는 integration 수준 — Final probe (probe-cold-start-timing) 가 측정.
+# 본 함수는 4 책임 (shell ready 폴링, claude 송신, Enter 재시도, REPL 폴링) 통합.
+#   T5 후 회고적 정리에서 _send_worker_cmd / _boot_repl_ready 로 분해 검토.
+bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label
+  local pid="$1" wname="$2" cmd="$3" label="$4"
+  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+    if ! shell_ready_wait "$pid"; then
+      echo "경고: '$wname' pane shell_ready_wait timeout — claude 송신 skip" >&2
+      SKIPPED_PANES="${SKIPPED_PANES:-} $wname"
+      return 0   # 다른 pane 진행 (기존 동작 유지·set -e 충돌 회피).
+    fi
+    tmux send-keys -t "$pid" -l "export HARNESS_WORKER=$wname"
+    tmux send-keys -t "$pid" Enter
+    tmux send-keys -t "$pid" -l "cd \"$PROJECT_ROOT\" && $cmd"
+    tmux send-keys -t "$pid" Enter
+    # 2차: capture 검사 전 짧은 대기. claude 기동·trust 화면 출력 여유.
+    sleep "${BOOT_REPL_CHECK_DELAY:-5}"
+    # 3차: ASCII 한정 패턴 (POSIX ERE). 매치 실패면 Enter 만 1회 재전송.
+    if ! tmux capture-pane -p -S -200 -t "$pid" 2>/dev/null | \
+         grep -qE 'trust this folder|Yes, I trust|bypass permissions on|accept edits on|Claude Code'; then
+      tmux send-keys -t "$pid" Enter
+    fi
+    wait_repl "$pid" || echo "경고: $label '$wname' pane REPL 준비 실패(trust/기동 확인 필요)" >&2
+  else
+    # 더미(cat) 경로: shell_ready_wait skip (claude PATH 부재 → 무의미 timeout 회피).
+    tmux send-keys -t "$pid" -l "export HARNESS_WORKER=$wname"
+    tmux send-keys -t "$pid" Enter
+    tmux send-keys -t "$pid" -l "cd \"$PROJECT_ROOT\" && $cmd"
+    tmux send-keys -t "$pid" Enter
+    sleep 0.2
+  fi
+  return 0
+}
+
 # /loop 주입 헬퍼: 프롬프트 파일이 있을 때만 (T10 전이면 no-op).
 inject_loop() {  # $1=pane_id(또는 target) $2=loop프롬프트파일
   local pid="$1" pf="$2"
@@ -252,15 +300,7 @@ for entry in "${WORKERS[@]}"; do
   fi
 
   tgt="${WORKER_PIDS[$i]}"
-  tmux send-keys -t "$tgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
-  tmux send-keys -t "$tgt" Enter
-  tmux send-keys -t "$tgt" -l "cd \"$PROJECT_ROOT\" && $(agent_cmd_for "$ENTRY_MODEL")"
-  tmux send-keys -t "$tgt" Enter
-  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-    wait_repl "$tgt" || echo "경고: $ENTRY_NAME pane REPL 준비 실패(trust/기동 확인 필요)" >&2
-  else
-    sleep 0.2
-  fi
+  bootstrap_pane "$tgt" "$ENTRY_NAME" "$(agent_cmd_for "$ENTRY_MODEL")" "워커"
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -286,15 +326,7 @@ if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf"; then
   exit 1
 fi
 
-tmux send-keys -t "$ORCH_PID" -l "export HARNESS_WORKER=ORCHESTRATOR"
-tmux send-keys -t "$ORCH_PID" Enter
-tmux send-keys -t "$ORCH_PID" -l "cd \"$PROJECT_ROOT\" && $(agent_cmd_for "${ORCHESTRATOR_MODEL:-opus}")"
-tmux send-keys -t "$ORCH_PID" Enter
-if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-  wait_repl "$ORCH_PID" || echo "경고: ORCHESTRATOR pane REPL 준비 실패(trust/기동 확인 필요)" >&2
-else
-  sleep 0.2
-fi
+bootstrap_pane "$ORCH_PID" "ORCHESTRATOR" "$(agent_cmd_for "${ORCHESTRATOR_MODEL:-opus}")" "ORCHESTRATOR"
 send_prompt "$ORCH_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$ORCH_PID" "$PROMPTS_DIR/loop/orchestrator.md"
 
@@ -316,15 +348,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       exit 1
     fi
     rtgt="${REV_PIDS[$j]}"
-    tmux send-keys -t "$rtgt" -l "export HARNESS_WORKER=$ENTRY_NAME"
-    tmux send-keys -t "$rtgt" Enter
-    tmux send-keys -t "$rtgt" -l "cd \"$PROJECT_ROOT\" && $(agent_cmd_for "$ENTRY_MODEL")"
-    tmux send-keys -t "$rtgt" Enter
-    if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-      wait_repl "$rtgt" || echo "경고: $ENTRY_NAME(리뷰어) pane REPL 준비 실패(trust/기동 확인 필요)" >&2
-    else
-      sleep 0.2
-    fi
+    bootstrap_pane "$rtgt" "$ENTRY_NAME" "$(agent_cmd_for "$ENTRY_MODEL")" "리뷰어"
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))
