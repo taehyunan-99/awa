@@ -1,7 +1,6 @@
-# 런타임 산출물 — 정의가 아닌 결과물
-workspace/tasks/
-workspace/results/
-workspace/.boot/
+# 런타임 산출물 — 정의가 아닌 결과물 (PROJECT_ROOT 별 격리)
+.agent-harness/
+.claude/.agent-harness-marker
 
 # 설계/계획 문서 — git 추적 안 함
 docs/

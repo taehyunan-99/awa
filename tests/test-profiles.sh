@@ -6,7 +6,8 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 
 source "$ROOT/profiles/default.sh"
-assert_eq "agents" "$SESSION" "default SESSION"
+# SESSION 라인 삭제됨 (T13) — _session_autoname 폴백이 PROJECT_ROOT 별 자동명 제공.
+assert_eq "" "${SESSION:-}" "default SESSION 미정의(폴백 의존)"
 assert_eq "tiled" "$LAYOUT" "default LAYOUT"
 assert_eq "2" "${#WORKERS[@]}" "default 워커 2개(reviewer 워커 제거·일원화)"
 assert_eq "dev:dev" "${WORKERS[0]}" "default 첫 워커"
