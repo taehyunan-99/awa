@@ -2,11 +2,40 @@
 # 공통 함수/상수. 각 bin 스크립트가 source 한다.
 # 직접 실행용 아님.
 
-# 이 파일(bin/lib.sh) 기준으로 repo 루트 계산
+# 이 파일(bin/lib.sh) 기준으로 하네스 루트 계산 (정의의 위치)
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$_LIB_DIR/.." && pwd)"
-WORKSPACE="$REPO_ROOT/workspace"
-SESSION_DEFAULT="agents"
+HARNESS_ROOT="$(cd "$_LIB_DIR/.." && pwd)"
+SESSION_DEFAULT="agents"  # 폴백 안의 폴백 (자동명이 보통 이김)
+
+# PROJECT_ROOT 도출: HARNESS_PROJECT(--project) > cwd 의 git toplevel > PWD.
+# 워커 cwd·.agent-harness 위치·settings.json 위치의 기준 (작업 대상 위치).
+resolve_project_root() {
+  if [ -n "${HARNESS_PROJECT:-}" ]; then
+    printf '%s' "$HARNESS_PROJECT"
+    return
+  fi
+  local r
+  r="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null)"
+  if [ -n "$r" ]; then
+    printf '%s' "$r"
+  else
+    echo "경고: '$PWD' 는 git repo 아님 — PWD 를 PROJECT_ROOT 로 사용 (--project 로 명시 가능)" >&2
+    printf '%s' "$PWD"
+  fi
+}
+
+PROJECT_ROOT="$(resolve_project_root)"
+# git repo 여부 별도 캐싱 (HARNESS_PROJECT 우선 경로에서도 정확)
+if git -C "$PROJECT_ROOT" rev-parse --show-toplevel >/dev/null 2>&1; then
+  PROJECT_ROOT_IS_GIT=1
+else
+  PROJECT_ROOT_IS_GIT=0
+fi
+
+WORKSPACE="$PROJECT_ROOT/.agent-harness"
+# 마이그레이션 호환 별칭 — T11 에서 제거. spec §5.1 의 "REPO_ROOT 변수 사라진다"
+# 는 최종 상태. 그 전까지 기존 25 스위트의 'workspace/' 참조 호환 위해 유지.
+REPO_ROOT="$HARNESS_ROOT"
 
 # SESSION 결정 단일화. 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION_DEFAULT.
 # dispatch.sh/wait-worker.sh/team-up.sh 가 모두 이 함수로 세션명을 얻어 불일치 제거(이슈 2).
