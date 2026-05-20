@@ -84,8 +84,6 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   exit 1
 fi
 
-mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
-
 # PostToolUse hook 설정을 PROJECT_ROOT/.claude 에 머신 절대경로로 치환해 생성 (D2).
 # 사용자 기존 settings.json 보호: marker 없으면 덮어쓰기 거부.
 if [ -f "$HARNESS_ROOT/templates/settings.json.tpl" ]; then
@@ -110,6 +108,10 @@ if [ "$PROJECT_ROOT_IS_GIT" = "1" ] && [ -f "$PROJECT_ROOT/.gitignore" ]; then
     echo "안내: $PROJECT_ROOT/.gitignore 에 '.agent-harness/' 룰 추가 권장" >&2
   fi
 fi
+
+# WORKSPACE 하위 디렉터리 생성은 marker 게이트 통과 후로 이동 (4차 리뷰).
+# 이유: 거부 케이스에서 mkdir 부작용 leak 차단 — spec D2·E8 사용자 보호.
+mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 
 # 오케스트레이터 페인으로 세션 생성. 셸 유지.
 tmux new-session -d -s "$SESSION" -x 220 -y 50 -n team

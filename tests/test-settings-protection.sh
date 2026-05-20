@@ -33,9 +33,13 @@ assert_fail "$rc" "team-up 거부 (rc != 0)"
 assert_contains "$out" "이미 존재" "거부 메시지"
 content="$(cat "$TMP/.claude/settings.json")"
 assert_contains "$content" "user_setting" "사용자 settings.json 보존"
+# fix: team-up 거부 시 mkdir 부작용 없어야 (사용자 PROJECT_ROOT 보호 — spec D2·E8)
+[ ! -d "$TMP/.agent-harness/.boot" ]; assert_success "$?" "거부 시 .boot 미생성"
+[ ! -d "$TMP/.agent-harness/tasks" ]; assert_success "$?" "거부 시 tasks 미생성"
 # T15.1 가 만일 세션을 띄웠다면 leak 방지 (정상 흐름이면 안 띄움)
 tmux kill-session -t "agents-$T15_SAFE" 2>/dev/null || true
 rm -f "$TMP/.claude/settings.json"
+rm -rf "$TMP/.agent-harness"
 
 echo "[T15.2] marker 있을 때 team-up 정상 — settings.json 덮어쓰기, marker 유지"
 echo '{"old":"harness_made"}' > "$TMP/.claude/settings.json"
