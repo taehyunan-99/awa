@@ -16,8 +16,8 @@ HARNESS_PROJECT="$TMP"
 source "$ROOT/bin/lib.sh" 2>/dev/null
 assert_eq "$TMP" "$PROJECT_ROOT" "HARNESS_PROJECT 우선"
 assert_eq "$ROOT" "$HARNESS_ROOT" "HARNESS_ROOT 는 bin/lib.sh 부모"
-unset HARNESS_PROJECT
 rm -rf "$TMP"
+unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT HARNESS_PROJECT
 
 # T1.2 — git repo 깊은 하위에서 toplevel 반환
 # git -C "$PWD" 가 cwd 기반인지 검증 — deep/nested 에서 source 해도 toplevel 반환
@@ -33,6 +33,7 @@ assert_eq "$g_real" "$pr_real" "git toplevel 반환"
 assert_eq "1" "$PROJECT_ROOT_IS_GIT" "git case → PROJECT_ROOT_IS_GIT=1"
 cd "$ORIG_PWD"
 rm -rf "$G"
+unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT HARNESS_PROJECT
 
 # T1.3 — git 아닌 디렉터리 → PWD 폴백 + stderr 경고
 N="$(mktemp -d)"
@@ -51,5 +52,6 @@ assert_eq "$n_real" "$pr_real" "PWD 폴백 값"
 assert_eq "0" "$PROJECT_ROOT_IS_GIT" "non-git case → PROJECT_ROOT_IS_GIT=0"
 cd "$ORIG_PWD"
 rm -rf "$N"
+unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT HARNESS_PROJECT
 
 test_summary

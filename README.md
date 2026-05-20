@@ -23,6 +23,8 @@ cd ~/work/projectA
 ~/Desktop/Repo/Practice/tmux-agent-team/bin/team-up.sh feature-team
 # 또는 어디서든:
 #   ~/.../bin/team-up.sh --project ~/work/projectA feature-team
+# 주의: --project 는 프로파일/위치 인자 앞에 와야 인식된다
+#       (`--project ~/x default`, `--project=~/x default` 형식).
 
 tmux attach -t agents-projectA   # 세션명은 basename 기반 자동
 
