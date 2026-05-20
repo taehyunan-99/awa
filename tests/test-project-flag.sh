@@ -31,4 +31,9 @@ assert_eq "1" "$rc" "bad path → return 1"
 echo "$out" | grep -q "경로 없음"
 assert_success "$?" "bad path stderr 경로 없음"
 
+# T4.3 — 빈 인자도 안전하게 return 1 (set -u 보호)
+out="$(_normalize_project "" 2>&1 >/dev/null)"
+rc=$?
+assert_eq "1" "$rc" "빈 인자 → return 1"
+
 test_summary
