@@ -32,6 +32,18 @@ else
   PROJECT_ROOT_IS_GIT=0
 fi
 
+# 경로 정합성 검증 (E4·F1·F4): sed 구분자·셸 메타문자·quoting 실수 위험 회피.
+# 허용: [A-Za-z0-9/._-]. 공백 미허용(F4 보수).
+# lib.sh 는 source 파일이라 exit 금지 → 변수로 결과 전달 (F1).
+# 호출 스크립트는 source 후 `[ "$PROJECT_ROOT_VALID" = "1" ] || exit 1`.
+PROJECT_ROOT_VALID=1
+case "$PROJECT_ROOT" in
+  *[!A-Za-z0-9/._-]*)
+    echo "오류: PROJECT_ROOT='$PROJECT_ROOT' 에 허용되지 않는 문자 포함." >&2
+    echo "  허용: [A-Za-z0-9/._-] (공백 미허용). 디렉터리 이름 정리 후 재시도." >&2
+    PROJECT_ROOT_VALID=0 ;;
+esac
+
 WORKSPACE="$PROJECT_ROOT/.agent-harness"
 # 마이그레이션 호환 별칭 — T11 에서 제거. spec §5.1 의 "REPO_ROOT 변수 사라진다"
 # 는 최종 상태. 그 전까지 기존 25 스위트의 'workspace/' 참조 호환 위해 유지.
