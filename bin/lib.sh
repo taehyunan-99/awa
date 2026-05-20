@@ -239,3 +239,14 @@ send_prompt() {
   tmux send-keys -t "$target" -l "$text"
   tmux send-keys -t "$target" Enter
 }
+
+# --project 인자 정규화 (E12·F2). stdout=절대경로, $?=0 성공, return 1 실패.
+# subshell 안 exit silent failure 회피 위해 return 사용·호출자 명시 검사.
+_normalize_project() {  # $1=raw → stdout=절대경로
+  local raw="$1"
+  if [ ! -d "$raw" ]; then
+    echo "오류: --project 경로 없음: $raw" >&2
+    return 1
+  fi
+  ( cd "$raw" && pwd )
+}
