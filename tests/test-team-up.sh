@@ -8,7 +8,14 @@ export SESSION_OVERRIDE="tu_$$"
 # 워커 페인은 claude 대신 'cat' 더미 실행 (입력 대기만)
 export AGENT_CMD="cat"
 
-cleanup() { tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true; rm -rf "$ROOT/workspace/.boot"; }
+# T6: PROJECT_ROOT 분리 후엔 임시 git repo 가 PROJECT_ROOT 가 됨
+TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
+export HARNESS_PROJECT="$TMP_PROJ"
+
+cleanup() {
+  tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
+  rm -rf "$TMP_PROJ"
+}
 trap cleanup EXIT
 
 # 1) 정상 생성
@@ -46,8 +53,8 @@ T2="$(tmux display-message -p -t "$TGT" '#{pane_title}')"
 assert_eq "dev" "$T2" "allow-set-title off: OSC title escape 후에도 pane_title 보존"
 
 # 부트스트랩 파일이 워커별로 생성되고 치환됨
-assert_eq "0" "$([ -f "$ROOT/workspace/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
-BOOT="$(cat "$ROOT/workspace/.boot/dev.md")"
+assert_eq "0" "$([ -f "$TMP_PROJ/.agent-harness/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
+BOOT="$(cat "$TMP_PROJ/.agent-harness/.boot/dev.md")"
 assert_contains "$BOOT" "워커 이름: dev" "{{WORKER_NAME}} → dev 치환됨"
 assert_contains "$BOOT" "done-dev-" "신호 채널명 치환됨"
 assert_contains "$BOOT" "역할: 개발자" "역할 프롬프트 합쳐짐"

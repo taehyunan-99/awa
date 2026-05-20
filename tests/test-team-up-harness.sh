@@ -5,7 +5,13 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 
 S="tuh_$$"
-cleanup() { tmux kill-session -t "$S" 2>/dev/null || true; }
+# T6: PROJECT_ROOT 분리 후엔 임시 git repo 가 PROJECT_ROOT 가 됨
+TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
+export HARNESS_PROJECT="$TMP_PROJ"
+cleanup() {
+  tmux kill-session -t "$S" 2>/dev/null || true
+  rm -rf "$TMP_PROJ"
+}
 trap cleanup EXIT
 
 PROF="$(mktemp -d)/p.sh"
