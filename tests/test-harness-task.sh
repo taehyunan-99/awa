@@ -5,16 +5,16 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/workspace"
-EV="$TMP/workspace/events.log"; : > "$EV"
+mkdir -p "$TMP/.agent-harness"
+EV="$TMP/.agent-harness/events.log"; : > "$EV"
 
 # 1. dispatch 가 .harness-task.<worker> 기록 (dispatch 의 기록 로직만 검증 —
 #    tmux/세션 없이: write_harness_task 헬퍼를 lib.sh 에 두고 dispatch 가 호출.
 #    헬퍼 단위 검증.)
 source "$ROOT/bin/lib.sh"
-WORKSPACE="$TMP/workspace"
+WORKSPACE="$TMP/.agent-harness"
 write_harness_task dev 101
-assert_eq "101" "$(cat "$TMP/workspace/.harness-task.dev")" "dispatch 가 task 기록"
+assert_eq "101" "$(cat "$TMP/.agent-harness/.harness-task.dev")" "dispatch 가 task 기록"
 
 # 2. log-event.sh: HARNESS_TASK env 없고 .harness-task.<worker> 있으면 그 값 사용
 echo '{"tool_input":{"file_path":"'"$TMP"'/src/a.ts"}}' \
@@ -33,7 +33,7 @@ t2="$(awk -F'\t' '{print $3}' "$EV")"
 assert_eq "999" "$t2" "env HARNESS_TASK 우선"
 
 # 4. 둘 다 없으면 - (기존 동작 보존)
-: > "$EV"; rm -f "$TMP/workspace/.harness-task.unknown"
+: > "$EV"; rm -f "$TMP/.agent-harness/.harness-task.unknown"
 echo '{"tool_input":{"file_path":"'"$TMP"'/src/c.ts"}}' \
   | EVENTS_LOG="$EV" REPO_ROOT="$TMP" bash "$ROOT/bin/log-event.sh"
 t3="$(awk -F'\t' '{print $3}' "$EV")"
