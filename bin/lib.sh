@@ -33,16 +33,34 @@ else
 fi
 
 # 경로 정합성 검증 (E4·F1·F4): sed 구분자·셸 메타문자·quoting 실수 위험 회피.
-# 허용: [A-Za-z0-9/._-]. 공백 미허용(F4 보수).
+# 허용: [A-Za-z0-9/._-]. 공백·빈 문자열 미허용(F4 보수).
 # lib.sh 는 source 파일이라 exit 금지 → 변수로 결과 전달 (F1).
 # 호출 스크립트는 source 후 `[ "$PROJECT_ROOT_VALID" = "1" ] || exit 1`.
-PROJECT_ROOT_VALID=1
-case "$PROJECT_ROOT" in
-  *[!A-Za-z0-9/._-]*)
-    echo "오류: PROJECT_ROOT='$PROJECT_ROOT' 에 허용되지 않는 문자 포함." >&2
-    echo "  허용: [A-Za-z0-9/._-] (공백 미허용). 디렉터리 이름 정리 후 재시도." >&2
-    PROJECT_ROOT_VALID=0 ;;
-esac
+#
+# 함수로 추출 — PROJECT_ROOT 와 HARNESS_ROOT 모두 같은 규칙 공유.
+# 테스트(test-harness-root-valid.sh·test-path-validation.sh)는 이 함수를 직접 호출해
+# case 패턴 복붙 없이 회귀 보장.
+_validate_path_chars() {  # $1=path → stdout "0" or "1"
+  case "${1:-}" in
+    "") echo 0 ;;                              # 빈 문자열은 위험 (잘못된 자동 도출)
+    *[!A-Za-z0-9/._-]*) echo 0 ;;
+    *) echo 1 ;;
+  esac
+}
+
+PROJECT_ROOT_VALID="$(_validate_path_chars "$PROJECT_ROOT")"
+if [ "$PROJECT_ROOT_VALID" = "0" ]; then
+  echo "오류: PROJECT_ROOT='$PROJECT_ROOT' 에 허용되지 않는 문자 포함." >&2
+  echo "  허용: [A-Za-z0-9/._-] (공백·빈 문자열 미허용). 디렉터리 이름 정리 후 재시도." >&2
+fi
+
+# HARNESS_ROOT 도 동일 validation. sed `#` 구분자 안전성·토큰 치환 안전성 보장 (4차 P1 §2.2).
+# 4차 spec 이전엔 HARNESS_ROOT 미검증 — 잠재 결함이었음.
+HARNESS_ROOT_VALID="$(_validate_path_chars "$HARNESS_ROOT")"
+if [ "$HARNESS_ROOT_VALID" = "0" ]; then
+  echo "오류: HARNESS_ROOT='$HARNESS_ROOT' 에 허용되지 않는 문자 포함." >&2
+  echo "  허용: [A-Za-z0-9/._-] (공백·빈 문자열 미허용). 하네스 설치 경로 정리 후 재시도." >&2
+fi
 
 WORKSPACE="$PROJECT_ROOT/.agent-harness"
 
