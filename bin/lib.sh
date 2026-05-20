@@ -265,3 +265,31 @@ _normalize_project() {  # $1=raw → stdout=절대경로
   fi
   ( cd "$raw" && pwd )
 }
+
+# pane 의 셸이 입력 받을 준비됐는지 sentinel echo 폴링.
+# claude PATH 존재까지 확인해 PATH 갱신 지연 케이스도 잡음.
+# return 0 = ready, return 1 = timeout.
+# P2 spec §2.1.
+shell_ready_wait() {  # $1=pane_id  $2=timeout_sec(기본 SHELL_READY_TIMEOUT 또는 15)
+  local pid="$1"
+  local timeout="${2:-${SHELL_READY_TIMEOUT:-15}}"
+  # sentinel salt 는 부모 셸 (lib.sh source 한 셸) 의 $$/$RANDOM 으로 expand — pane 셸에선 추가 expand 없음.
+  # split 형태 "__SHRDY"${salt}"_DONE__" 는 명령 라인 echo 와 실제 출력의 grep 매치 분리 효과 (위양성 차단).
+  local salt="$$_$RANDOM"
+  local sentinel="__SHRDY${salt}_DONE__"
+  # claude 존재 검증 + sentinel 출력.
+  # command -v, type, which 셋 중 하나라도 성공하면 OK (alias 환경 fallback).
+  # sentinel 을 변수 concat 로 보내 명령 라인엔 prefix/suffix 가 분리된 채 보이게 함.
+  tmux send-keys -t "$pid" "( command -v claude || type claude || which claude ) >/dev/null 2>&1 && echo \"__SHRDY\"${salt}\"_DONE__\"" Enter
+  local max_iter=$((timeout * 5))   # 0.2s * 5 = 1s 단위.
+  local i=0
+  while [ "$i" -lt "$max_iter" ]; do
+    # -S -200 으로 최근 200줄 history 검사 — 후속 출력에 sentinel 이 스크롤 아웃 되어도 잡음.
+    if tmux capture-pane -p -S -200 -t "$pid" 2>/dev/null | grep -q "$sentinel"; then
+      return 0
+    fi
+    sleep 0.2
+    i=$((i + 1))
+  done
+  return 1
+}
