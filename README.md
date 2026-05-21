@@ -120,3 +120,24 @@ bash tests/run-all.sh
 - 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`
 - 실측 프로브(claude 기동): `tests/probes/probe-{loop,hook}.sh` (수동)
 - 3차(PROJECT_ROOT 분리): 임의 프로젝트 작업·동시 가동 지원. 설계: `docs/superpowers/specs/2026-05-20-project-root-separation-design.md`
+
+## 권한 모델 (4차 P0)
+
+워커별 settings.json 사본으로 위험 명령 자동 차단:
+
+- **dev**: `git push`, `rm` (절대경로 포함), `gh pr` 차단. `templates/settings.dev.json.tpl`.
+- **tester**: `rm` 만 차단.
+- **reviewer (quality)**: *prompt 단계 제약*. 기술적 차단 불가 (claude PreToolUse hook deny + acceptEdits 공존 시 무효 — probe 36). lead 가 `permission-events.log`·`events.log` 감시.
+- **lead**: 차단 없음 (조정자).
+
+### 한계 (정직성)
+
+- **reviewer Read-only 기술적 차단 불가** — probe 36 으로 PreToolUse hook deny 가 acceptEdits 와 공존 시 무효 확정. prompt 단계 제약 + lead 의 두 로그 감시로 *부드러운 차단* 만 가능. reviewer 가 prompt 어기면 행위는 기록되지만 실행은 막을 수 없음.
+- **rm 경로 변형 미커버** — macOS 의 `/usr/bin/rm`·`/bin/rm` 만. Homebrew (`/usr/local/bin/rm`, `/opt/homebrew/bin/rm`), Linux (`/snap/bin/rm` 등) 환경에선 PATH 확인 후 `templates/settings.dev.json.tpl` 의 deny 에 직접 추가 필요.
+- **wrapper 우회 차단됨** — `bash -c "rm ..."`·`sh -c`·`eval` 모두 `Bash(rm *)` 매치 (probe 37-40 확정).
+- **|| fallback** — `rm X || echo OK` 시 rm 차단되지만 echo 실행. 명령 차단이지 의도 차단 아님.
+- **settings.deny 미커버 위험 명령** — `chmod 777`, `sudo`, `dd`, `mv $HOME` 등 호출 시 claude 가 *묻기 모드* 로 들어가 pane 멈춤. deny 패턴 확장 필요 시 `templates/settings.dev.json.tpl` 수정.
+- **MCP 도구·Read/Grep/Glob/WebFetch** 전부 자유. 본 spec 범위 밖.
+- **claude 권한 모델 비결정성** — claude 버전 업그레이드마다 깨질 수 있음. `RUN_INTEGRATION=1 bash tests/run-all.sh` 로 정기 회귀.
+
+상세: `docs/superpowers/specs/2026-05-21-harness-4th-P0-permissions-design.md`.
