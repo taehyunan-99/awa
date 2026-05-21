@@ -204,6 +204,17 @@ fi
 # trust 화면("Is this a project you trust?") 자동 Enter 통과 + REPL 준비 폴링.
 # probe 는 세션명 인자였으나 team-up 은 pane_id/target 을 쓴다 — capture-pane/
 # send-keys 는 pane target 도 동작하므로 인자만 pane target 으로 일반화(로직 동일).
+#
+# 2026-05-21 P2 회귀 fix: claude v2.1.145 상태줄에 'bypass permissions on' 더 이상
+#   출력 안 함 → 옛 단일 패턴은 false negative 로 항상 timeout. 다중 OR 매치로 회복.
+#   ready 신호 (any-of):
+#     - 'Claude Code v[0-9]' — welcome 박스 헤더 (가장 안정·버전 무관)
+#     - 'Welcome back'       — welcome 박스 본문
+#     - 'bypass permissions on' — 옛 상태줄 (역호환 — 옛 claude 살아있을 때 대비)
+#     - 'accept edits on'    — 옛 상태줄 (마찬가지)
+#   negative 신호 (즉시 fail):
+#     - 'Error:', 'Could not authenticate', 'not logged in', 'failed to start'
+#     - 폴링 timeout 까지 헛돌지 않고 조기 종료 (사용자 진단 빠름)
 wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
   local s="$1" i dump
   for i in $(seq 1 60); do
@@ -214,8 +225,12 @@ wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
       tmux send-keys -t "$s" Enter   # 기본 선택 "1. Yes, I trust this folder"
       continue
     fi
-    # 상태줄(bypass permissions on)이 뜨면 REPL 입력 가능 상태.
-    if printf '%s' "$dump" | grep -q 'bypass permissions on'; then
+    # negative 신호 — 명백한 에러면 timeout 까지 안 기다리고 즉시 fail.
+    if printf '%s' "$dump" | grep -qE 'Error:|Could not authenticate|not logged in|failed to start'; then
+      return 1
+    fi
+    # ready 신호 — 다중 OR 매치. 하나라도 떴으면 REPL 준비됨.
+    if printf '%s' "$dump" | grep -qE 'Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'; then
       return 0
     fi
   done
@@ -254,8 +269,9 @@ bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label
     # 2차: capture 검사 전 짧은 대기. claude 기동·trust 화면 출력 여유.
     sleep "${BOOT_REPL_CHECK_DELAY:-5}"
     # 3차: ASCII 한정 패턴 (POSIX ERE). 매치 실패면 Enter 만 1회 재전송.
+    # wait_repl 과 같은 신호 집합 (Welcome back 추가, Claude Code → Claude Code v[0-9] 로 strict).
     if ! tmux capture-pane -p -S -200 -t "$pid" 2>/dev/null | \
-         grep -qE 'trust this folder|Yes, I trust|bypass permissions on|accept edits on|Claude Code'; then
+         grep -qE 'trust this folder|Yes, I trust|bypass permissions on|accept edits on|Claude Code v[0-9]|Welcome back'; then
       tmux send-keys -t "$pid" Enter
     fi
     wait_repl "$pid" || echo "경고: $label '$wname' pane REPL 준비 실패(trust/기동 확인 필요)" >&2
