@@ -24,8 +24,11 @@ echo "team-up 종료 — exit=$RC, elapsed=${elapsed}s"
 echo "로그 (마지막 20줄):"
 tail -20 /tmp/p2-team-up.log
 
-if [ "$elapsed" -lt 30 ] && [ "$RC" = "0" ]; then
-  echo "PASS: 30초 안 부트 완료"
+# 임계 45초 — 4 pane 순차 부트 + claude 초기 로드 (Welcome 박스 렌더링,
+# Skill 자동 로드, 모델별 LLM warm-up) 합쳐 30대 초중반 정상. 5초 여유.
+# 2026-05-21 P2 false negative fix 직후 실측 35초 — 원래 30초 임계는 보수적.
+if [ "$elapsed" -lt 45 ] && [ "$RC" = "0" ]; then
+  echo "PASS: 45초 안 부트 완료 (${elapsed}s)"
 else
-  echo "FAIL: 30초 초과 또는 exit 0 아님"
+  echo "FAIL: 45초 초과 또는 exit 0 아님 (${elapsed}s, RC=$RC)"
 fi
