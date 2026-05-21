@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "EVENTS_LOG=\"__PROJECT_ROOT__/.agent-harness/events.log\" REPO_ROOT=\"__PROJECT_ROOT__\" bash \"__HARNESS_ROOT__/bin/log-event.sh\""
+            "command": "EVENTS_LOG=\"{{PROJECT_ROOT}}/.agent-harness/events.log\" REPO_ROOT=\"{{PROJECT_ROOT}}\" bash \"{{HARNESS_ROOT}}/bin/log-event.sh\""
           }
         ]
       }

@@ -126,6 +126,37 @@ boot_file() {
   printf '%s/.boot/%s.md' "$WORKSPACE" "$worker"
 }
 
+# 워커 역할 → settings 사본 산출 (4차 P0). 매핑 없으면 빈 echo + rc=0.
+# 호출자는 빈 echo 면 --settings 안 붙임.
+#   $1=worker_role (dev/test/reviewer-quality/...) → echo path 또는 빈 출력
+generate_worker_settings() {
+  local role="$1"
+  local tpl_name=""
+  case "$role" in
+    dev|security|researcher) tpl_name="dev" ;;
+    tester) tpl_name="test" ;;
+    reviewer-*) tpl_name="reviewer" ;;
+    *) return 0 ;;   # 매핑 없음 — settings 없이 부트 (lead/LEAD/unknown 포함). 빈 stdout.
+  esac
+  local tpl="$HARNESS_ROOT/templates/settings.${tpl_name}.json.tpl"
+  local out_dir="$PROJECT_ROOT/.agent-harness/.boot-settings"
+  local out="$out_dir/${role}.json"
+  if [ ! -f "$tpl" ]; then
+    echo "오류: settings 템플릿 없음 ($tpl) — 워커 '$role'" >&2
+    return 1
+  fi
+  mkdir -p "$out_dir"
+  sed -e "s#{{PROJECT_ROOT}}#$PROJECT_ROOT#g" \
+      -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
+      "$tpl" > "$out"
+  # 광범위 토큰 검증 — 화이트리스트 외 잔존도 fail (템플릿 오류 사전 차단).
+  if grep -qE '\{\{[A-Z_]+\}\}' "$out"; then
+    echo "오류: $out 에 토큰 미치환 잔존: $(grep -oE '\{\{[A-Z_]+\}\}' "$out" | sort -u | tr '\n' ' ')" >&2
+    return 1
+  fi
+  echo "$out"
+}
+
 # 세션 존재 여부. 존재하면 0, 아니면 비-0.
 session_exists() {
   local s="${1:-$SESSION_DEFAULT}"
