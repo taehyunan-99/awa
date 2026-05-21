@@ -324,7 +324,20 @@ for entry in "${WORKERS[@]}"; do
   fi
 
   tgt="${WORKER_PIDS[$i]}"
-  bootstrap_pane "$tgt" "$ENTRY_NAME" "$(agent_cmd_for "$ENTRY_MODEL")" "워커"
+  # 4차 P0: 워커 역할 → settings 사본 *항상* 도출 (AGENT_CMD 무관 — 테스트 가능성).
+  # --settings 인자만 claude 분기에 추가 — cat/dummy 는 인자 의미 없음.
+  cmd="$(agent_cmd_for "$ENTRY_MODEL")"
+  settings_path=""
+  if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE")"; then
+    echo "오류: '$ENTRY_NAME' settings 생성 실패 — 부트 skip" >&2
+    SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"
+    i=$((i + 1))
+    continue
+  fi
+  if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
+    cmd="$cmd --settings \"$settings_path\""
+  fi
+  bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커"
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -350,7 +363,17 @@ if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf"; then
   exit 1
 fi
 
-bootstrap_pane "$LEAD_PID" "LEAD" "$(agent_cmd_for "${LEAD_MODEL:-opus}")" "LEAD"
+# 4차 P0: LEAD 는 매핑 없음 — generate_worker_settings 가 빈 echo (rc=0). settings 미적용.
+lead_cmd="$(agent_cmd_for "${LEAD_MODEL:-opus}")"
+settings_path=""
+if ! settings_path="$(generate_worker_settings "LEAD")"; then
+  echo "오류: LEAD settings 생성 실패 — 부트 중단" >&2
+  exit 1
+fi
+if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
+  lead_cmd="$lead_cmd --settings \"$settings_path\""
+fi
+bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
 
@@ -372,7 +395,19 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       exit 1
     fi
     rtgt="${REV_PIDS[$j]}"
-    bootstrap_pane "$rtgt" "$ENTRY_NAME" "$(agent_cmd_for "$ENTRY_MODEL")" "리뷰어"
+    # 4차 P0: 리뷰어 역할 (reviewer-quality·reviewer-arch·reviewer-spec) → reviewer 템플릿.
+    rev_cmd="$(agent_cmd_for "$ENTRY_MODEL")"
+    settings_path=""
+    if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE")"; then
+      echo "오류: 리뷰어 '$ENTRY_NAME' settings 생성 실패 — 부트 skip" >&2
+      SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"
+      j=$((j + 1))
+      continue
+    fi
+    if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
+      rev_cmd="$rev_cmd --settings \"$settings_path\""
+    fi
+    bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))
