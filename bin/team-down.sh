@@ -76,6 +76,12 @@ if [ -d "$WORKSPACE/review" ]; then
   rm -rf "${WORKSPACE:?WORKSPACE unset}/review" || true
 fi
 
+# 4차 P0: 워커별 settings 사본·권한 로그·lead 커서 정리.
+if [ -d "$WORKSPACE/.boot-settings" ]; then
+  rm -rf "${WORKSPACE:?WORKSPACE unset}/.boot-settings" || true
+fi
+rm -f "$WORKSPACE/permission-events.log" "$WORKSPACE/.lead-perm-cursor" 2>/dev/null || true
+
 # settings.json + marker 정리 (marker 자체도 마지막에). 다음 team-up 이 재생성.
 rm -f "$PROJECT_ROOT/.claude/settings.json" 2>/dev/null || true
 rm -f "$MARKER" 2>/dev/null || true
