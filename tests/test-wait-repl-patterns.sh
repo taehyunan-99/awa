@@ -56,11 +56,11 @@ ORCH_FIXTURE="$(cat <<'EOF'
 │   Welcome back 태현!   │
 │   Opus 4.7 · Claude Max  │
 ╰────────────────────────────╯
-❯ /agent-harness/.boot/ORCHESTRATOR.md 를 읽고
+❯ /agent-harness/.boot/LEAD.md 를 읽고
 EOF
 )"
 printf '%s' "$ORCH_FIXTURE" | grep -qE "$READY_PAT"
-assert_success "$?" "T4: 실제 final 캡처 (orchestrator) ready 매치"
+assert_success "$?" "T4: 실제 final 캡처 (lead) ready 매치"
 
 # T5: team-up.sh 안 wait_repl 함수에 옛 단일 패턴 잔존 없음 (회귀 가드).
 # 'grep -q' (옵션 q 만, E 없음) + 'bypass permissions on' 단일 조합이 없어야 함.

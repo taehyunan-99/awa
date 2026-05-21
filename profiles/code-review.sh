@@ -5,4 +5,4 @@ WORKERS=(
   "security:security"
 )
 REVIEWERS=("spec-rev:reviewer-spec:sonnet" "quality-rev:reviewer-quality:haiku" "arch-rev:reviewer-arch:opus")
-ORCHESTRATOR_MODEL="opus"
+LEAD_MODEL="opus"

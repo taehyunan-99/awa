@@ -7,4 +7,4 @@ WORKERS=(
   "test:tester"
 )
 REVIEWERS=("quality-rev:reviewer-quality:haiku")
-ORCHESTRATOR_MODEL="opus"
+LEAD_MODEL="opus"

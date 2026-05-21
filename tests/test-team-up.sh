@@ -38,7 +38,7 @@ assert_eq "3" "$N" "페인 3개"
 TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{pane_title}' | sort | tr '\n' ',')"
 assert_contains "$TITLES" "dev" "워커 title dev 설정됨(layout 무관, pane_id 기반)"
 assert_contains "$TITLES" "test" "워커 title test 설정됨"
-assert_contains "$TITLES" "ORCHESTRATOR" "오케 title 설정됨"
+assert_contains "$TITLES" "LEAD" "오케 title 설정됨"
 
 # title 보존 결정적 검증: 워커 페인을 실제 셸로 띄워 OSC0 escape 를 흘려도
 # allow-set-title off 덕에 select-pane -T 로 준 title 이 유지돼야 함 (spec §6 전제).

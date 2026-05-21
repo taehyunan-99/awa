@@ -155,8 +155,8 @@ fix_session_titles "$SESSION"
 
 # 오케스트레이터 페인의 영속 pane_id 캡처 후 id 로 title 설정.
 # (split 이전 시점이라 layout 영향 없으나, 워커와 동일하게 id 기준으로 통일.)
-ORCH_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
-tmux select-pane -t "$ORCH_PID" -T "ORCHESTRATOR"
+LEAD_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
+tmux select-pane -t "$LEAD_PID" -T "LEAD"
 
 # 워커 페인 분할.
 # split-window -P -F '#{pane_id}' 로 새 페인의 영속 pane_id(%N) 를 즉시 캡처.
@@ -321,15 +321,15 @@ for entry in "${WORKERS[@]}"; do
   i=$((i + 1))
 done
 
-# 메인(ORCHESTRATOR) 부트: _common.md 제외. orchestrator.md + 워커 카탈로그.
+# 메인(LEAD) 부트: _common.md 제외. lead.md + 워커 카탈로그.
 catalog=""
 for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
   desc="$(head -1 "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" 2>/dev/null || true)"
   catalog+="- $ENTRY_NAME (역할 $ENTRY_ROLE): $desc"$'\n'
 done
-obf="$(boot_file ORCHESTRATOR)"
-{ cat "$PROMPTS_DIR/roles/orchestrator.md" 2>/dev/null || true
+obf="$(boot_file LEAD)"
+{ cat "$PROMPTS_DIR/roles/lead.md" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
 # 오케 boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
@@ -342,9 +342,9 @@ if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf"; then
   exit 1
 fi
 
-bootstrap_pane "$ORCH_PID" "ORCHESTRATOR" "$(agent_cmd_for "${ORCHESTRATOR_MODEL:-opus}")" "ORCHESTRATOR"
-send_prompt "$ORCH_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-inject_loop "$ORCH_PID" "$PROMPTS_DIR/loop/orchestrator.md"
+bootstrap_pane "$LEAD_PID" "LEAD" "$(agent_cmd_for "${LEAD_MODEL:-opus}")" "LEAD"
+send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
+inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then

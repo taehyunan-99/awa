@@ -72,7 +72,7 @@ SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
 - `research` — 워커: researcher×3, 리뷰어: quality-rev
 - `feature-team` — 워커: dev / test / arch, 리뷰어: spec-rev / quality-rev / arch-rev (모델 차등)
 
-새 팀: `profiles/<name>.sh` 추가 (`SESSION`, `LAYOUT`, `WORKERS=("이름:역할[:모델]" ...)`, 선택 `REVIEWERS=(...)`, `ORCHESTRATOR_MODEL`), 필요 시 `prompts/roles/<역할>.md` 추가. `bin/` 은 수정 불필요.
+새 팀: `profiles/<name>.sh` 추가 (`SESSION`, `LAYOUT`, `WORKERS=("이름:역할[:모델]" ...)`, 선택 `REVIEWERS=(...)`, `LEAD_MODEL`), 필요 시 `prompts/roles/<역할>.md` 추가. `bin/` 은 수정 불필요.
 
 ## 통신 메커니즘
 

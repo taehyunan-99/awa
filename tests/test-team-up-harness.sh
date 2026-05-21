@@ -20,7 +20,7 @@ SESSION="$S"
 LAYOUT="tiled"
 WORKERS=("dev:dev" "test:tester")
 REVIEWERS=("qual:reviewer-quality:haiku")
-ORCHESTRATOR_MODEL="opus"
+LEAD_MODEL="opus"
 EOF
 
 AGENT_CMD="cat" bash "$ROOT/bin/team-up.sh" "$PROF" >/dev/null 2>&1
@@ -32,7 +32,7 @@ assert_contains "$wins" "0" "window 0(team) 존재"
 assert_contains "$wins" "1" "window 1(review) 존재"
 
 w0titles="$(tmux list-panes -t "$S:0" -F '#{pane_title}' | tr '\n' ' ')"
-assert_contains "$w0titles" "ORCHESTRATOR" "team 윈도우에 orchestrator"
+assert_contains "$w0titles" "LEAD" "team 윈도우에 lead"
 assert_contains "$w0titles" "dev" "team 윈도우에 dev 워커"
 w1titles="$(tmux list-panes -t "$S:1" -F '#{pane_title}' | tr '\n' ' ')"
 assert_contains "$w1titles" "qual" "review 윈도우에 리뷰어 qual"

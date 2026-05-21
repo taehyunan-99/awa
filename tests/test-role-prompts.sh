@@ -4,17 +4,17 @@ cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
 
-orch="$(cat "$ROOT/prompts/roles/orchestrator.md")"
-assert_contains "$orch" "단계" "orchestrator 단계전이 금지 규약"
-assert_contains "$orch" ".harness-state" "orchestrator harness-state 규약"
-assert_contains "$orch" "카탈로그" "orchestrator 워커 카탈로그 사용"
+orch="$(cat "$ROOT/prompts/roles/lead.md")"
+assert_contains "$orch" "단계" "lead 단계전이 금지 규약"
+assert_contains "$orch" ".harness-state" "lead harness-state 규약"
+assert_contains "$orch" "카탈로그" "lead 워커 카탈로그 사용"
 
 revl="$(cat "$ROOT/prompts/loop/reviewer.md")"
 assert_contains "$revl" "events.log" "reviewer loop 가 events.log 감시"
 assert_contains "$revl" ".review-cursor" "reviewer loop 커서 사용"
 
-orchl="$(cat "$ROOT/prompts/loop/orchestrator.md")"
-assert_contains "$orchl" "review/" "orchestrator loop 가 review/ 감시"
+orchl="$(cat "$ROOT/prompts/loop/lead.md")"
+assert_contains "$orchl" "review/" "lead loop 가 review/ 감시"
 
 for r in spec quality arch; do
   if [ -f "$ROOT/prompts/roles/reviewer-$r.md" ]; then

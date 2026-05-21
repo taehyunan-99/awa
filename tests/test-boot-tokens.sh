@@ -35,8 +35,8 @@ cat > "$FIX_PROMPTS/roles/test-reviewer.md" <<'EOF'
 리뷰는 {{HARNESS_ROOT}}/bin/log-event.sh 를 기준으로 한다.
 EOF
 
-# 오케 boot 도 토큰 검증 — orchestrator.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
-cat >> "$FIX_PROMPTS/roles/orchestrator.md" <<'EOF'
+# 오케 boot 도 토큰 검증 — lead.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
+cat >> "$FIX_PROMPTS/roles/lead.md" <<'EOF'
 
 ## (fixture) 토큰 검증
 dispatch: {{HARNESS_ROOT}}/bin/dispatch.sh
@@ -48,7 +48,7 @@ cat > "$PROF" <<'EOF'
 LAYOUT=tiled
 WORKERS=("dev:test-role")
 REVIEWERS=("rev:test-reviewer")
-ORCHESTRATOR_MODEL=sonnet
+LEAD_MODEL=sonnet
 EOF
 
 # team-up 호출 (AGENT_CMD=cat 더미).
@@ -62,7 +62,7 @@ rc=$?
 assert_eq "0" "$rc" "team-up 성공 (rc=$rc, err=$(head -3 /tmp/_t-boot-tokens-err.log 2>/dev/null))"
 
 WORKER_BOOT="$TMP_PROJ/.agent-harness/.boot/dev.md"
-ORCH_BOOT="$TMP_PROJ/.agent-harness/.boot/ORCHESTRATOR.md"
+ORCH_BOOT="$TMP_PROJ/.agent-harness/.boot/LEAD.md"
 REV_BOOT="$TMP_PROJ/.agent-harness/.boot/rev.md"
 
 # T3.1: 워커 boot — 예약 토큰 잔존 0 + 절대경로 dispatch 등장.
