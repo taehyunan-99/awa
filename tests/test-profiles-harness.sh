@@ -8,13 +8,13 @@ ROOT="$(cd .. && pwd)"
 ( source "$ROOT/profiles/feature-team.sh"
   [ "${#WORKERS[@]}" -ge 1 ] && echo "W_OK"
   [ "${#REVIEWERS[@]}" -ge 1 ] && echo "R_OK"
-  printf 'ORCH=%s\n' "$LEAD_MODEL"
+  printf 'LEAD=%s\n' "$LEAD_MODEL"
   printf 'W0=%s\n' "${WORKERS[0]}"
 ) > /tmp/prof_out_$$ 2>&1
 out="$(cat /tmp/prof_out_$$)"; rm -f /tmp/prof_out_$$
 assert_contains "$out" "W_OK" "WORKERS 정의됨"
 assert_contains "$out" "R_OK" "REVIEWERS 정의됨"
-assert_contains "$out" "ORCH=" "LEAD_MODEL 정의됨"
+assert_contains "$out" "LEAD=" "LEAD_MODEL 정의됨"
 assert_contains "$out" ":" "워커 엔트리에 역할 구분자(:) 존재"
 
 # 리뷰어 역할명은 reviewer-<관점> 형식

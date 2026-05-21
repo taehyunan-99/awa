@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # T3 회귀: bootstrap_pane 이 {{HARNESS_ROOT}} 토큰을 절대경로로 치환.
 # AGENT_CMD=cat 으로 team-up 실행 → .boot/<worker>.md 파일 검사.
-# 워커·오케스트레이터·리뷰어 3종 boot 모두 sed 치환·토큰 검증 통과 확인.
+# 워커·lead·리뷰어 3종 boot 모두 sed 치환·토큰 검증 통과 확인.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
@@ -35,7 +35,7 @@ cat > "$FIX_PROMPTS/roles/test-reviewer.md" <<'EOF'
 리뷰는 {{HARNESS_ROOT}}/bin/log-event.sh 를 기준으로 한다.
 EOF
 
-# 오케 boot 도 토큰 검증 — lead.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
+# lead boot 도 토큰 검증 — lead.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
 cat >> "$FIX_PROMPTS/roles/lead.md" <<'EOF'
 
 ## (fixture) 토큰 검증
@@ -62,7 +62,7 @@ rc=$?
 assert_eq "0" "$rc" "team-up 성공 (rc=$rc, err=$(head -3 /tmp/_t-boot-tokens-err.log 2>/dev/null))"
 
 WORKER_BOOT="$TMP_PROJ/.agent-harness/.boot/dev.md"
-ORCH_BOOT="$TMP_PROJ/.agent-harness/.boot/LEAD.md"
+LEAD_BOOT="$TMP_PROJ/.agent-harness/.boot/LEAD.md"
 REV_BOOT="$TMP_PROJ/.agent-harness/.boot/rev.md"
 
 # T3.1: 워커 boot — 예약 토큰 잔존 0 + 절대경로 dispatch 등장.
@@ -81,19 +81,19 @@ else
   fi
 fi
 
-# T3.2: 오케스트레이터 boot — 예약 토큰 잔존 0 + 절대경로 dispatch 등장 (fixture 박은 토큰).
-if [ ! -f "$ORCH_BOOT" ]; then
-  assert_eq "exists" "missing" "오케 boot 파일 존재 (stderr=$(cat /tmp/_t-boot-tokens-err.log))"
+# T3.2: lead boot — 예약 토큰 잔존 0 + 절대경로 dispatch 등장 (fixture 박은 토큰).
+if [ ! -f "$LEAD_BOOT" ]; then
+  assert_eq "exists" "missing" "lead boot 파일 존재 (stderr=$(cat /tmp/_t-boot-tokens-err.log))"
 else
-  if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$ORCH_BOOT"; then
-    assert_eq "no-tokens-remaining" "tokens-remaining" "오케 boot: 예약 토큰 잔존"
+  if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$LEAD_BOOT"; then
+    assert_eq "no-tokens-remaining" "tokens-remaining" "lead boot: 예약 토큰 잔존"
   else
-    assert_eq "no-tokens-remaining" "no-tokens-remaining" "오케 boot: 모든 예약 토큰 치환됨"
+    assert_eq "no-tokens-remaining" "no-tokens-remaining" "lead boot: 모든 예약 토큰 치환됨"
   fi
-  if grep -qF "$ROOT/bin/dispatch.sh" "$ORCH_BOOT"; then
-    assert_eq "abs-path-present" "abs-path-present" "오케 boot: 절대경로 dispatch.sh 등장"
+  if grep -qF "$ROOT/bin/dispatch.sh" "$LEAD_BOOT"; then
+    assert_eq "abs-path-present" "abs-path-present" "lead boot: 절대경로 dispatch.sh 등장"
   else
-    assert_eq "abs-path-present" "abs-path-missing" "오케 boot: 절대경로 dispatch.sh 등장 — 첫 5줄: $(head -5 "$ORCH_BOOT")"
+    assert_eq "abs-path-present" "abs-path-missing" "lead boot: 절대경로 dispatch.sh 등장 — 첫 5줄: $(head -5 "$LEAD_BOOT")"
   fi
 fi
 

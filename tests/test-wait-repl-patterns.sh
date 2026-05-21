@@ -51,7 +51,7 @@ drwxr-xr-x 2 user staff 64 May 21 ." | grep -qE "$READY_PAT"
 assert_fail "$?" "T3.2: false positive 가드 — 일반 ls 출력"
 
 # T4: 실제 final 캡처 시뮬레이션 (probe-cold-start-diag 결과 기반).
-ORCH_FIXTURE="$(cat <<'EOF'
+LEAD_FIXTURE="$(cat <<'EOF'
 ╭─── Claude Code v2.1.145 ───╮
 │   Welcome back 태현!   │
 │   Opus 4.7 · Claude Max  │
@@ -59,7 +59,7 @@ ORCH_FIXTURE="$(cat <<'EOF'
 ❯ /agent-harness/.boot/LEAD.md 를 읽고
 EOF
 )"
-printf '%s' "$ORCH_FIXTURE" | grep -qE "$READY_PAT"
+printf '%s' "$LEAD_FIXTURE" | grep -qE "$READY_PAT"
 assert_success "$?" "T4: 실제 final 캡처 (lead) ready 매치"
 
 # T5: team-up.sh 안 wait_repl 함수에 옛 단일 패턴 잔존 없음 (회귀 가드).

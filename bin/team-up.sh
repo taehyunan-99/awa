@@ -133,7 +133,7 @@ fi
 # 이유: 거부 케이스에서 mkdir 부작용 leak 차단 — spec D2·E8 사용자 보호.
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 
-# 오케스트레이터 페인으로 세션 생성. 셸 유지.
+# lead 페인으로 세션 생성. 셸 유지.
 tmux new-session -d -s "$SESSION" -x 220 -y 50 -n team
 
 # 인덱스 규약 세션 로컬 고정: 사용자 전역 ~/.tmux.conf 의
@@ -153,7 +153,7 @@ fi
 # select-pane -T 로 지정한 워커명 title 을 덮어쓰지 못하게 함 (spec §6 전제).
 fix_session_titles "$SESSION"
 
-# 오케스트레이터 페인의 영속 pane_id 캡처 후 id 로 title 설정.
+# lead 페인의 영속 pane_id 캡처 후 id 로 title 설정.
 # (split 이전 시점이라 layout 영향 없으나, 워커와 동일하게 id 기준으로 통일.)
 LEAD_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
 tmux select-pane -t "$LEAD_PID" -T "LEAD"
@@ -238,7 +238,7 @@ wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
 }
 
 # P2 §2.2: pane 부트스트랩 — 셸 ready 폴링 + Enter-만 재전송 안전망.
-# 세 경로(워커/오케스트레이터/리뷰어)에 동일한 흐름을 일원화.
+# 세 경로(워커/lead/리뷰어)에 동일한 흐름을 일원화.
 #   $1=pane_id  $2=worker_name(HARNESS_WORKER 값)  $3=실행할 agent_cmd  $4=역할 라벨(메시지용)
 # 흐름:
 #   1) shell_ready_wait 로 셸·claude PATH 준비 확인 (claude 분기). timeout 시 SKIPPED_PANES 누적·return 0.
@@ -331,7 +331,7 @@ done
 obf="$(boot_file LEAD)"
 { cat "$PROMPTS_DIR/roles/lead.md" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
-# 오케 boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
+# lead boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
 sed -e "s#{{SESSION}}#$SESSION#g" \
     -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
