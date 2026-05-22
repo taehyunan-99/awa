@@ -328,7 +328,7 @@ for entry in "${WORKERS[@]}"; do
   # --settings 인자만 claude 분기에 추가 — cat/dummy 는 인자 의미 없음.
   cmd="$(agent_cmd_for "$ENTRY_MODEL")"
   settings_path=""
-  if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE")"; then
+  if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE" "$ENTRY_NAME")"; then
     echo "오류: '$ENTRY_NAME' settings 생성 실패 — 부트 skip" >&2
     SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"
     i=$((i + 1))
@@ -363,12 +363,12 @@ if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf"; then
   exit 1
 fi
 
-# 4차 P0: LEAD 는 매핑 없음 — generate_worker_settings 가 빈 echo (rc=0). settings 미적용.
+# 5차: LEAD 도 generate_worker_settings 로 settings 생성 (lead 템플릿 적용, F40).
 lead_cmd="$(agent_cmd_for "${LEAD_MODEL:-opus}")"
 settings_path=""
-if ! settings_path="$(generate_worker_settings "LEAD")"; then
-  echo "오류: LEAD settings 생성 실패 — 부트 중단" >&2
-  exit 1
+if ! settings_path="$(generate_worker_settings "LEAD" "LEAD")"; then
+  echo "경고: LEAD settings 생성 실패 — settings 미적용으로 계속 (lead 템플릿 미설치)" >&2
+  settings_path=""
 fi
 if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
   lead_cmd="$lead_cmd --settings \"$settings_path\""
@@ -398,7 +398,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     # 4차 P0: 리뷰어 역할 (reviewer-quality·reviewer-arch·reviewer-spec) → reviewer 템플릿.
     rev_cmd="$(agent_cmd_for "$ENTRY_MODEL")"
     settings_path=""
-    if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE")"; then
+    if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE" "$ENTRY_NAME")"; then
       echo "오류: 리뷰어 '$ENTRY_NAME' settings 생성 실패 — 부트 skip" >&2
       SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"
       j=$((j + 1))

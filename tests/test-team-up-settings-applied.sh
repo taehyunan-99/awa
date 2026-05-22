@@ -42,6 +42,7 @@ BOOTSET="$TMP/.agent-harness/.boot-settings"
 content="$(cat "$BOOTSET/dev.json")"
 assert_contains "$content" "Bash(git push *)" "dev.json git push deny"
 assert_contains "$content" "$TMP/.agent-harness/permission-events.log" "dev.json PROJECT_ROOT 치환"
+assert_contains "$content" 'WORKER=\"dev\"' "dev.json WORKER=entry_name(dev)"
 # 잔존 토큰 부재
 if printf '%s' "$content" | grep -qE '\{\{[A-Z_]+\}\}'; then
   assert_eq "no" "yes" "dev.json 토큰 잔존 부재"
@@ -50,10 +51,12 @@ fi
 # researcher 검증 — dev 와 동일 매핑이므로 deny 동일해야.
 content="$(cat "$BOOTSET/researcher.json")"
 assert_contains "$content" "Bash(git push *)" "researcher.json dev 템플릿 매핑 (git push deny)"
+assert_contains "$content" 'WORKER=\"arch\"' "researcher.json WORKER=entry_name(arch)"
 
 # tester 검증
 content="$(cat "$BOOTSET/tester.json")"
 assert_contains "$content" "Bash(rm *)" "tester.json rm deny"
+assert_contains "$content" 'WORKER=\"test\"' "tester.json WORKER=entry_name(test)"
 if printf '%s' "$content" | grep -q "git push"; then
   assert_eq "no" "yes" "tester.json 에 git push deny 부재"
 fi
@@ -65,6 +68,8 @@ if printf '%s' "$content" | grep -q '"deny"'; then
   assert_eq "no" "yes" "reviewer-quality.json deny 부재"
 fi
 assert_contains "$content" "log-deny.sh" "reviewer-quality.json hook"
+assert_contains "$content" '"Read"' "reviewer-quality.json seed allow Read"
+assert_contains "$content" 'WORKER=\"quality-rev\"' "reviewer-quality.json WORKER=entry_name"
 
 # reviewer-spec / reviewer-arch 도 동일 reviewer 템플릿 — deny 부재 + hook 존재.
 for rev in reviewer-spec reviewer-arch; do
@@ -73,6 +78,7 @@ for rev in reviewer-spec reviewer-arch; do
     assert_eq "no" "yes" "$rev.json deny 부재"
   fi
   assert_contains "$content" "log-deny.sh" "$rev.json hook"
+  assert_contains "$content" '"Read"' "$rev.json seed allow Read"
 done
 
 # AGENT_CMD=cat 경로에선 --settings 가 cmd 에 추가되지 않음 (claude 분기에서만 추가).
