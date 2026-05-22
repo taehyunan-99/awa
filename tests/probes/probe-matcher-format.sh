@@ -5,14 +5,14 @@
 # ask 가 뜨는지(=매칭 실패) 안 뜨는지(=매칭 성공) capture-pane 으로 관찰.
 set -uo pipefail
 cd "$(dirname "$0")"
-source ./assert.sh
+source ../assert.sh
 
 if [ "${RUN_INTEGRATION:-0}" != "1" ]; then
   echo "SKIP: RUN_INTEGRATION!=1 (matcher 형식 probe 는 claude 의존)"
   exit 0
 fi
 
-ROOT="$(cd .. && pwd)"
+ROOT="$(cd ../.. && pwd)"
 TMP="$(mktemp -d)"
 SESSION="probe-matcher-$$"
 cleanup() { tmux kill-session -t "$SESSION" 2>/dev/null || true; rm -rf "$TMP"; }
