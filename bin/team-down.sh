@@ -41,6 +41,36 @@ else
   echo "세션 '$SESSION' 없음 (이미 정리됨)."
 fi
 
+# 5차: watch-asks 데몬 종료 (marker 게이트 밖 — marker 없는 PROJECT_ROOT 의 데몬 누수도 정리).
+STATE_DIR="$PROJECT_ROOT/.agent-harness/state"
+
+# 1단계: tail 손자 먼저 직접 kill (데몬 죽이기 전 — tail-pids 파일 아직 존재).
+# jsonl 경로는 ${HOME}/.claude/projects/-<enc>/<sid>.jsonl (PROJECT_ROOT 밖) →
+# pkill 패턴은 NO MATCH 또는 멀티프로젝트 위험. tail-pids PID 직접 kill (reparent 면역+멀티프로젝트 안전).
+if [ -f "${STATE_DIR}/tail-pids" ]; then
+  while IFS= read -r tpid; do
+    kill "$tpid" 2>/dev/null || true
+  done < "${STATE_DIR}/tail-pids"
+fi
+
+# 2단계: 데몬 본체 SIGTERM → 대기 → SIGKILL
+if [ -f "${STATE_DIR}/watch-asks.pid" ]; then
+  pid=$(cat "${STATE_DIR}/watch-asks.pid")
+  kill "${pid}" 2>/dev/null || true
+  for i in $(seq 1 30); do
+    if ! kill -0 "${pid}" 2>/dev/null; then break; fi
+    sleep 0.1
+  done
+  if kill -0 "${pid}" 2>/dev/null; then
+    kill -9 "${pid}" 2>/dev/null || true
+  fi
+  sleep 0.1
+  rm -f "${STATE_DIR}/watch-asks.pid"
+fi
+
+# 3단계: tail-pids 파일 정리 (1단계에서 PID 이미 kill — 파일만 제거).
+rm -f "${STATE_DIR}/tail-pids" 2>/dev/null || true
+
 # E8·F8: marker 없는 PROJECT_ROOT 의 .agent-harness/·settings.json 보호.
 # 우연히 만들어진 디렉터리·사용자 자료를 건드리지 않기 위함.
 MARKER="$PROJECT_ROOT/.claude/.agent-harness-marker"
@@ -81,6 +111,16 @@ if [ -d "$WORKSPACE/.boot-settings" ]; then
   rm -rf "${WORKSPACE:?WORKSPACE unset}/.boot-settings" || true
 fi
 rm -f "$WORKSPACE/permission-events.log" "$WORKSPACE/.lead-perm-cursor" 2>/dev/null || true
+
+# 5차: state 디렉터리 정리 (marker 게이트 안 — 하네스 산출물만).
+STATE_DIR="${WORKSPACE}/state"
+rm -rf "${STATE_DIR:?STATE_DIR unset}/pending-asks" \
+       "${STATE_DIR}/incidents" \
+       "${STATE_DIR}/removal-requests" 2>/dev/null || true
+rm -f "${STATE_DIR}/workers.list" "${STATE_DIR}/watch-asks.log" \
+      "${STATE_DIR}/watch-asks.stdout.log" "${STATE_DIR}/watch-asks.stderr.log" \
+      "${STATE_DIR}/tail-pids" 2>/dev/null || true
+rmdir "${STATE_DIR}" 2>/dev/null || true
 
 # settings.json + marker 정리 (marker 자체도 마지막에). 다음 team-up 이 재생성.
 rm -f "$PROJECT_ROOT/.claude/settings.json" 2>/dev/null || true
