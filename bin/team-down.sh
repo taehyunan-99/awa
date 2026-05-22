@@ -35,7 +35,8 @@ SESSION="$(resolve_session)"
 
 # 세션 종료 (있으면) — marker 유무와 무관하게 사용자가 종료 의도. R4: 중복 kill 제거.
 if tmux has-session -t "$SESSION" 2>/dev/null; then
-  tmux kill-session -t "$SESSION"
+  # || true: kill-session 실패(권한 등) 가 set -e 로 이후 데몬 종료·state 정리를 스킵하지 않도록.
+  tmux kill-session -t "$SESSION" || true
   echo "세션 '$SESSION' 종료."
 else
   echo "세션 '$SESSION' 없음 (이미 정리됨)."
@@ -49,6 +50,7 @@ STATE_DIR="$PROJECT_ROOT/.agent-harness/state"
 # pkill 패턴은 NO MATCH 또는 멀티프로젝트 위험. tail-pids PID 직접 kill (reparent 면역+멀티프로젝트 안전).
 if [ -f "${STATE_DIR}/tail-pids" ]; then
   while IFS= read -r tpid; do
+    [ -z "$tpid" ] && continue   # 빈 줄 → kill "" 무의미 호출 방지
     kill "$tpid" 2>/dev/null || true
   done < "${STATE_DIR}/tail-pids"
 fi

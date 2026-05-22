@@ -63,6 +63,7 @@ cleanup() {
   # 1차: tail PID 직접 kill (reparent 면역 — FIFO 경유로 PID 직접 추적)
   if [[ -f "${STATE_DIR}/tail-pids" ]]; then
     while IFS= read -r tpid; do
+      [ -z "$tpid" ] && continue   # 빈 줄 가드
       kill "$tpid" 2>/dev/null || true
     done < "${STATE_DIR}/tail-pids"
     rm -f "${STATE_DIR}/tail-pids"
