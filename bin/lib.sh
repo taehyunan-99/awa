@@ -126,17 +126,19 @@ boot_file() {
   printf '%s/.boot/%s.md' "$WORKSPACE" "$worker"
 }
 
-# 워커 역할 → settings 사본 산출 (4차 P0). 매핑 없으면 빈 echo + rc=0.
-# 호출자는 빈 echo 면 --settings 안 붙임.
-#   $1=worker_role (dev/test/reviewer-quality/...) → echo path 또는 빈 출력
+# 워커 역할 → settings 사본 산출 (5차: 2 인자).
+# $1=entry_role (settings 파일명 결정: dev/test/reviewer-*/lead/...) → echo path
+# $2=entry_name (settings 의 {{ENTRY_NAME}} 토큰 치환값 — WORKER env 통일, F22 옵션 A)
+# 매핑 없는 역할은 default 템플릿 적용 (4차 P0 의 `*) return 0` 대체, F12·§5.13).
 generate_worker_settings() {
-  local role="$1"
+  local role="$1" entry_name="${2:-}"
   local tpl_name=""
   case "$role" in
     dev|security|researcher) tpl_name="dev" ;;
     tester) tpl_name="test" ;;
     reviewer-*) tpl_name="reviewer" ;;
-    *) return 0 ;;   # 매핑 없음 — settings 없이 부트 (lead/LEAD/unknown 포함). 빈 stdout.
+    lead|LEAD) tpl_name="lead" ;;
+    *) tpl_name="default" ;;
   esac
   local tpl="$HARNESS_ROOT/templates/settings.${tpl_name}.json.tpl"
   local out_dir="$PROJECT_ROOT/.agent-harness/.boot-settings"
@@ -146,8 +148,10 @@ generate_worker_settings() {
     return 1
   fi
   mkdir -p "$out_dir"
+  # F39: 기존 PROJECT_ROOT·HARNESS_ROOT 치환 유지 + ENTRY_NAME 토큰 추가 (대체 아님).
   sed -e "s#{{PROJECT_ROOT}}#$PROJECT_ROOT#g" \
       -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
+      -e "s#{{ENTRY_NAME}}#$entry_name#g" \
       "$tpl" > "$out"
   # 광범위 토큰 검증 — 화이트리스트 외 잔존도 fail (템플릿 오류 사전 차단).
   if grep -qE '\{\{[A-Z_]+\}\}' "$out"; then
