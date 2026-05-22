@@ -142,7 +142,7 @@ fi
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 
 # lead 페인으로 세션 생성. 셸 유지.
-tmux new-session -d -s "$SESSION" -x 220 -y 50 -n team
+tmux new-session -d -s "$SESSION" -c "${PROJECT_ROOT}" -x 220 -y 50 -n team
 
 # 인덱스 규약 세션 로컬 고정: 사용자 전역 ~/.tmux.conf 의
 # base-index/pane-base-index(예: 1) 와 무관하게 window 0 / pane 1 보장.
@@ -337,7 +337,9 @@ for entry in "${WORKERS[@]}"; do
   if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
     cmd="$cmd --settings \"$settings_path\""
   fi
+  started=$(date +%s)
   bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커"
+  discover_jsonl_and_record "$ENTRY_NAME" "$tgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -373,7 +375,9 @@ fi
 if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
   lead_cmd="$lead_cmd --settings \"$settings_path\""
 fi
+started=$(date +%s)
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
+discover_jsonl_and_record "LEAD" "$LEAD_PID" "$PROJECT_ROOT" "$started" "lead" || true
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
 
@@ -407,11 +411,29 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
       rev_cmd="$rev_cmd --settings \"$settings_path\""
     fi
+    started=$(date +%s)
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
+    discover_jsonl_and_record "$ENTRY_NAME" "$rtgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))
   done
+fi
+
+# 5차: watch-asks 데몬 기동 (모든 부트 완료 후). claude 분기에서만 (cat 더미는 jsonl 없어 무의미).
+if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+  STATE_DIR="${PROJECT_ROOT}/.agent-harness/state"
+  mkdir -p "${STATE_DIR}"
+  PROJECT_ROOT="${PROJECT_ROOT}" HARNESS_ROOT="${HARNESS_ROOT}" \
+    nohup bash "${HARNESS_ROOT}/bin/watch-asks.sh" \
+      > "${STATE_DIR}/watch-asks.stdout.log" \
+      2> "${STATE_DIR}/watch-asks.stderr.log" &
+  sleep 0.5
+  if [ -f "${STATE_DIR}/watch-asks.pid" ]; then
+    echo "watch-asks daemon started (PID $(cat "${STATE_DIR}/watch-asks.pid"))"
+  else
+    echo "경고: watch-asks 데몬 기동 확인 실패 — ${STATE_DIR}/watch-asks.stderr.log 확인" >&2
+  fi
 fi
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
