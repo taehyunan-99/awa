@@ -339,7 +339,10 @@ for entry in "${WORKERS[@]}"; do
   fi
   started=$(date +%s)
   bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커"
-  discover_jsonl_and_record "$ENTRY_NAME" "$tgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
+  # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 jsonl 미생성 → 폴링 hang 회피).
+  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+    discover_jsonl_and_record "$ENTRY_NAME" "$tgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
+  fi
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -377,7 +380,10 @@ if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
 fi
 started=$(date +%s)
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
-discover_jsonl_and_record "LEAD" "$LEAD_PID" "$PROJECT_ROOT" "$started" "lead" || true
+# 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 jsonl 미생성 → 폴링 hang 회피).
+if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+  discover_jsonl_and_record "LEAD" "$LEAD_PID" "$PROJECT_ROOT" "$started" "lead" || true
+fi
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
 
@@ -413,7 +419,10 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     fi
     started=$(date +%s)
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
-    discover_jsonl_and_record "$ENTRY_NAME" "$rtgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
+    # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 jsonl 미생성 → 폴링 hang 회피).
+    if [ "${AGENT_CMD:-claude}" = "claude" ]; then
+      discover_jsonl_and_record "$ENTRY_NAME" "$rtgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
+    fi
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))

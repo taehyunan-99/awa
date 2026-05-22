@@ -25,9 +25,8 @@ assert_contains "$src" 'nohup bash "${HARNESS_ROOT}/bin/watch-asks.sh"' "U5 데�
 echo "[U6] cat 더미로 team-up 성공 (데몬 코드가 cat 경로 안 깨뜨림)"
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; SESSION="agents-$SAFE"
 ( cd "$TMP" && git init -q )
-# DISCOVER_MAX_TRIES=1: cat 더미는 jsonl 미생성 → discovery 가 기본 60회×0.5s×3곳(워커/lead/리뷰어) 폴링하면 90s+ hang.
-# 1회로 단축해 cat 경로 빠른 종료(실측: 30s hang → 10s). claude 분기는 이 env 없이 정상 폴링.
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat DISCOVER_MAX_TRIES=1 bash "$ROOT/bin/team-up.sh" feature-team >/dev/null 2>&1
+# cat 더미는 jsonl 미생성 → team-up 의 discovery 는 claude 분기에서만 호출되므로 hang 없음 (T18 정정).
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" feature-team >/dev/null 2>&1
 rc=$?
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 [ -f "$TMP/.agent-harness/state/watch-asks.pid" ] && kill "$(cat "$TMP/.agent-harness/state/watch-asks.pid")" 2>/dev/null || true
