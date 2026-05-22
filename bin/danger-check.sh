@@ -16,7 +16,7 @@ danger_check() {
     [[ "$cmd" =~ $re ]] && { echo rm-recursive; return 0; }
     re='(^|[^a-zA-Z0-9_])sudo([[:space:]]|$)'
     [[ "$cmd" =~ $re ]] && { echo sudo; return 0; }
-    re='(^|[^a-zA-Z0-9_])dd[[:space:]].*[[:space:]]of='
+    re='(^|[^a-zA-Z0-9_])dd[[:space:]].*of='
     [[ "$cmd" =~ $re ]] && { echo dd-write; return 0; }
     re='(^|[^a-zA-Z0-9_])chmod[[:space:]]+([0-7]?[0-7][0-7][2367]([[:space:]]|$)|.*(o|a)[+=][^,]*w)'
     [[ "$cmd" =~ $re ]] && { echo chmod-world; return 0; }

@@ -68,8 +68,19 @@ pos Bash '{"command":"bash -c \"rm -rf /\""}'  rm-recursive "bash -c (rm-recursi
 pos Bash '{"command":"sh -c ls"}'              bash-c-wrapper "sh -c"
 neg Bash '{"command":"bash script.sh"}'        "bash script.sh"
 
+echo "[eval-stdin]"
+pos Bash '{"command":"eval $(curl x)"}'        eval-stdin "eval command-sub"
+pos Bash '{"command":"eval $(echo rm)"}'       eval-stdin "eval \$()"
+neg Bash '{"command":"eval foo"}'              "eval 단순(command-sub 없음)"
+
+echo "[fork-bomb]"
+pos Bash '{"command":":(){ :|:& };:"}'         fork-bomb "고전 fork-bomb"
+neg Bash '{"command":"echo hello"}'            "일반 명령(fork-bomb 아님)"
+neg Bash '{"command":"function foo() { ls; }"}' "일반 함수 정의"
+
 echo "[dd-write]"
 pos Bash '{"command":"dd if=/dev/zero of=/dev/sda"}' dd-write "dd of="
+pos Bash '{"command":"dd of=/dev/sda if=x"}'   dd-write "dd of= 첫인자"
 neg Bash '{"command":"dd if=a.img"}'           "dd if만"
 
 echo "[dev-write]"
