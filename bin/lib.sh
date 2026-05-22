@@ -413,3 +413,33 @@ derive_pattern() {
       ;;
   esac
 }
+
+# bootstrap_pane 직후 claude jsonl 발견 + workers.list 5필드 append (§5.6, F14).
+# $1=entry_name(표시 이름) $2=pane_id $3=cwd(PROJECT_ROOT) $4=started(epoch) $5=entry_role
+# started 는 호출자가 bootstrap_pane 직전 `started=$(date +%s)` 로 측정 (F18).
+discover_jsonl_and_record() {
+  local entry_name="$1" pane="$2" cwd="$3" started="$4" entry_role="$5"
+  local cwd_encoded proj_dir jsonl="" f_mtime f i
+  local max_tries="${DISCOVER_MAX_TRIES:-60}"   # 테스트 단축용 env override
+  cwd_encoded=$(echo "${cwd}" | sed 's#^/##; s#/#-#g')   # F19: leading slash 제거 후 dash 치환 (claude 단일 dash 컨벤션, 실측 확정)
+  proj_dir="${HOME}/.claude/projects/-${cwd_encoded}"
+  for i in $(seq 1 "${max_tries}"); do
+    for f in $(ls -t "${proj_dir}"/*.jsonl 2>/dev/null); do
+      f_mtime=$(stat -f %m "${f}")
+      if [[ "${f_mtime}" -ge "${started}" ]]; then
+        jsonl="${f}"; break
+      fi
+    done
+    [[ -n "${jsonl}" ]] && break
+    sleep 0.5
+  done
+  if [[ -z "${jsonl}" ]]; then
+    echo "경고: ${entry_name} jsonl 미발견" >&2
+    return 1
+  fi
+  local session_id; session_id=$(basename "${jsonl}" .jsonl)
+  mkdir -p "${cwd}/.agent-harness/state"
+  # F14: 5필드 — entry_name · pane · session · jsonl · entry_role
+  printf '%s %s %s %s %s\n' "${entry_name}" "${pane}" "${session_id}" "${jsonl}" "${entry_role}" \
+    >> "${cwd}/.agent-harness/state/workers.list"
+}
