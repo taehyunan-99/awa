@@ -11,7 +11,20 @@ notify_lead() {
   incidents=("${state}/incidents"/*.json)
   removals=("${state}/removal-requests"/*.json)
   eval "$saved_nullglob"
-  local n_ask=${#asks[@]} n_inc=${#incidents[@]} n_rm=${#removals[@]}
+
+  # pending-asks 는 처리 시 파일 삭제 → 존재 자체가 미처리. incident/removal 은 파일 잔존 +
+  # notified/status 필드로 처리 여부 표시 (spec §5.4) → 미처리만 카운트.
+  local n_ask=${#asks[@]} n_inc=0 n_rm=0
+  local f
+  # ${arr[@]:-} : bash 3.2 + set -u 에서 빈 배열 참조가 unbound 로 터지지 않도록 가드.
+  for f in "${incidents[@]:-}"; do
+    [ -f "$f" ] || continue
+    [ "$(jq -r '.notified // false' "$f" 2>/dev/null)" = "false" ] && n_inc=$(( n_inc + 1 ))
+  done
+  for f in "${removals[@]:-}"; do
+    [ -f "$f" ] || continue
+    [ "$(jq -r '.status // "pending"' "$f" 2>/dev/null)" = "pending" ] && n_rm=$(( n_rm + 1 ))
+  done
   local total=$(( n_ask + n_inc + n_rm ))
 
   # lead pane: workers.list 의 5번째 필드 == lead (대소문자 무관).
