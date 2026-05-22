@@ -214,11 +214,47 @@ watch_one_worker() {
   rm -f "$fifo"
 }
 
-# T15 가 채울 응답 watcher (골격: 빈 루프).
 watch_pending_responses() {
   while true; do
+    for resp in "${STATE_DIR}/pending-asks/"*.response; do
+      [[ -f "${resp}" ]] || continue
+      process_response "${resp}"
+    done
     sleep 0.5
   done
+}
+
+process_response() {
+  local resp="$1"
+  local uuid="${resp##*/}"; uuid="${uuid%.response}"
+  local meta="${STATE_DIR}/pending-asks/${uuid}.json"
+
+  [[ -f "${meta}" ]] || { rm -f "${resp}"; return; }
+
+  local entry_role pane tool input decision scope pattern
+  entry_role="$(jq -r .entry_role "${meta}")"
+  pane="$(jq -r .pane "${meta}")"
+  tool="$(jq -r .tool "${meta}")"
+  input="$(jq -c '.input' "${meta}")"
+  decision="$(cat "${resp}")"
+
+  case "${decision}" in
+    approve-once)
+      send_keys_safe "${pane}" "1"
+      ;;
+    "approve-permanent:exact"|"approve-permanent:command-group"|"approve-permanent:tool")
+      scope="${decision#approve-permanent:}"
+      pattern="$(derive_pattern "${tool}" "${input}" "${scope}")"
+      add_to_allow "${entry_role}" "${pattern}"
+      send_keys_safe "${pane}" "2"
+      ;;
+    deny)
+      send_keys_safe "${pane}" "3"
+      ;;
+  esac
+
+  rm -f "${resp}" "${meta}"
+  notify_lead
 }
 
 # 메인: 라이브러리 로드 모드가 아니면 데몬 실행.
