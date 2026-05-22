@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# matrix_lookup + lead_auto_allow_lookup. source 시 부수효과 없음 (함수 정의만).
+# bash 3.2 호환.
+
+# settings.allow 패턴과 input 비교 → MATCH 면 exit 0 + stdout 에 패턴.
+# $1=entry_role $2=tool $3=input_json
+matrix_lookup() {
+  local entry_role="$1" tool="$2" input="$3"
+  local settings="${PROJECT_ROOT}/.agent-harness/.boot-settings/${entry_role}.json"
+  [ -f "$settings" ] || return 1
+  local allows
+  allows="$(jq -r '.permissions.allow // [] | .[]' "$settings" 2>/dev/null)"
+  # spec §5.1: add_to_allow 의 mv rename 과 동시 read 시 fd 가 구버전 잡아 빈 결과 가능 →
+  # 재시도 1회(E8 결정성 보강). 재시도도 비면 NO_MATCH (lead-auto-allow/pending 으로 흘러 재처리).
+  if [ -z "$allows" ]; then
+    sleep 0.05
+    allows="$(jq -r '.permissions.allow // [] | .[]' "$settings" 2>/dev/null)"
+  fi
+  [ -n "$allows" ] || return 1
+  local field key
+  case "$tool" in
+    Bash) key="command" ;;
+    Edit|Write|MultiEdit) key="file_path" ;;
+    *) key="" ;;
+  esac
+  if [ -n "$key" ]; then
+    field="$(printf '%s' "$input" | jq -r --arg k "$key" '.[$k] // ""')"
+  else
+    field=""
+  fi
+  local pat ptool pinner prefix
+  while IFS= read -r pat; do
+    [ -n "$pat" ] || continue
+    case "$pat" in
+      *'('*)
+        ptool="${pat%%(*}"
+        pinner="${pat#*(}"; pinner="${pinner%)}"
+        [ "$ptool" = "$tool" ] || continue
+        case "$pinner" in
+          *':*')
+            prefix="${pinner%:\*}"
+            case "$field" in
+              "$prefix"*) printf '%s' "$pat"; return 0 ;;
+            esac
+            ;;
+          *' *')
+            # space-glob 형식 (4차 P0 컨벤션): prefix 뒤 공백+*
+            prefix="${pinner% \*}"
+            case "$field" in
+              "$prefix"*) printf '%s' "$pat"; return 0 ;;
+            esac
+            ;;
+          *)
+            [ "$field" = "$pinner" ] && { printf '%s' "$pat"; return 0; }
+            ;;
+        esac
+        ;;
+      *)
+        [ "$pat" = "$tool" ] && { printf '%s' "$pat"; return 0; }
+        ;;
+    esac
+  done <<EOF
+$allows
+EOF
+  return 1
+}
+
+# lead-auto-allow.yaml 카테고리 순서대로 패턴 매칭 → MATCH 면 exit 0 + "category:pattern".
+# $1=tool $2=input_json
+lead_auto_allow_lookup() {
+  local tool="$1" input="$2"
+  local yaml="${PROJECT_ROOT}/config/lead-auto-allow.yaml"
+  [ -f "$yaml" ] || return 1
+  local field key
+  case "$tool" in
+    Bash) key="command" ;;
+    Edit|Write|MultiEdit) key="file_path" ;;
+    *) key="" ;;
+  esac
+  if [ -n "$key" ]; then
+    field="$(printf '%s' "$input" | jq -r --arg k "$key" '.[$k] // ""')"
+  else
+    field=""
+  fi
+  # awk 파서: "category:" 줄 + "  - "pattern"" 줄을 "category<TAB>pattern" 으로 평탄화.
+  # 단순 형식만 지원 (§5.9): category: + 들여쓰기 2칸 + - "패턴". 주석(#) 줄 무시.
+  local flat
+  flat="$(awk '
+    /^[[:space:]]*#/ { next }
+    /^[a-zA-Z][a-zA-Z0-9_-]*:[[:space:]]*$/ { cat=$1; sub(/:$/,"",cat); next }
+    /^[[:space:]]+-[[:space:]]/ {
+      line=$0
+      sub(/^[[:space:]]+-[[:space:]]*/,"",line)
+      gsub(/^"|"$/,"",line)
+      if (cat != "") print cat "\t" line
+    }
+  ' "$yaml")"
+  local catname pat ptool pinner prefix
+  while IFS="$(printf '\t')" read -r catname pat; do
+    [ -n "$pat" ] || continue
+    case "$pat" in
+      *'('*)
+        ptool="${pat%%(*}"
+        pinner="${pat#*(}"; pinner="${pinner%)}"
+        [ "$ptool" = "$tool" ] || continue
+        case "$pinner" in
+          *':*')
+            prefix="${pinner%:\*}"
+            case "$field" in
+              "$prefix"*) printf '%s:%s' "$catname" "$pat"; return 0 ;;
+            esac
+            ;;
+          *)
+            [ "$field" = "$pinner" ] && { printf '%s:%s' "$catname" "$pat"; return 0; }
+            ;;
+        esac
+        ;;
+      *)
+        [ "$pat" = "$tool" ] && { printf '%s:%s' "$catname" "$pat"; return 0; }
+        ;;
+    esac
+  done <<EOF
+$flat
+EOF
+  return 1
+}

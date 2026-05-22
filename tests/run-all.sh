@@ -12,6 +12,16 @@ for t in test-*.sh; do
   [ "$rc" -ne 0 ] && total_fail=$((total_fail + 1))
 done
 
+# 5차: tests/unit/ 의 unit test 도 순회.
+if [ -d unit ]; then
+  for t in unit/test-*.sh; do
+    [ -e "$t" ] || continue
+    echo "=== $t ==="
+    rc=0; bash "$t" || rc=$?
+    [ "$rc" -ne 0 ] && total_fail=$((total_fail + 1))
+  done
+fi
+
 # Integration probe — claude 의존, 느림. 명시적 opt-in.
 if [ "${RUN_INTEGRATION:-0}" = "1" ]; then
   for p in probes/probe-deny-end-to-end.sh; do
