@@ -141,6 +141,15 @@ fi
 # 이유: 거부 케이스에서 mkdir 부작용 leak 차단 — spec D2·E8 사용자 보호.
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 
+# 5차: lead-auto-allow.yaml 을 PROJECT_ROOT/config 에 설치 (spec §841 프로젝트별 커스텀).
+# lead_auto_allow_lookup 은 ${PROJECT_ROOT}/config/lead-auto-allow.yaml 을 읽으므로,
+#   파일이 없으면 lookup 이 영구 rc=1 → lead-auto-allow 전체 무동작. 부트 시 기본값 설치.
+# 이미 있으면 보존 (사용자/프로젝트 커스텀 존중 — settings.json marker 정책과 동일 철학).
+if [ ! -f "$PROJECT_ROOT/config/lead-auto-allow.yaml" ] && [ -f "$HARNESS_ROOT/config/lead-auto-allow.yaml" ]; then
+  mkdir -p "$PROJECT_ROOT/config"
+  cp "$HARNESS_ROOT/config/lead-auto-allow.yaml" "$PROJECT_ROOT/config/lead-auto-allow.yaml"
+fi
+
 # lead 페인으로 세션 생성. 셸 유지.
 tmux new-session -d -s "$SESSION" -c "${PROJECT_ROOT}" -x 220 -y 50 -n team
 
@@ -334,14 +343,16 @@ for entry in "${WORKERS[@]}"; do
     i=$((i + 1))
     continue
   fi
+  # 5차: 워커 세션 ID 를 우리가 지정 → jsonl 파일명이 이 uuid 로 결정됨 (실측 확정).
+  # discovery 가 mtime 폴링 없이 경로를 직접 계산 → 동시 부트 race 면역.
+  worker_sid="$(uuidgen | tr 'A-Z' 'a-z')"
   if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-    cmd="$cmd --settings \"$settings_path\""
+    cmd="$cmd --settings \"$settings_path\" --session-id $worker_sid"
   fi
-  started=$(date +%s)
   bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커"
-  # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 jsonl 미생성 → 폴링 hang 회피).
+  # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 --session-id 미적용 → jsonl 없음).
   if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-    discover_jsonl_and_record "$ENTRY_NAME" "$tgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
+    discover_jsonl_and_record "$ENTRY_NAME" "$tgt" "$PROJECT_ROOT" "$worker_sid" "$ENTRY_ROLE" || true
   fi
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
@@ -375,14 +386,14 @@ if ! settings_path="$(generate_worker_settings "LEAD" "LEAD")"; then
   echo "오류: LEAD settings 생성 실패 — 부트 중단" >&2
   exit 1
 fi
+lead_sid="$(uuidgen | tr 'A-Z' 'a-z')"
 if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-  lead_cmd="$lead_cmd --settings \"$settings_path\""
+  lead_cmd="$lead_cmd --settings \"$settings_path\" --session-id $lead_sid"
 fi
-started=$(date +%s)
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
-# 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 jsonl 미생성 → 폴링 hang 회피).
+# 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 --session-id 미적용 → jsonl 없음).
 if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-  discover_jsonl_and_record "LEAD" "$LEAD_PID" "$PROJECT_ROOT" "$started" "lead" || true
+  discover_jsonl_and_record "LEAD" "$LEAD_PID" "$PROJECT_ROOT" "$lead_sid" "lead" || true
 fi
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
@@ -414,14 +425,14 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       j=$((j + 1))
       continue
     fi
+    rev_sid="$(uuidgen | tr 'A-Z' 'a-z')"
     if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-      rev_cmd="$rev_cmd --settings \"$settings_path\""
+      rev_cmd="$rev_cmd --settings \"$settings_path\" --session-id $rev_sid"
     fi
-    started=$(date +%s)
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
-    # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 jsonl 미생성 → 폴링 hang 회피).
+    # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 --session-id 미적용 → jsonl 없음).
     if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-      discover_jsonl_and_record "$ENTRY_NAME" "$rtgt" "$PROJECT_ROOT" "$started" "$ENTRY_ROLE" || true
+      discover_jsonl_and_record "$ENTRY_NAME" "$rtgt" "$PROJECT_ROOT" "$rev_sid" "$ENTRY_ROLE" || true
     fi
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"

@@ -414,13 +414,17 @@ derive_pattern() {
   esac
 }
 
-# bootstrap_pane 직후 claude jsonl 발견 + workers.list 5필드 append (§5.6, F14).
-# $1=entry_name(표시 이름) $2=pane_id $3=cwd(PROJECT_ROOT) $4=started(epoch) $5=entry_role
-# started 는 호출자가 bootstrap_pane 직전 `started=$(date +%s)` 로 측정 (F18).
+# claude --session-id 로 지정한 uuid → workers.list 5필드 append (§5.6, F14).
+# $1=entry_name(표시 이름) $2=pane_id $3=cwd(PROJECT_ROOT) $4=session_id(uuid) $5=entry_role
+#
+# 5차 정정 (mtime 폴링 폐기): claude --session-id <uuid> 가 jsonl 파일명을 결정함을
+#   실측 확정 (interactive 포함). 따라서 uuid 로 경로를 *직접 계산* — 디렉터리 스캔·
+#   mtime 비교·폴링 전부 불필요. 동시 부트 race 면역 (각 워커가 자기 uuid 로 1:1 매칭).
+# jsonl 파일은 워커가 첫 메시지를 처리한 *뒤*에야 생기므로, 여기서 파일 존재를 기다리지
+#   않는다. watch-asks 의 `tail -F` 가 파일 생성을 대기·따라잡으므로 경로만 정확하면 충분.
 discover_jsonl_and_record() {
-  local entry_name="$1" pane="$2" cwd="$3" started="$4" entry_role="$5"
-  local cwd_real cwd_encoded proj_dir jsonl="" f_mtime f i
-  local max_tries="${DISCOVER_MAX_TRIES:-60}"   # 테스트 단축용 env override
+  local entry_name="$1" pane="$2" cwd="$3" session_id="$4" entry_role="$5"
+  local cwd_real cwd_encoded proj_dir jsonl
   # claude jsonl 디렉터리 인코딩 (실측 확정, e2e probe):
   #  1) realpath(pwd -P): macOS /var → /private/var 심볼릭 링크 정규화. claude 는 realpath 기준.
   #  2) [^a-zA-Z0-9] → '-': claude 는 / 뿐 아니라 . _ 등 모든 비영숫자를 dash 로 치환.
@@ -428,21 +432,7 @@ discover_jsonl_and_record() {
   cwd_real="$(cd "${cwd}" 2>/dev/null && pwd -P || printf '%s' "${cwd}")"
   cwd_encoded=$(printf '%s' "${cwd_real}" | sed 's#[^a-zA-Z0-9]#-#g')
   proj_dir="${HOME}/.claude/projects/${cwd_encoded}"
-  for i in $(seq 1 "${max_tries}"); do
-    for f in $(ls -t "${proj_dir}"/*.jsonl 2>/dev/null); do
-      f_mtime=$(stat -f %m "${f}")
-      if [[ "${f_mtime}" -ge "${started}" ]]; then
-        jsonl="${f}"; break
-      fi
-    done
-    [[ -n "${jsonl}" ]] && break
-    sleep 0.5
-  done
-  if [[ -z "${jsonl}" ]]; then
-    echo "경고: ${entry_name} jsonl 미발견" >&2
-    return 1
-  fi
-  local session_id; session_id=$(basename "${jsonl}" .jsonl)
+  jsonl="${proj_dir}/${session_id}.jsonl"
   mkdir -p "${cwd}/.agent-harness/state"
   # F14: 5필드 — entry_name · pane · session · jsonl · entry_role
   printf '%s %s %s %s %s\n' "${entry_name}" "${pane}" "${session_id}" "${jsonl}" "${entry_role}" \
