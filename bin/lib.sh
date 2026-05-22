@@ -324,3 +324,28 @@ shell_ready_wait() {  # $1=pane_id  $2=timeout_sec(기본 SHELL_READY_TIMEOUT �
   done
   return 1
 }
+
+# ===== 5차 lead gateway 보조 함수 =====
+
+# epoch seconds (정수). incidents/pending-asks/removal-requests 의 timestamp 필드 통일 단위 (F23).
+timestamp() {
+  date +%s
+}
+
+# 로그 한 줄을 400 byte 미만으로 truncate + append (SIGPIPE 가드).
+# 한글 1자=3byte 고려. ${#line} 은 문자 수라 byte 와 다름 → head -c 로 byte 단위.
+# set -euo pipefail 환경에서 큰 입력 시 head -c 가 stdin 닫으면 printf 가 SIGPIPE → || true 흡수.
+# LOG 변수는 데몬 본체(watch-asks.sh)가 export 해 주입.
+log_safe() {
+  local line="$1"
+  local truncated
+  truncated=$(printf '%s' "${line}" | head -c 400 2>/dev/null || true)
+  printf '%s\n' "${truncated}" >> "${LOG:-/dev/null}"
+}
+
+# tool 입력 JSON 을 200 byte 미만으로 요약 (로그용). SIGPIPE 가드.
+# $1=tool $2=input_json
+summarize_input() {
+  local tool="$1" input="$2"
+  printf '%s' "${input}" | head -c 200 2>/dev/null || true
+}
