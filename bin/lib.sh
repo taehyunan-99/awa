@@ -358,3 +358,58 @@ summarize_input() {
   local tool="$1" input="$2"
   printf '%s' "${input}" | head -c 200 2>/dev/null | iconv -f UTF-8 -t UTF-8//IGNORE 2>/dev/null || true
 }
+
+# settings.allow 에 패턴 추가 (atomic write). entry_role 기준 settings 파일.
+# F14: 인자는 entry_role (settings 파일명) — entry_name 아님. 같은 role 매핑 워커 모두 공유.
+# $1=entry_role $2=pattern
+add_to_allow() {
+  local entry_role="$1" pattern="$2"
+  local settings="${PROJECT_ROOT}/.agent-harness/.boot-settings/${entry_role}.json"
+  local tmp="${settings}.tmp.$$.${RANDOM}"   # F2: 병렬 워커 tmp 충돌 회피 ($$ 는 데몬 PID 공유)
+  [ -f "$settings" ] || return 1
+  # .permissions.allow // [] fallback: 4차 P0 templates 는 allow 키 없음 — null 안전.
+  jq --arg p "${pattern}" \
+    '.permissions.allow = ((.permissions.allow // []) + [$p] | unique)' \
+    "${settings}" > "${tmp}" && mv "${tmp}" "${settings}"
+}
+
+# 도구·입력·scope → claude allow 패턴 도출.
+# $1=tool $2=input_json $3=scope (exact|command-group|tool)
+# Bash: command 의 첫 토큰(또는 첫 2토큰)을 prefix 로. Edit/Write: file_path.
+derive_pattern() {
+  local tool="$1" input="$2" scope="$3"
+  case "$scope" in
+    tool)
+      printf '%s' "${tool}"
+      return
+      ;;
+  esac
+  local key field
+  case "$tool" in
+    Bash) key="command" ;;
+    Edit|Write|MultiEdit) key="file_path" ;;
+    *) key="" ;;
+  esac
+  if [ -z "$key" ]; then
+    printf '%s' "${tool}"
+    return
+  fi
+  field="$(printf '%s' "${input}" | jq -r --arg k "$key" '.[$k] // ""')"
+  case "$scope" in
+    exact)
+      printf '%s(%s)' "${tool}" "${field}"
+      ;;
+    command-group)
+      if [ "$tool" = "Bash" ]; then
+        # 첫 2 토큰을 prefix 로 (예: "npm test foo" → "npm test"). 단일 토큰이면 그 토큰만.
+        local first second prefix
+        first="$(printf '%s' "$field" | awk '{print $1}')"
+        second="$(printf '%s' "$field" | awk '{print $2}')"
+        if [ -n "$second" ]; then prefix="$first $second"; else prefix="$first"; fi
+        printf '%s(%s:*)' "${tool}" "${prefix}"
+      else
+        printf '%s(%s:*)' "${tool}" "$(dirname "$field")"
+      fi
+      ;;
+  esac
+}
