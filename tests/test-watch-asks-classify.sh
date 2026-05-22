@@ -80,4 +80,5 @@ mark_worker_inactive "%5"   # 멱등: 이미 inactive 면 중복 prefix 안 함
 n="$(grep -c '^# inactive:' "$STATE_DIR/workers.list")"
 assert_eq "1" "$n" "P7 멱등 (중복 prefix 없음)"
 
+rm -rf "$HARNESS_PROJECT"   # 정정5(MINOR): mktemp -d 임시 디렉터리 정리
 test_summary

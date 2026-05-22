@@ -61,4 +61,5 @@ echo "approve-permanent:exact" > "$STATE_DIR/pending-asks/u5.response"
 process_response "$STATE_DIR/pending-asks/u5.response"
 assert_contains "$(cat "$BOOTSET/dev.json")" "Bash(deploy prod)" "R5 exact 패턴"
 
+rm -rf "$HARNESS_PROJECT"   # 정정5(MINOR): mktemp -d 임시 디렉터리 정리
 test_summary

@@ -37,7 +37,8 @@ run_daemon() {
   trap cleanup EXIT INT TERM
 
   # workers.list 읽어 워커당 자식 fork (lead skip).
-  while IFS=' ' read -r entry_name pane session jsonl_path entry_role; do
+  # 정정3(MINOR): 마지막 줄 trailing newline 없을 때 read 가 skip — || [ -n ] 으로 방지.
+  while IFS=' ' read -r entry_name pane session jsonl_path entry_role || [ -n "${entry_name}" ]; do
     [[ "${entry_role}" == "lead" || "${entry_role}" == "LEAD" ]] && continue
     watch_one_worker "${entry_name}" "${entry_role}" "${pane}" "${session}" "${jsonl_path}" &
     CHILDREN+=($!)
@@ -65,6 +66,7 @@ cleanup() {
       kill "$tpid" 2>/dev/null || true
     done < "${STATE_DIR}/tail-pids"
     rm -f "${STATE_DIR}/tail-pids"
+    sleep 0.1   # 정정4(MINOR): tail kill 후 watch_one_worker 의 FIFO rm 시간 확보 (/tmp FIFO 누수 완화)
   fi
   # 2차: 직계 자식
   for cpid in "${CHILDREN[@]:-}"; do
@@ -122,8 +124,10 @@ log_and_queue_removal() {
   local entry_name="$1" text="$2"
   local uuid; uuid="$(uuidgen)"
   local f="${STATE_DIR}/removal-requests/${uuid}.json"
+  # 정정2(MINOR): atomic write — 비원자적 쓰기로 깨진 JSON 생성 방지 (정정1 의 트리거 근본 예방).
+  local tmp="${f}.tmp.$$.${RANDOM}"
   jq -n --arg w "$entry_name" --arg t "$text" --argjson ts "$(timestamp)" \
-    '{worker:$w, report:$t, timestamp:$ts, status:"pending"}' > "$f"
+    '{worker:$w, report:$t, timestamp:$ts, status:"pending"}' > "$tmp" && mv "$tmp" "$f"
   notify_lead
   log_safe "[$(timestamp)] ${entry_name} rm 보고 → removal-request (${uuid})"
 }
@@ -132,17 +136,21 @@ queue_incident() {
   local entry_name="$1" pane="$2" tool="$3" input="$4" category="$5"
   local uuid; uuid="$(uuidgen)"
   local f="${STATE_DIR}/incidents/${uuid}.json"
+  # 정정2(MINOR): atomic write.
+  local tmp="${f}.tmp.$$.${RANDOM}"
   jq -n --arg w "$entry_name" --arg p "$pane" --arg tool "$tool" \
         --argjson inp "$input" --arg cat "$category" --argjson ts "$(timestamp)" \
-    '{worker:$w, pane:$p, tool:$tool, input:$inp, category:$cat, timestamp:$ts, notified:false}' > "$f"
+    '{worker:$w, pane:$p, tool:$tool, input:$inp, category:$cat, timestamp:$ts, notified:false}' > "$tmp" && mv "$tmp" "$f"
 }
 
 queue_pending_ask() {
   local uuid="$1" entry_name="$2" entry_role="$3" pane="$4" session="$5" tool="$6" input="$7"
   local f="${STATE_DIR}/pending-asks/${uuid}.json"
+  # 정정2(MINOR): atomic write.
+  local tmp="${f}.tmp.$$.${RANDOM}"
   jq -n --arg w "$entry_name" --arg r "$entry_role" --arg p "$pane" --arg s "$session" \
         --arg tool "$tool" --argjson inp "$input" --argjson ts "$(timestamp)" \
-    '{worker:$w, entry_role:$r, pane:$p, session:$s, tool:$tool, input:$inp, timestamp:$ts}' > "$f"
+    '{worker:$w, entry_role:$r, pane:$p, session:$s, tool:$tool, input:$inp, timestamp:$ts}' > "$tmp" && mv "$tmp" "$f"
 }
 
 process_jsonl_line() {
@@ -232,10 +240,12 @@ process_response() {
   [[ -f "${meta}" ]] || { rm -f "${resp}"; return; }
 
   local entry_role pane tool input decision scope pattern
-  entry_role="$(jq -r .entry_role "${meta}")"
-  pane="$(jq -r .pane "${meta}")"
-  tool="$(jq -r .tool "${meta}")"
-  input="$(jq -c '.input' "${meta}")"
+  # 정정1(MAJOR): 깨진 meta(parse error exit 5) → set -e 로 서브쉘 사망 방지.
+  # 각 jq 호출에 2>/dev/null + 실패 시 파일 폐기 후 return.
+  entry_role="$(jq -r .entry_role "${meta}" 2>/dev/null)" || { rm -f "${resp}" "${meta}"; return; }
+  pane="$(jq -r .pane "${meta}" 2>/dev/null)"             || { rm -f "${resp}" "${meta}"; return; }
+  tool="$(jq -r .tool "${meta}" 2>/dev/null)"             || { rm -f "${resp}" "${meta}"; return; }
+  input="$(jq -c '.input' "${meta}" 2>/dev/null)"         || { rm -f "${resp}" "${meta}"; return; }
   decision="$(cat "${resp}")"
 
   case "${decision}" in
