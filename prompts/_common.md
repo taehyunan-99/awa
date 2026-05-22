@@ -28,3 +28,13 @@
 - 도구 — `{{HARNESS_ROOT}}/bin/`. 항상 절대경로로 호출하라.
 - 산출물 — `$PWD/.agent-harness/` (= PROJECT_ROOT 안).
 - PROJECT_ROOT 안에서 도구를 찾지 마라. "bin/dispatch.sh" 식으로 백틱+상대경로로 호출 금지.
+
+## 권한·rm 정책 (5차)
+
+- 파일 제거가 필요하면 `rm` 도구 *직접 호출 금지*. 자기 pane 의 텍스트 출력으로 lead 에게 보고:
+  - `@lead: rm <path> — <reason>` (단일 파일)
+  - `@lead: rm-r <path> — <reason>` (재귀 삭제)
+  - `@lead: remove-dir <path> — <reason>` (디렉터리 단위)
+- 보고 후 다른 작업 진행. 제거된 파일에 의존하는 작업은 *재시도 시* lead 가 처리해놨음.
+- 매트릭스에 없는 도구·명령을 호출하면 ask 가 뜨지만 watch-asks 데몬·lead 가 자동 응답한다. 워커는 *그냥 시도* 하면 된다.
+- 위험 명령 (`rm -rf`, `sudo`, `dd of=`, `curl ... | sh`, `git push --force` 등) 은 자동 거부된다. 다른 방식으로 진행하라.
