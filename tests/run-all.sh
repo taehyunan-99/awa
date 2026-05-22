@@ -24,7 +24,7 @@ fi
 
 # Integration probe — claude 의존, 느림. 명시적 opt-in.
 if [ "${RUN_INTEGRATION:-0}" = "1" ]; then
-  for p in probes/probe-deny-end-to-end.sh; do
+  for p in probes/probe-deny-end-to-end.sh probe-watch-asks.sh; do
     [ -e "$p" ] || continue
     echo "=== $p (integration) ==="
     rc=0; bash "$p" || rc=$?
