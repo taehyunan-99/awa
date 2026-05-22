@@ -332,20 +332,25 @@ timestamp() {
   date +%s
 }
 
-# 로그 한 줄을 400 byte 미만으로 truncate + append (SIGPIPE 가드).
+# 로그 한 줄을 최대 400 byte (이하) 로 truncate + append (SIGPIPE 가드).
+# 파일 줄 최대 = 400 byte 데이터 + newline 1 byte = 401 byte.
 # 한글 1자=3byte 고려. ${#line} 은 문자 수라 byte 와 다름 → head -c 로 byte 단위.
-# set -euo pipefail 환경에서 큰 입력 시 head -c 가 stdin 닫으면 printf 가 SIGPIPE → || true 흡수.
+# set -euo pipefail 환경에서 큰 입력 시 head -c 가 stdin 닫으면 printf 가 SIGPIPE → || true 흡수 (실측 exit 0).
+# iconv //IGNORE 로 UTF-8 멀티바이트 경계 잘림 제거 (깨진 마지막 바이트 제거 → 유효 UTF-8).
 # LOG 변수는 데몬 본체(watch-asks.sh)가 export 해 주입.
 log_safe() {
   local line="$1"
   local truncated
-  truncated=$(printf '%s' "${line}" | head -c 400 2>/dev/null || true)
+  # 400 byte truncate + UTF-8 멀티바이트 경계 정리 (//IGNORE 가 깨진 마지막 바이트 제거).
+  # SIGPIPE 가드: set -euo pipefail 환경 대용량 입력 시 || true 흡수 (실측 exit 0).
+  truncated=$(printf '%s' "${line}" | head -c 400 2>/dev/null | iconv -f UTF-8 -t UTF-8//IGNORE 2>/dev/null || true)
   printf '%s\n' "${truncated}" >> "${LOG:-/dev/null}"
 }
 
-# tool 입력 JSON 을 200 byte 미만으로 요약 (로그용). SIGPIPE 가드.
+# tool 입력 JSON 을 최대 200 byte (이하) 로 요약 (로그용). SIGPIPE 가드.
+# 200 byte truncate + UTF-8 경계 정리.
 # $1=tool $2=input_json
 summarize_input() {
   local tool="$1" input="$2"
-  printf '%s' "${input}" | head -c 200 2>/dev/null || true
+  printf '%s' "${input}" | head -c 200 2>/dev/null | iconv -f UTF-8 -t UTF-8//IGNORE 2>/dev/null || true
 }

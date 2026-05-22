@@ -29,4 +29,13 @@ big_json='{"command":"'"$(head -c 1000 /dev/zero | tr '\0' 'x')"'"}'
 sumlen="$(summarize_input "Bash" "$big_json" | wc -c | tr -d ' ')"
 [ "$sumlen" -le 201 ]; assert_success "$?" "H4 200byte 미만 ($sumlen)"
 
+echo "[H5] log_safe 한글 입력 → 유효 UTF-8"
+export LOG="$HARNESS_PROJECT/test-kr.log"
+kr="$(for i in $(seq 1 200); do printf '한글'; done)"   # 400 한글자 = 1200 byte
+log_safe "$kr"
+# 유효 UTF-8 검증 (iconv strict 통과)
+iconv -f UTF-8 -t UTF-8 < "$LOG" >/dev/null 2>&1; assert_success "$?" "H5 한글 유효 UTF-8"
+krbytes="$(wc -c < "$LOG" | tr -d ' ')"
+[ "$krbytes" -le 401 ]; assert_success "$?" "H5 한글 400byte 미만 ($krbytes)"
+
 test_summary
