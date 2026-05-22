@@ -164,11 +164,14 @@ process_jsonl_line() {
     if matches_rm_report "${text}"; then
       log_and_queue_removal "${entry_name}" "${text}"
     fi
-    return
+    return 0
   fi
 
-  # 2. tool_use 이벤트만 처리
-  is_tool_use "${line}" || return
+  # 2. tool_use 이벤트만 처리.
+  #   ★ `return 0` 필수: 비-tool_use 줄(system/user 등 대부분)에서 `return`(인자 없음)은
+  #   is_tool_use 의 non-zero 종료코드를 반환 → watch_one_worker 의 set -e + while-read
+  #   서브셸이 즉사 → 그 워커 jsonl 감시 영구 중단. 조기 skip 은 정상 흐름이므로 rc=0.
+  is_tool_use "${line}" || return 0
 
   tool="$(extract_tool "${line}")"
   input="$(extract_input_json "${line}")"
@@ -179,7 +182,7 @@ process_jsonl_line() {
   if matched="$(matrix_lookup "${entry_role}" "${tool}" "${input}")"; then
     send_keys_safe "${pane}" "2"
     log_safe "[$(timestamp)] ${entry_name} ${tool}(${input_summary}) → MATRIX-ALLOWED (${matched})"
-    return
+    return 0
   fi
 
   # 4. danger-check → MATCH 면 send-keys 3 + incident (lead-auto-allow 보다 먼저)
@@ -188,7 +191,7 @@ process_jsonl_line() {
     queue_incident "${entry_name}" "${pane}" "${tool}" "${input}" "${category}"
     notify_lead
     log_safe "[$(timestamp)] ${entry_name} ${tool}(${input_summary}) → AUTO-DENIED (${category})"
-    return
+    return 0
   fi
 
   # 5. lead-auto-allow → MATCH 면 add_to_allow + send-keys 2
@@ -198,7 +201,7 @@ process_jsonl_line() {
     add_to_allow "${entry_role}" "${pattern}"
     send_keys_safe "${pane}" "2"
     log_safe "[$(timestamp)] ${entry_name} ${tool}(${input_summary}) → LEAD-AUTO-ALLOWED (category: ${category}, added: ${pattern})"
-    return
+    return 0
   fi
 
   # 6. 회색 영역 → pending-ask
@@ -206,6 +209,7 @@ process_jsonl_line() {
   queue_pending_ask "${ask_uuid}" "${entry_name}" "${entry_role}" "${pane}" "${session}" "${tool}" "${input}"
   notify_lead
   log_safe "[$(timestamp)] ${entry_name} ${tool}(${input_summary}) → USER-ASK (uuid: ${ask_uuid})"
+  return 0
 }
 
 watch_one_worker() {

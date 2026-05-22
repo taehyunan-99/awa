@@ -80,5 +80,38 @@ mark_worker_inactive "%5"   # 멱등: 이미 inactive 면 중복 prefix 안 함
 n="$(grep -c '^# inactive:' "$STATE_DIR/workers.list")"
 assert_eq "1" "$n" "P7 멱등 (중복 prefix 없음)"
 
+echo "[P8] ★ set -e 하에서 비-tool_use 줄이 process_jsonl_line 을 non-zero 로 끝내지 않음"
+# 실전 결함 재현: watch_one_worker 는 set -euo pipefail. process_jsonl_line 이
+#   비-tool_use 줄(system/user 등 대부분)에서 non-zero 반환하면 while-read 서브셸이 즉사 →
+#   그 워커 jsonl 감시 영구 중단. tool_use 가 아닌 줄에서도 반드시 rc=0 이어야 함.
+echo '{"permissions":{"allow":[]}}' > "$BOOTSET/dev.json"
+for ntline in \
+  '{"type":"system","subtype":"init"}' \
+  '{"type":"user","message":{"content":"hi"}}' \
+  '{"type":"file-history-snapshot"}' \
+  '{"type":"assistant","message":{"content":[{"type":"text","text":"그냥 설명"}]}}' ; do
+  ( set -euo pipefail
+    process_jsonl_line "arch" "dev" "%5" "sid" "$ntline" ) >/dev/null 2>&1
+  rc=$?
+  assert_eq "0" "$rc" "P8 비-tool_use 줄 rc=0 ($(printf '%s' "$ntline" | head -c 30))"
+done
+
+echo "[P9] ★ set -e + while-read 루프(watch_one_worker 재현)가 비-tool_use 연속에도 생존"
+# 비-tool_use 줄 여러 개 → tool_use 1개. 결함이면 첫 비-tool_use 에서 루프 사망해
+#   마지막 tool_use 가 처리 안 됨 (MATRIX/USER-ASK 로그 누락).
+: > "$SENDKEYS_LOG"; : > "$LOG"
+echo '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$BOOTSET/dev.json"
+loop_rc=0
+( set -euo pipefail
+  printf '%s\n' \
+    '{"type":"system","subtype":"init"}' \
+    '{"type":"user","message":{"content":"x"}}' \
+    "$(mk_tooluse Bash 'ls /tmp')" \
+  | while IFS= read -r line; do
+      process_jsonl_line "arch" "dev" "%5" "sid" "$line"
+    done ) || loop_rc=$?
+assert_eq "0" "$loop_rc" "P9 루프 set -e 생존"
+assert_contains "$(cat "$LOG")" "MATRIX-ALLOWED" "P9 마지막 tool_use 처리됨 (루프 안 죽음)"
+
 rm -rf "$HARNESS_PROJECT"   # 정정5(MINOR): mktemp -d 임시 디렉터리 정리
 test_summary
