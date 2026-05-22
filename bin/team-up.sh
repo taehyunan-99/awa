@@ -367,8 +367,8 @@ fi
 lead_cmd="$(agent_cmd_for "${LEAD_MODEL:-opus}")"
 settings_path=""
 if ! settings_path="$(generate_worker_settings "LEAD" "LEAD")"; then
-  echo "경고: LEAD settings 생성 실패 — settings 미적용으로 계속 (lead 템플릿 미설치)" >&2
-  settings_path=""
+  echo "오류: LEAD settings 생성 실패 — 부트 중단" >&2
+  exit 1
 fi
 if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
   lead_cmd="$lead_cmd --settings \"$settings_path\""
