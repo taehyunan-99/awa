@@ -12,8 +12,11 @@ export HOME="$TMPHOME"   # ~/.claude/projects 경로 격리
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh"
 
-cwd_encoded="$(echo "$PROJ" | sed 's#^/##; s#/#-#g')"   # 실제 claude 단일 dash 컨벤션 — 함수와 독립적으로 동일 경로 산출
-PROJDIR="$TMPHOME/.claude/projects/-${cwd_encoded}"
+# claude 인코딩 (실측 확정, e2e probe): realpath(pwd -P) 후 [^a-zA-Z0-9]→'-'.
+# macOS /var → /private/var 정규화 + . _ 등 모든 비영숫자 dash. 함수와 동일 규칙으로 독립 산출.
+PROJ_REAL="$(cd "$PROJ" && pwd -P)"
+cwd_encoded="$(printf '%s' "$PROJ_REAL" | sed 's#[^a-zA-Z0-9]#-#g')"
+PROJDIR="$TMPHOME/.claude/projects/${cwd_encoded}"
 mkdir -p "$PROJDIR"
 
 echo "[D1] started 이후 mtime jsonl 발견 + 5필드 append"
@@ -33,8 +36,9 @@ assert_eq "researcher" "$fifth" "D2 5번째=entry_role"
 
 echo "[D3] started 이전 mtime jsonl 무시 → 미발견 경고 + rc=1"
 PROJ2="$(mktemp -d)"; ( cd "$PROJ2" && git init -q )
-enc2="$(echo "$PROJ2" | sed 's#^/##; s#/#-#g')"
-PD2="$TMPHOME/.claude/projects/-${enc2}"
+PROJ2_REAL="$(cd "$PROJ2" && pwd -P)"
+enc2="$(printf '%s' "$PROJ2_REAL" | sed 's#[^a-zA-Z0-9]#-#g')"
+PD2="$TMPHOME/.claude/projects/${enc2}"
 mkdir -p "$PD2"
 touch -t 200001010000 "$PD2/old.jsonl"
 started2="$(date +%s)"

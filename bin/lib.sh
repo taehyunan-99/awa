@@ -419,10 +419,15 @@ derive_pattern() {
 # started 는 호출자가 bootstrap_pane 직전 `started=$(date +%s)` 로 측정 (F18).
 discover_jsonl_and_record() {
   local entry_name="$1" pane="$2" cwd="$3" started="$4" entry_role="$5"
-  local cwd_encoded proj_dir jsonl="" f_mtime f i
+  local cwd_real cwd_encoded proj_dir jsonl="" f_mtime f i
   local max_tries="${DISCOVER_MAX_TRIES:-60}"   # 테스트 단축용 env override
-  cwd_encoded=$(echo "${cwd}" | sed 's#^/##; s#/#-#g')   # F19: leading slash 제거 후 dash 치환 (claude 단일 dash 컨벤션, 실측 확정)
-  proj_dir="${HOME}/.claude/projects/-${cwd_encoded}"
+  # claude jsonl 디렉터리 인코딩 (실측 확정, e2e probe):
+  #  1) realpath(pwd -P): macOS /var → /private/var 심볼릭 링크 정규화. claude 는 realpath 기준.
+  #  2) [^a-zA-Z0-9] → '-': claude 는 / 뿐 아니라 . _ 등 모든 비영숫자를 dash 로 치환.
+  #     leading / 도 dash 가 되어 결과가 '-private-...' 형태 (prefix dash 별도 안 붙임).
+  cwd_real="$(cd "${cwd}" 2>/dev/null && pwd -P || printf '%s' "${cwd}")"
+  cwd_encoded=$(printf '%s' "${cwd_real}" | sed 's#[^a-zA-Z0-9]#-#g')
+  proj_dir="${HOME}/.claude/projects/${cwd_encoded}"
   for i in $(seq 1 "${max_tries}"); do
     for f in $(ls -t "${proj_dir}"/*.jsonl 2>/dev/null); do
       f_mtime=$(stat -f %m "${f}")
