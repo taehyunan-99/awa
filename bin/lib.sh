@@ -414,6 +414,34 @@ derive_pattern() {
   esac
 }
 
+# timeout 명령 해석: coreutils timeout / gtimeout / 폴백 (macOS 기본 환경 대응).
+# tmux wait-for 같은 블로킹 명령을 N초 상한으로 실행. 자연완료=0, timeout=124.
+# 주의 1: 폴백은 서브셸로 감싸지 않고 직접 백그라운드 → $pid 가 곧 대상 프로세스
+#   (서브셸이면 tmux wait-for 손주가 고아로 영생).
+# 주의 2: SIGKILL 사용. tmux 소스(cmd-wait-for.c) 검증 결과 — 클라이언트에 보내는
+#   시그널은 서버의 채널 woken/waiter 를 *건드리지 않는다*(SIGTERM 도 다른 대기자를
+#   안 깨움). SIGKILL 을 택한 실제 이유는 wait-for 클라이언트가 SIGTERM 을 자체
+#   핸들러로 잡아 깔끔히 종료할 수 있어 "kill 로 죽였는지(timeout)" 판별이 모호하기
+#   때문 — SIGKILL 은 핸들러 우회라 판별 명확. (채널 오염과는 무관.)
+run_with_timeout() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$secs" "$@"
+  else
+    "$@" &
+    local pid=$!
+    ( sleep "$secs"; kill -KILL "$pid" 2>/dev/null ) &
+    local watcher=$!
+    local crc=0
+    wait "$pid" 2>/dev/null || crc=$?
+    kill -KILL "$watcher" 2>/dev/null || true
+    wait "$watcher" 2>/dev/null || true
+    [ "$crc" -eq 0 ] && return 0 || return 124
+  fi
+}
+
 # claude --session-id 로 지정한 uuid → workers.list 5필드 append (§5.6, F14).
 # $1=entry_name(표시 이름) $2=pane_id $3=cwd(PROJECT_ROOT) $4=session_id(uuid) $5=entry_role
 #
