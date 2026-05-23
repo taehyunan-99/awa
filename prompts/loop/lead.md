@@ -9,11 +9,12 @@
 ### 1단계. state/pending-asks/ 처리 (회색 영역 사용자 위임)
 
 `ls .agent-harness/state/pending-asks/*.json 2>/dev/null` 확인. 각 `<uuid>.json` 마다 (jq 로 필드 읽기 — `gate_pid`, `channel`, `worker`, `tool`, `input`):
+(여기서 `<uuid>` = ls 로 얻은 .json 파일의 basename 에서 `.json` 확장자를 뗀 값. 아래 모든 스니펫의 `<uuid>` 를 이 값으로 치환.)
 - `gate_pid` 를 읽어 `kill -0 <gate_pid> 2>/dev/null` 확인.
   - 실패(좀비, hook 이미 죽음) → `rm -f` 로 .json·.response 삭제 후 skip (응답할 hook 이 없음 → -S 불필요).
   - 성공 → AskUserQuestion:
     질문: "<worker> 가 <tool>(<input>) 호출. 허용?"
-    선택지 (기본 권장 첫 항목): "명령군 허용 (권장) / 정확 허용 / 도구 전체 허용 / 한 번만 / 거부"
+    선택지 (기본 권장 첫 항목, 각 선택지 → decision 값): "명령군 허용 (권장)" → `approve-permanent:command-group` / "정확 허용" → `approve-permanent:exact` / "도구 전체 허용" → `approve-permanent:tool` / "한 번만" → `approve-once` / "거부" → `deny`
 - 응답을 **atomic 작성** (부분 read 방지):
   ```
   printf '%s' "<decision>" > .agent-harness/state/pending-asks/<uuid>.response.tmp
@@ -43,6 +44,7 @@
 - 승인 → 자기 pane 에서 `rm <path>` (lead settings 의 rm allow) + status=done
 - 거부 → status=denied
 - 재고 → status=reconsider + 다음 dispatch 에 추가 정보 요청
+- (status 갱신은 2단계와 동일 atomic 패턴: `jq '.status="done"' f > f.tmp && mv f.tmp f` — done/denied/reconsider 각각 해당 값으로.)
 
 ## 워커 rm 위임 (보존)
 
