@@ -82,6 +82,14 @@ parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_MODEL 설정
       exit 1
       ;;
   esac
+  # ENTRY_ROLE 도 sed `#` 구분자에 직접 삽입되므로 ENTRY_NAME 과 동일 문자셋으로 제한.
+  # (#, &, \, " 등이 sed s#...#$role#g 를 파손 — generate_worker_settings 의 -e "s#{{ENTRY_ROLE}}#$role#g").
+  case "$ENTRY_ROLE" in
+    ""|*[!A-Za-z0-9_-]*)
+      echo "오류: 역할 이름 '$ENTRY_ROLE' 허용 문자 외 ([A-Za-z0-9_-] 만)" >&2
+      exit 1
+      ;;
+  esac
   return 0
 }
 

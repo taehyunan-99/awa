@@ -86,4 +86,18 @@ _safe_gi="$(printf '%s' "$(basename "$TMP_GI")" | sed 's/[^A-Za-z0-9_-]/_/g')"
 tmux kill-session -t "agents-$_safe_gi" 2>/dev/null || true
 rm -rf "$TMP_GI"
 
+# 5) parse_entry — ENTRY_ROLE 금지 문자 거부 (ENTRY_NAME 검증과 대칭, sed 구분자 파손 방지)
+#    bad#role 은 sed s#...#bad#role#g 를 파손 — 사전 거부 필수.
+#    SESSION_OVERRIDE 해제: 기존 tu_$$ 세션과 충돌 방지 (autoname 경로 사용).
+TMP_BR="$(mktemp -d)"; ( cd "$TMP_BR" && git init -q )
+_pf_br="$(mktemp /tmp/profile_badXXXX.sh)"
+printf 'WORKERS=("worker1:bad#role")\nREVIEWERS=()\nLEAD_MODEL="sonnet"\n' > "$_pf_br"
+err_br="$(unset SESSION_OVERRIDE; HARNESS_PROJECT="$TMP_BR" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" "$_pf_br" 2>&1 >/dev/null)"; rc_br=$?
+_safe_br="$(printf '%s' "$(basename "$TMP_BR")" | sed 's/[^A-Za-z0-9_-]/_/g')"
+tmux kill-session -t "agents-$_safe_br" 2>/dev/null || true
+rm -f "$_pf_br"; rm -rf "$TMP_BR"
+assert_fail "$rc_br" "ENTRY_ROLE 금지 문자(#) → exit 1"
+assert_contains "$err_br" "역할 이름" "ENTRY_ROLE 거부 오류 메시지 발화"
+assert_contains "$err_br" "bad#role" "ENTRY_ROLE 거부 시 문제 역할명 포함"
+
 test_summary
