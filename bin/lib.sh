@@ -343,7 +343,7 @@ timestamp() {
 # 한글 1자=3byte 고려. ${#line} 은 문자 수라 byte 와 다름 → head -c 로 byte 단위.
 # set -euo pipefail 환경에서 큰 입력 시 head -c 가 stdin 닫으면 printf 가 SIGPIPE → || true 흡수 (실측 exit 0).
 # iconv //IGNORE 로 UTF-8 멀티바이트 경계 잘림 제거 (깨진 마지막 바이트 제거 → 유효 UTF-8).
-# LOG 변수는 데몬 본체(watch-asks.sh)가 export 해 주입.
+# LOG 변수는 호출자(permission-gate hook 등)가 export 해 주입.
 log_safe() {
   local line="$1"
   local truncated
