@@ -359,19 +359,45 @@ summarize_input() {
   printf '%s' "${input}" | head -c 200 2>/dev/null | iconv -f UTF-8 -t UTF-8//IGNORE 2>/dev/null || true
 }
 
-# settings.allow 에 패턴 추가 (atomic write). entry_role 기준 settings 파일.
-# F14: 인자는 entry_role (settings 파일명) — entry_name 아님. 같은 role 매핑 워커 모두 공유.
+# settings.allow 에 패턴 추가 (mkdir 원자성 락 + atomic write). entry_role 기준 settings.
+# 6차: 병렬 워커 hook 이 직접 호출 → read-modify-write 를 mkdir 락으로 보호 (lost update 방지).
+#   flock 은 macOS 기본 부재 → mkdir(POSIX 원자성).
+# ★ RETURN trap 미사용 (이식성·단순성): 대신 (1) 명시적 rmdir 로 정상 정리,
+#   (2) stale lock 자동 회수 — 락 보유자가 비정상 종료해 lock 이 남아도, 다음 호출이
+#   "오래된(>15s) lock" 을 강제 제거하고 진입. 데드락 영구화 방지.
 # $1=entry_role $2=pattern
 add_to_allow() {
   local entry_role="$1" pattern="$2"
   local settings="${PROJECT_ROOT}/.agent-harness/.boot-settings/${entry_role}.json"
-  local tmp="${settings}.tmp.$$.${RANDOM}"   # F2: 병렬 워커 tmp 충돌 회피 ($$ 는 데몬 PID 공유)
   [ -f "$settings" ] || return 1
-  # .permissions.allow // [] fallback: 4차 P0 templates 는 allow 키 없음 — null 안전.
+  local lock="${settings}.lock"
+  local tmp="${settings}.tmp.$$.${RANDOM}"
+  local i=0 max=300   # 300 * 0.05s = 15s 상한
+  while ! mkdir "$lock" 2>/dev/null; do
+    # stale lock 회수: mtime 을 *읽을 수 있고*(mt>0) 15초 이상 묵었을 때만 강제 제거.
+    # ★ 5차 실측 결함: mt=0(stat 실패 — lock 이 막 사라짐)이면 age=now-0=거대값이 되어
+    #   "방금 다른 워커가 새로 만든 정상 lock" 을 15s 초과로 오판해 강제삭제 → 임계구역
+    #   동시진입 → lost update 재발(이 함수의 존재 이유 무력화). mt>0 가드로 차단 (실측 확정,
+    #   20병렬 부하 count=20·진짜 16s stale 회수 둘 다 통과). mt=0 면 강제삭제 금지·단순 재시도.
+    local mt; mt="$(_mtime_epoch "$lock")"
+    if [ "$mt" -gt 0 ]; then
+      local age=$(( $(date +%s) - mt ))
+      [ "$age" -ge 15 ] && rmdir "$lock" 2>/dev/null || true
+    fi
+    i=$((i + 1))
+    [ "$i" -ge "$max" ] && { echo "add_to_allow: lock 획득 실패 ($settings)" >&2; return 1; }
+    sleep 0.05
+  done
   jq --arg p "${pattern}" \
     '.permissions.allow = ((.permissions.allow // []) + [$p] | unique)' \
     "${settings}" > "${tmp}" && mv "${tmp}" "${settings}"
+  local rc=$?
+  rmdir "$lock" 2>/dev/null || true
+  return $rc
 }
+
+# 디렉터리/파일 mtime epoch (BSD stat). 못 읽으면 0 (호출부가 mt>0 가드로 처리). lib.sh 에 없으면 추가.
+_mtime_epoch() { stat -f %m "$1" 2>/dev/null || echo 0; }
 
 # 도구·입력·scope → claude allow 패턴 도출.
 # $1=tool $2=input_json $3=scope (exact|command-group|tool)
