@@ -14,7 +14,7 @@ reviewer 는 다음 도구만 사용한다:
 
 다음 도구는 **절대 사용 금지**:
 - Bash — *모든* 셸 명령 (git diff·ls·cat 등도 안 됨)
-- Edit, MultiEdit — 파일 수정
+- Edit — 파일 수정
 - 다른 경로 Write — review/ 외 파일 생성
 
 위반 시 verdict 기록 자체가 신뢰성 잃음. lead 가 위반 감지:

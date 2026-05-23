@@ -1,7 +1,8 @@
 # 카테고리별 안전 패턴. 위에서 아래로 매칭 (먼저 매칭되는 카테고리 채택).
 # 각 패턴은 Tool(prefix:*) 형식 또는 Tool(exact) — settings.json 의 allow 와 동일.
-# 적용 시점: watch-asks 의 process_jsonl_line 단계 5. danger-check(단계 4) 통과 후에만 호출.
-# → 위험 명령은 lead-auto-allow 도달 전에 자동 거부. 위험 패턴 포함 금지 (방어선 다층화).
+# 적용 시점: permission-gate hook 의 classify 단계 — danger → matrix → auto(여기) → gray 순.
+# danger_check 통과 후에만 도달하므로 위험 명령은 lead-auto-allow 에 닿기 전 자동 거부.
+# → 위험 패턴 포함 금지 (방어선 다층화).
 # 파서: bin/matrix-lookup.sh 의 awk 파서. 단순 형식만: category: + 들여쓰기 2칸 + - "패턴".
 read-only:
   - "Bash(ls:*)"
