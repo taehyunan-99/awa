@@ -20,7 +20,7 @@ matrix_lookup() {
   local field key
   case "$tool" in
     Bash) key="command" ;;
-    Edit|Write|MultiEdit) key="file_path" ;;
+    Edit|Write) key="file_path" ;;
     *) key="" ;;
   esac
   if [ -n "$key" ]; then
@@ -74,7 +74,7 @@ lead_auto_allow_lookup() {
   local field key
   case "$tool" in
     Bash) key="command" ;;
-    Edit|Write|MultiEdit) key="file_path" ;;
+    Edit|Write) key="file_path" ;;
     *) key="" ;;
   esac
   if [ -n "$key" ]; then

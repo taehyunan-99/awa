@@ -8,7 +8,7 @@ danger_check() {
   local cmd="" path="" re
   case "$tool" in
     Bash) cmd="$(printf '%s' "$input" | jq -r '.command // ""')" ;;
-    Edit|Write|MultiEdit) path="$(printf '%s' "$input" | jq -r '.file_path // ""')" ;;
+    Edit|Write) path="$(printf '%s' "$input" | jq -r '.file_path // ""')" ;;
   esac
 
   if [ -n "$cmd" ]; then

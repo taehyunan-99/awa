@@ -413,7 +413,7 @@ derive_pattern() {
   local key field
   case "$tool" in
     Bash) key="command" ;;
-    Edit|Write|MultiEdit) key="file_path" ;;
+    Edit|Write) key="file_path" ;;
     *) key="" ;;
   esac
   if [ -z "$key" ]; then
@@ -434,7 +434,9 @@ derive_pattern() {
         if [ -n "$second" ]; then prefix="$first $second"; else prefix="$first"; fi
         printf '%s(%s:*)' "${tool}" "${prefix}"
       else
-        printf '%s(%s:*)' "${tool}" "$(dirname "$field")"
+        # Edit/Write: file_path 의 디렉터리. ★ 빈 file_path → dirname '' = '.' (위험) 회피:
+        #   field 비면 tool 명만 (도구 전체 — exact 보다 좁힐 근거 없음, deny 보다 안전한 폴백).
+        if [ -z "$field" ]; then printf '%s' "${tool}"; else printf '%s(%s:*)' "${tool}" "$(dirname "$field")"; fi
       fi
       ;;
   esac
