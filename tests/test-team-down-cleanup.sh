@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# team-down 이 .boot-settings/·permission-events.log·.lead-perm-cursor 제거 확인.
+# team-down 이 .boot-settings/ 제거 확인.
 # T19: state 디렉터리 정리(게이트 안) 검증. 6차: 데몬 폐기 — watch-asks/tail-pids 단언 제거.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -23,8 +23,6 @@ HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" feature-team >/
 WS="$TMP/.agent-harness"
 mkdir -p "$WS/.boot-settings"
 echo '{"x":"y"}' > "$WS/.boot-settings/dev.json"
-echo 'ts dev - PRE Bash rm' > "$WS/permission-events.log"
-echo "0" > "$WS/.lead-perm-cursor"
 
 # T19: marker 생성 (게이트 안 정리가 실행되려면 marker 필요).
 mkdir -p "$TMP/.claude"
@@ -40,8 +38,6 @@ echo "ts dev - PRE Bash" > "$WS/state/permission-gate.log"   # 6차 게이트 �
 HARNESS_PROJECT="$TMP" bash "$ROOT/bin/team-down.sh" >/dev/null 2>&1
 
 [ ! -d "$WS/.boot-settings" ]; assert_success "$?" ".boot-settings 제거"
-[ ! -f "$WS/permission-events.log" ]; assert_success "$?" "permission-events.log 제거"
-[ ! -f "$WS/.lead-perm-cursor" ]; assert_success "$?" ".lead-perm-cursor 제거"
 
 # 기존 cleanup 동작 회귀
 [ ! -d "$WS/.boot" ] || [ -z "$(ls "$WS/.boot"/*.md 2>/dev/null)" ]

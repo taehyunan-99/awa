@@ -77,11 +77,10 @@ if [ -d "$WORKSPACE/review" ]; then
   rm -rf "${WORKSPACE:?WORKSPACE unset}/review" || true
 fi
 
-# 4차 P0: 워커별 settings 사본·권한 로그·lead 커서 정리.
+# 4차 P0: 워커별 settings 사본 정리.
 if [ -d "$WORKSPACE/.boot-settings" ]; then
   rm -rf "${WORKSPACE:?WORKSPACE unset}/.boot-settings" || true
 fi
-rm -f "$WORKSPACE/permission-events.log" "$WORKSPACE/.lead-perm-cursor" 2>/dev/null || true
 
 # 6차: state 디렉터리 정리 (marker 게이트 안 — 하네스 산출물만, 데몬 폐기).
 STATE_DIR="${WORKSPACE}/state"

@@ -80,7 +80,7 @@ EOF
     "Use the Bash tool to run: echo SENT_21"
 
   printf '\n## 결론\n\n'
-  printf '- 19 hits ≥ 1 = log-deny.sh / reviewer-deny.sh 의 events.log 기록 작동\n'
+  printf '- 19 hits ≥ 1 = permission-gate.sh 의 hook 사이드이펙트가 deny 결정 후에도 실행됨\n'
   printf '- 19 hits = 0 = hook 사이드이펙트 미실행 → spec 의 lead 감지 메커니즘 깨짐\n'
   printf '- 20 hits ≥ 1 = pass-through 시 hook 정상 (예상)\n'
   printf '- 21 hits = 0 = matcher 미매치 시 hook 안 뜸 (예상 — 정확도 검증)\n'
