@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 각 test-*.sh 는 마지막에 test_summary 를 호출해 종료코드로 통과/실패를 전달해야 한다.
-# RUN_INTEGRATION=1 일 때 probes/probe-deny-end-to-end.sh, probe-permission-gate.sh 도 실행 (claude 의존).
+# RUN_INTEGRATION=1 일 때 probes/probe-deny-end-to-end.sh, probes/probe-permission-gate.sh 도 실행 (claude 의존).
 set -euo pipefail
 cd "$(dirname "$0")"
 
