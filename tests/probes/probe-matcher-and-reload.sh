@@ -7,6 +7,20 @@ set -uo pipefail
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
 
+# REPL 준비 대기 — ★ 확정 신호로 판정 (probe-hook-merge 교훈: '❯' 단독은 부팅 중 빈
+#   입력선을 ready 로 오인 → 지시가 REPL 에 안 들어가 위양성). 상태줄/박스 신호로 강화.
+#   인자: 세션명. trust 프롬프트 자동 통과.
+wait_repl() {
+  local ses="$1" d
+  for _ in $(seq 1 70); do
+    sleep 2
+    d="$(tmux capture-pane -t "$ses" -p 2>/dev/null)"
+    printf '%s' "$d" | grep -q 'trust this folder' && { tmux send-keys -t "$ses" Enter; continue; }
+    printf '%s' "$d" | grep -qE 'accept edits on|bypass permissions|for shortcuts|esc to interrupt|Welcome back' && { sleep 3; return 0; }
+  done
+  return 1
+}
+
 # P1: settings.allow 에 colon-asterisk 패턴 Bash(echo:*) 넣고 echo 호출이 ask 없이 통과하는지.
 #     통과하면 colon-asterisk 가 claude 와 정합 (matrix_lookup 패턴 형식 확정).
 PROBE_DIR="$(mktemp -d)"
@@ -18,12 +32,7 @@ JSON
 tmux kill-session -t "$SES" 2>/dev/null || true
 tmux new-session -d -s "$SES" -c "$PROBE_DIR" -x 200 -y 50
 tmux send-keys -t "$SES" "cd '$PROBE_DIR' && claude --model claude-haiku-4-5-20251001 --settings '$PROBE_DIR/.claude/settings.json' --session-id $(uuidgen)" Enter
-sleep 8
-for _ in $(seq 1 30); do
-  tmux capture-pane -t "$SES" -p | grep -q 'trust this folder' && tmux send-keys -t "$SES" Enter
-  tmux capture-pane -t "$SES" -p | grep -q '❯' && break
-  sleep 2
-done
+wait_repl "$SES" || { echo "P1 RESULT: ✗ REPL 미준비 (위양성 방지 차원 SKIP)"; tmux kill-session -t "$SES" 2>/dev/null; rm -rf "$PROBE_DIR"; exit 1; }
 tmux send-keys -t "$SES" "run exactly: echo COLON_ASTERISK_OK" Enter
 sleep 10
 out="$(tmux capture-pane -t "$SES" -p)"
@@ -54,12 +63,7 @@ JSON
 tmux kill-session -t "$P7_SES" 2>/dev/null || true
 tmux new-session -d -s "$P7_SES" -c "$P7_DIR" -x 200 -y 50
 tmux send-keys -t "$P7_SES" "cd '$P7_DIR' && claude --model claude-haiku-4-5-20251001 --settings '$P7_DIR/.claude/settings.json' --session-id $(uuidgen)" Enter
-sleep 8
-for _ in $(seq 1 30); do
-  tmux capture-pane -t "$P7_SES" -p | grep -q 'trust this folder' && tmux send-keys -t "$P7_SES" Enter
-  tmux capture-pane -t "$P7_SES" -p | grep -q '❯' && break
-  sleep 2
-done
+wait_repl "$P7_SES" || { echo "P7 RESULT: ✗ REPL 미준비 (위양성 방지 차원 SKIP)"; tmux kill-session -t "$P7_SES" 2>/dev/null; rm -rf "$P7_DIR"; exit 1; }
 # 워커에게 wait-for -S 호출 지시 (채널은 즉시 반환되도록 미리 -S 안 함 → 대기자 없는 채널에 -S = 즉시 반환)
 tmux send-keys -t "$P7_SES" "run exactly: tmux wait-for -S harness-gate-probe7test" Enter
 sleep 10
@@ -95,30 +99,53 @@ P8_SET="$(generate_worker_settings dev dev-1)"
 tmux kill-session -t "$P8_SES" 2>/dev/null || true
 tmux new-session -d -s "$P8_SES" -c "$P8_DIR" -x 200 -y 50
 tmux send-keys -t "$P8_SES" "cd '$P8_DIR' && claude --model claude-haiku-4-5-20251001 --settings '$P8_SET' --session-id $(uuidgen)" Enter
-sleep 8
-for _ in $(seq 1 30); do
-  tmux capture-pane -t "$P8_SES" -p | grep -q 'trust this folder' && tmux send-keys -t "$P8_SES" Enter
-  tmux capture-pane -t "$P8_SES" -p | grep -q '❯' && break
-  sleep 2
-done
-# WebFetch 시도 (게이트 발화 → pending-ask 또는 Waiting 기대). 채널 미응답이라 곧 deny 되나
-#   pending-ask .json 생성 여부로 "게이트 발화"를 판정 (deny 돼도 게이트는 동작한 것).
-tmux send-keys -t "$P8_SES" "fetch https://example.com using WebFetch" Enter
-sleep 12
-pj="$(ls "$P8_DIR/.agent-harness/state/pending-asks/"*.json 2>/dev/null | head -1)"
-if [ -n "$pj" ]; then
-  echo "P8 RESULT (WebFetch): ✓ 게이트 발화 (pending-ask 생성) — tool=$(jq -r .tool "$pj")"
-  rm -f "$pj" "$P8_DIR/.agent-harness/state/pending-asks/"*.response 2>/dev/null   # 다음 시도 위해 정리
+wait_repl "$P8_SES" || { echo "P8 RESULT: ✗ REPL 미준비 (위양성 방지 차원 SKIP)"; tmux kill-session -t "$P8_SES" 2>/dev/null; rm -rf "$P8_DIR"; exit 1; }
+
+# ★ 게이트 발화 판정은 pending-ask 파일 *폴링* + 도구명 *명시 지시* 로 한다.
+#   sleep 고정 + 모호한 지시는 모델이 도구를 호출하기 전에 판정해 위양성을 냈다 (실측 diag).
+P8_PA="$P8_DIR/.agent-harness/state/pending-asks"
+P8_GATELOG="$P8_DIR/.agent-harness/state/permission-gate.log"
+wait_pending() {  # $1=기대 tool $2=최대초. 매칭 pending-ask 경로를 stdout, rc0.
+  local want="$1" max="${2:-50}" i=0 f t
+  while [ "$i" -lt "$max" ]; do
+    for f in "$P8_PA/"*.json; do
+      [ -f "$f" ] || continue
+      t="$(jq -r .tool "$f" 2>/dev/null)"
+      [ "$t" = "$want" ] && { printf '%s' "$f"; return 0; }
+    done
+    sleep 3; i=$((i+3))
+  done
+  return 1
+}
+# 응답 깔고 워커 wake (무한 대기 방지) + pending 정리.
+release_pending() {  # $1=pending-ask 경로
+  local f="$1" u c
+  u="$(jq -r .uuid "$f")"; c="$(jq -r .channel "$f")"
+  printf 'deny' > "$P8_PA/${u}.response.tmp" && mv "$P8_PA/${u}.response.tmp" "$P8_PA/${u}.response"
+  tmux wait-for -S "$c" 2>/dev/null || true
+  sleep 4
+  rm -f "$P8_PA/"*.json "$P8_PA/"*.response 2>/dev/null
+}
+
+# WebFetch: 도구명 명시 지시 → 게이트가 pending-ask(tool=WebFetch) 생성해야 함.
+tmux send-keys -t "$P8_SES" -l "Use the WebFetch tool to fetch https://example.com and report the page title"
+sleep 1; tmux send-keys -t "$P8_SES" Enter
+if pj="$(wait_pending WebFetch 50)"; then
+  echo "P8 RESULT (WebFetch): ✓ 게이트 발화 (pending-ask, tool=WebFetch)"
+  release_pending "$pj"
 else
-  echo "P8 RESULT (WebFetch): ? pending-ask 미생성 — matcher 에 WebFetch 안 잡혔거나 워커가 호출 안 함. 화면:"
+  echo "P8 RESULT (WebFetch): ✗ pending-ask(WebFetch) 미생성 — 게이트로그 확인:"
+  grep -E 'WebFetch' "$P8_GATELOG" 2>/dev/null || echo "    (게이트로그에 WebFetch 항목 없음 → 모델이 호출 안 함 가능)"
   tmux capture-pane -t "$P8_SES" -p | tail -12
 fi
 
-# ★ 서브에이전트 스폰 도구명 실측 (4차 — ① 목적): 워커에게 서브에이전트 사용 지시 →
+# ★ 서브에이전트 스폰 도구명 실측 (4차 — ① 목적): 도구명 명시 지시 →
 #   pending-ask .tool 필드로 실제 도구명 확정. `Agent` 면 docs 일치, 다른 이름이면 matcher 정정.
-tmux send-keys -t "$P8_SES" "use a subagent to list files in this directory" Enter
-sleep 15
-pjs="$(ls "$P8_DIR/.agent-harness/state/pending-asks/"*.json 2>/dev/null | head -1)"
+tmux send-keys -t "$P8_SES" -l "Use the Agent tool to spawn a subagent that lists files in this directory"
+sleep 1; tmux send-keys -t "$P8_SES" Enter
+sleep 3
+pjs="$(ls "$P8_PA/"*.json 2>/dev/null | head -1)"
+for _ in $(seq 1 16); do [ -n "$pjs" ] && break; sleep 3; pjs="$(ls "$P8_PA/"*.json 2>/dev/null | head -1)"; done
 if [ -n "$pjs" ]; then
   stool="$(jq -r .tool "$pjs")"
   echo "P8 RESULT (subagent): ✓ 게이트 발화 — 실제 도구명 tool=${stool}"
@@ -127,6 +154,7 @@ if [ -n "$pjs" ]; then
   else
     echo "  ★ docs 와 다름 (${stool}) → Task 5 matcher 문자열에 '${stool}' 추가 필요!"
   fi
+  release_pending "$pjs"
 else
   echo "P8 RESULT (subagent): ? pending-ask 미생성 — matcher 에 Agent 안 잡혔거나(도구명 다름) 워커가 서브에이전트 안 씀. 화면:"
   tmux capture-pane -t "$P8_SES" -p | tail -12
