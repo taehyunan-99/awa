@@ -149,9 +149,11 @@ generate_worker_settings() {
   fi
   mkdir -p "$out_dir"
   # F39: 기존 PROJECT_ROOT·HARNESS_ROOT 치환 유지 + ENTRY_NAME 토큰 추가 (대체 아님).
+  # 6차: ENTRY_ROLE 토큰 추가 — permission-gate.sh 가 역할별 matrix/settings 조회에 사용.
   sed -e "s#{{PROJECT_ROOT}}#$PROJECT_ROOT#g" \
       -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
       -e "s#{{ENTRY_NAME}}#$entry_name#g" \
+      -e "s#{{ENTRY_ROLE}}#$role#g" \
       "$tpl" > "$out"
   # 광범위 토큰 검증 — 화이트리스트 외 잔존도 fail (템플릿 오류 사전 차단).
   if grep -qE '\{\{[A-Z_]+\}\}' "$out"; then

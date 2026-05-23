@@ -21,8 +21,8 @@ assert_eq "0" "$rc" "G1 rc=0"
 assert_eq "$TMP/.agent-harness/.boot-settings/dev.json" "$out" "G1 경로"
 [ -f "$out" ]; assert_success "$?" "G1 파일 생성"
 content="$(cat "$out")"
-assert_contains "$content" "$TMP/.agent-harness/permission-events.log" "G1 PROJECT_ROOT 치환"
-assert_contains "$content" "$ROOT/bin/log-deny.sh" "G1 HARNESS_ROOT 치환"
+assert_contains "$content" "PROJECT_ROOT=\\\"$TMP\\\"" "G1 PROJECT_ROOT 치환"
+assert_contains "$content" "$ROOT/bin/permission-gate.sh" "G1 HARNESS_ROOT 치환"
 assert_contains "$content" "Bash(git push *)" "G1 dev deny 포함"
 assert_contains "$content" 'WORKER=\"devbot\"' "G1 ENTRY_NAME 토큰 치환 (WORKER env)"
 
@@ -40,7 +40,7 @@ echo "[G3] 매핑 reviewer-quality → settings.reviewer.json.tpl (2인자)"
 out="$(generate_worker_settings reviewer-quality qrev)"
 assert_eq "$TMP/.agent-harness/.boot-settings/reviewer-quality.json" "$out" "G3 경로"
 content="$(cat "$out")"
-assert_contains "$content" "log-deny.sh" "G3 hook 포함"
+assert_contains "$content" "permission-gate.sh" "G3 hook 포함"
 assert_contains "$content" 'WORKER=\"qrev\"' "G3 ENTRY_NAME 토큰 치환"
 assert_contains "$content" '"Read"' "G3 reviewer seed allow (T4)"
 
@@ -94,5 +94,22 @@ mv "$ROOT/templates/settings.dev.json.tpl.bak" "$ROOT/templates/settings.dev.jso
 assert_fail "$rc" "G7 rc!=0 (광범위 토큰 검증)"
 assert_contains "$err" "토큰 미치환 잔존" "G7 stderr"
 assert_contains "$err" "{{UNKNOWN_TOKEN}}" "G7 stderr 에 잔존 토큰 명시"
+
+echo "[G8] ENTRY_ROLE 토큰 치환 + permission-gate.sh 경로"
+out="$(generate_worker_settings "dev" "dev-1")"
+grep -q 'permission-gate.sh' "$out"; assert_success "$?" "G8 permission-gate.sh 참조"
+# JSON 내부 따옴표는 \" 로 이스케이프되므로 fixed-string + 백슬래시 리터럴로 매칭.
+grep -qF 'ENTRY_ROLE=\"dev\"' "$out"; assert_success "$?" "G8 ENTRY_ROLE 치환"
+! grep -q '{{ENTRY_ROLE}}' "$out"; assert_success "$?" "G8 ENTRY_ROLE 토큰 잔존 없음"
+
+echo "[G9] dev 통합 matcher 존재 (Bash|Edit|Write|Agent|WebFetch, MultiEdit 제외)"
+grep -q 'Bash|Edit|Write|Agent|WebFetch' "$out"; assert_success "$?" "G9 dev 통합 matcher"
+! grep -q 'MultiEdit' "$out"; assert_success "$?" "G9b MultiEdit 미포함 (죽은 도구)"
+
+echo "[G10] default 는 전수 게이트 matcher \"*\" 유지 (미지 역할 사각지대 0 — 5차)"
+outd="$(generate_worker_settings "unknown-role-xyz" "u-1")"   # 매핑 없는 역할 → default 템플릿
+grep -q '"matcher": "\*"' "$outd"; assert_success "$?" "G10 default matcher * 유지"
+grep -q 'permission-gate.sh' "$outd"; assert_success "$?" "G10 default 도 permission-gate command"
+! grep -q 'log-deny' "$outd"; assert_success "$?" "G10 default log-deny 잔존 없음"
 
 test_summary
