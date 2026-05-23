@@ -20,6 +20,12 @@ assert_contains "$content" 'Bash(kill -0:*)' "lead allow kill -0"
 assert_contains "$content" 'Bash(git push --force:*)' "lead deny git force"
 assert_contains "$content" 'Bash(sudo:*)' "lead deny sudo"
 
+# 6차 e2e 발견: LEAD 는 hook 게이트 비대상 → claude 기본 권한모델 적용. lead.md 가 안내하는
+# 명령치환($(...))·변수할당·if 복합 셸을 claude 가 "정적분석 불가"로 보고 매 사이클 confirm 요구
+# (allow 패턴과 무관). bypassPermissions 로 배관 confirm 제거 — deny·circuit breaker(rm -rf /)는
+# 유효, AskUserQuestion(워커 권한 판단 사람 위임)은 별개 메커니즘이라 영향 없음 (공식 docs 확인).
+assert_contains "$content" '"defaultMode": "bypassPermissions"' "lead bypassPermissions (배관 confirm 제거, deny 유지)"
+
 if printf '%s' "$content" | grep -q '"hooks"'; then
   assert_eq "no-hooks" "has-hooks" "lead 템플릿 hooks 미포함"
 else

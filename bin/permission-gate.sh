@@ -148,7 +148,11 @@ gate_gray() {
   #   allow 0, 회색명령 1회 거짓 deny 만(워커 재시도로 자가치유). stale 은 cmd_wait_for_remove
   #   로 1회만 소비(실측) → 다음 wait 정상 블로킹. 3차의 lead `kill -0` wake-gating 은 race 를
   #   못 막으면서(hook 셸 스폰~wait enqueue 사이 틈) 불필요 → 제거. hook 은 단순 유지.
-  run_with_timeout "$poll_max" tmux wait-for "$channel" >/dev/null 2>&1 || true
+  # GATE_SKIP_WAIT=1 (단위 테스트 전용): 실제 tmux wait-for 호출을 건너뛴다. 단위 테스트가
+  #   외부 tmux 서버 상태에 의존하지 않도록 격리 — 서버가 있으면 대기자 없는 채널에 진짜
+  #   블로킹돼 hang, 채널 woken 잔존에 따라 비결정적(실측 확인)이기 때문. 테스트는 .response 를
+  #   미리 깔고 이 분기로 곧장 검증 로직(아래)만 본다. 실제 wait-for 블로킹 경로는 probe 가 커버.
+  [ "${GATE_SKIP_WAIT:-0}" = "1" ] || run_with_timeout "$poll_max" tmux wait-for "$channel" >/dev/null 2>&1 || true
   # ★ 단일 방어선: .response 존재만이 allow 근거 (서버부재·서버사망·timeout 모두 파일 없음).
   if [ ! -f "$resp" ]; then
     cleanup_pending "$uuid"

@@ -48,6 +48,15 @@ echo "[G4] emit JSON 스키마 정합 (hookEventName=PreToolUse)"
 ev="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.hookEventName')"
 assert_eq "PreToolUse" "$ev" "G4 hookEventName"
 
+# ★ 회색(gate_gray) 케이스 격리 (e2e 발견): gate_gray 는 tmux wait-for 로 lead 응답을
+#   블로킹 대기한다. 단위 테스트가 이를 그대로 타면 *실제 tmux 서버* 채널에 wait-for 를
+#   걸어 — 서버가 있으면(다른 세션·e2e) 대기자 없는 채널에 진짜 블로킹 → hang (G5 는 POLL_MAX
+#   미설정이라 기본 540초!), 채널 woken 잔존에 따라 비결정적(실측 규명). 단위 테스트는 외부
+#   tmux 상태에 의존하면 안 되므로 GATE_SKIP_WAIT=1 로 wait-for 호출을 건너뛰고 .response
+#   검증 로직만 결정적으로 본다. 실제 wait-for 블로킹 경로는 probe-permission-gate(E3) +
+#   run_with_timeout RT 테스트가 커버. ★ G5 부터 회색이므로 여기서 설정 (G5/G6/G7/G8 전부 덮음).
+export GATE_SKIP_WAIT=1
+
 echo "[G5] emit JSON 유효성 + stdout 오염 없음 (colon command → gray placeholder deny)"
 out="$(run_gate "Bash" '{"command":"echo a:b:c"}')"
 # 출력이 정확히 1줄 유효 JSON 인지 (stdout 에 로그/경고 안 섞임 — claude 파싱 필수).
@@ -79,10 +88,8 @@ assert_eq "allow" "$dec" "G6 회색 approve-once → allow"
 unset GATE_TEST_UUID GATE_POLL_MAX
 
 echo "[G7] 회색 + .response 없음 → deny (fail-closed)"
-# 주의: 단위 테스트 환경엔 tmux 서버가 없어 run_with_timeout 내 tmux wait-for 가
-#   즉시 rc=0 반환 → .response 검증으로 deny. (실서버 + 실제 540s timeout 경로는
-#   run_with_timeout 자체를 Task 0 RT2/RT3 에서 검증, gate_gray E2E 는 T12 probe.)
-#   이 케이스의 핵심은 "응답 파일 없음 = deny" 라는 fail-closed 단일 방어선 검증.
+# 핵심: "응답 파일 없음 = deny" 라는 fail-closed 단일 방어선 검증. GATE_SKIP_WAIT 로 wait-for
+#   를 건너뛰어도 .response 가 없으면 deny — 격리와 무관하게 방어선 자체를 검증한다.
 export GATE_TEST_UUID="no-resp-uuid"
 export GATE_POLL_MAX="1"
 out="$(run_gate "Bash" '{"command":"npm run build"}')"
@@ -100,5 +107,6 @@ assert_eq "allow" "$dec" "G8 approve-permanent allow"
 learned="$(jq -r '[.permissions.allow[] | select(. == "Bash(npm test:*)")] | length' "$BOOT/dev.json")"
 assert_eq "1" "$learned" "G8 command-group 학습 (Bash(npm test:*))"
 unset GATE_TEST_UUID GATE_POLL_MAX
+unset GATE_SKIP_WAIT
 
 test_summary
