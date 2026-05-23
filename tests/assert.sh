@@ -30,6 +30,17 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local haystack="$1" needle="$2" msg="${3:-}"
+  _TESTS_RUN=$((_TESTS_RUN + 1))
+  if printf '%s' "$haystack" | grep -qF -- "$needle"; then
+    _TESTS_FAIL=$((_TESTS_FAIL + 1))
+    echo "  FAIL: ${msg:-assert_not_contains} (found unwanted [$needle])"
+  else
+    echo "  ok: ${msg:-assert_not_contains}"
+  fi
+}
+
 assert_success() {
   # 직전 명령이 성공(0)했어야 함. 호출자가 $? 를 인자로 넘긴다: assert_success "$?" "메시지"
   local rc="$1" msg="${2:-assert_success}"

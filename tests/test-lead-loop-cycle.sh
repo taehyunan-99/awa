@@ -1,28 +1,26 @@
 #!/usr/bin/env bash
-# lead.md 에 5차 사이클 통합 처리 + dedup + watch-asks 점검 포함.
+# lead.md 6차: 게이트 3단계(pending/incident/removal) + reviewer 거버넌스 보존. 데몬·dedup·PRE폴링 폐기.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
 content="$(cat "$ROOT/prompts/loop/lead.md")"
 
-# 기존 4차 P0 보존
-assert_contains "$content" "권한 이벤트 감지" "4차 P0 섹션 보존"
-assert_contains "$content" ".lead-perm-cursor" "4차 P0 커서 보존"
-
-# 5차 사이클
-assert_contains "$content" "사이클 통합 처리" "5차 사이클 섹션"
+# 6차 게이트 3단계 (보존·핵심)
 assert_contains "$content" "pending-asks" "1단계 pending-asks"
-assert_contains "$content" "incidents" "3단계 incidents"
-assert_contains "$content" "removal-requests" "4단계 removal-requests"
+assert_contains "$content" "incidents" "2단계 incidents"
+assert_contains "$content" "removal-requests" "3단계 removal-requests"
 assert_contains "$content" "AskUserQuestion" "사용자 위임"
 assert_contains "$content" "approve-permanent:command-group" "응답 형식"
-# dedup
-assert_contains "$content" "iso_to_epoch" "ISO→epoch 변환"
-assert_contains "$content" "60" "60s 윈도우"
-assert_contains "$content" "notified" "incident dedup notified"
-# watch-asks 점검
-assert_contains "$content" "watch-asks.pid" "데몬 점검"
-assert_contains "$content" "kill -0" "데몬 살아있음 확인"
+# 6차 wake 메커니즘 (워커 고정 채널 + 단순 -S, wake-gating 없음)
+assert_contains "$content" "wait-for -S" "hook wake (-S)"
+assert_contains "$content" ".channel" "워커 고정 채널 필드로 wake"
+# reviewer 거버넌스 보존 (회귀 방지 — spec §3.4 결함 6)
+assert_contains "$content" "VIOLATION" "review VIOLATION 보존"
+
+# ★ 6차 폐기 항목 *부재* 단언 (negative — 회귀하면 fail). assert.sh 의 (a) 헬퍼 사용.
+assert_not_contains "$content" "watch-asks" "데몬 점검 폐기"
+assert_not_contains "$content" ".lead-perm-cursor" "PRE 폴링 커서 폐기"
+assert_not_contains "$content" "iso_to_epoch" "dedup 폐기"
 
 test_summary
