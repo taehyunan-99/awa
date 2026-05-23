@@ -26,6 +26,7 @@ assert_eq "0" "$rc" "U6 team-up 성공 (cat 경로)"
 echo "[U-state] team-up 부트 시 pending-asks/incidents/removal mkdir (marker 게이트 후)"
 [ -d "$TMP/.agent-harness/state/pending-asks" ]; assert_success "$?" "U-state pending-asks 생성"
 [ -d "$TMP/.agent-harness/state/incidents" ]; assert_success "$?" "U-state incidents 생성"
+[ -d "$TMP/.agent-harness/state/removal-requests" ]; assert_success "$?" "U-state removal-requests 생성"
 
 echo "[U7] ★ team-up 가 PROJECT_ROOT/config/lead-auto-allow.yaml 설치 (실전 부트 경로)"
 # 실전 결함: lead_auto_allow_lookup 은 PROJECT_ROOT/config/lead-auto-allow.yaml 을 읽는데

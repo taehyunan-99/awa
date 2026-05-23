@@ -353,8 +353,7 @@ for entry in "${WORKERS[@]}"; do
     i=$((i + 1))
     continue
   fi
-  # 5차: 워커 세션 ID 를 우리가 지정 → jsonl 파일명이 이 uuid 로 결정됨 (실측 확정).
-  # discovery 가 mtime 폴링 없이 경로를 직접 계산 → 동시 부트 race 면역.
+  # 6차: 세션 ID 를 우리가 지정 → jsonl 파일명이 이 uuid 로 결정 (디버그 추적성). 데몬 discovery 폐기로 경로 계산은 불필요.
   worker_sid="$(uuidgen | tr 'A-Z' 'a-z')"
   if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
     cmd="$cmd --settings \"$settings_path\" --session-id $worker_sid"
