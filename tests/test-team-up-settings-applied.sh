@@ -41,7 +41,7 @@ BOOTSET="$TMP/.agent-harness/.boot-settings"
 # dev 검증
 content="$(cat "$BOOTSET/dev.json")"
 assert_contains "$content" "Bash(git push *)" "dev.json git push deny"
-assert_contains "$content" "$TMP/.agent-harness/permission-events.log" "dev.json PROJECT_ROOT 치환"
+assert_contains "$content" "PROJECT_ROOT=\\\"$TMP\\\"" "dev.json PROJECT_ROOT 치환"
 assert_contains "$content" 'WORKER=\"dev\"' "dev.json WORKER=entry_name(dev)"
 # 잔존 토큰 부재
 if printf '%s' "$content" | grep -qE '\{\{[A-Z_]+\}\}'; then
@@ -67,7 +67,7 @@ content="$(cat "$BOOTSET/reviewer-quality.json")"
 if printf '%s' "$content" | grep -q '"deny"'; then
   assert_eq "no" "yes" "reviewer-quality.json deny 부재"
 fi
-assert_contains "$content" "log-deny.sh" "reviewer-quality.json hook"
+assert_contains "$content" "permission-gate.sh" "reviewer-quality.json hook"
 assert_contains "$content" '"Read"' "reviewer-quality.json seed allow Read"
 assert_contains "$content" 'WORKER=\"quality-rev\"' "reviewer-quality.json WORKER=entry_name"
 
@@ -77,7 +77,7 @@ for rev in reviewer-spec reviewer-arch; do
   if printf '%s' "$content" | grep -q '"deny"'; then
     assert_eq "no" "yes" "$rev.json deny 부재"
   fi
-  assert_contains "$content" "log-deny.sh" "$rev.json hook"
+  assert_contains "$content" "permission-gate.sh" "$rev.json hook"
   assert_contains "$content" '"Read"' "$rev.json seed allow Read"
 done
 

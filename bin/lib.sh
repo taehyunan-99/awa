@@ -149,9 +149,11 @@ generate_worker_settings() {
   fi
   mkdir -p "$out_dir"
   # F39: 기존 PROJECT_ROOT·HARNESS_ROOT 치환 유지 + ENTRY_NAME 토큰 추가 (대체 아님).
+  # 6차: ENTRY_ROLE 토큰 추가 — permission-gate.sh 가 역할별 matrix/settings 조회에 사용.
   sed -e "s#{{PROJECT_ROOT}}#$PROJECT_ROOT#g" \
       -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
       -e "s#{{ENTRY_NAME}}#$entry_name#g" \
+      -e "s#{{ENTRY_ROLE}}#$role#g" \
       "$tpl" > "$out"
   # 광범위 토큰 검증 — 화이트리스트 외 잔존도 fail (템플릿 오류 사전 차단).
   if grep -qE '\{\{[A-Z_]+\}\}' "$out"; then
@@ -341,7 +343,7 @@ timestamp() {
 # 한글 1자=3byte 고려. ${#line} 은 문자 수라 byte 와 다름 → head -c 로 byte 단위.
 # set -euo pipefail 환경에서 큰 입력 시 head -c 가 stdin 닫으면 printf 가 SIGPIPE → || true 흡수 (실측 exit 0).
 # iconv //IGNORE 로 UTF-8 멀티바이트 경계 잘림 제거 (깨진 마지막 바이트 제거 → 유효 UTF-8).
-# LOG 변수는 데몬 본체(watch-asks.sh)가 export 해 주입.
+# LOG 변수는 호출자(permission-gate hook 등)가 export 해 주입.
 log_safe() {
   local line="$1"
   local truncated
@@ -359,19 +361,45 @@ summarize_input() {
   printf '%s' "${input}" | head -c 200 2>/dev/null | iconv -f UTF-8 -t UTF-8//IGNORE 2>/dev/null || true
 }
 
-# settings.allow 에 패턴 추가 (atomic write). entry_role 기준 settings 파일.
-# F14: 인자는 entry_role (settings 파일명) — entry_name 아님. 같은 role 매핑 워커 모두 공유.
+# settings.allow 에 패턴 추가 (mkdir 원자성 락 + atomic write). entry_role 기준 settings.
+# 6차: 병렬 워커 hook 이 직접 호출 → read-modify-write 를 mkdir 락으로 보호 (lost update 방지).
+#   flock 은 macOS 기본 부재 → mkdir(POSIX 원자성).
+# ★ RETURN trap 미사용 (이식성·단순성): 대신 (1) 명시적 rmdir 로 정상 정리,
+#   (2) stale lock 자동 회수 — 락 보유자가 비정상 종료해 lock 이 남아도, 다음 호출이
+#   "오래된(>15s) lock" 을 강제 제거하고 진입. 데드락 영구화 방지.
 # $1=entry_role $2=pattern
 add_to_allow() {
   local entry_role="$1" pattern="$2"
   local settings="${PROJECT_ROOT}/.agent-harness/.boot-settings/${entry_role}.json"
-  local tmp="${settings}.tmp.$$.${RANDOM}"   # F2: 병렬 워커 tmp 충돌 회피 ($$ 는 데몬 PID 공유)
   [ -f "$settings" ] || return 1
-  # .permissions.allow // [] fallback: 4차 P0 templates 는 allow 키 없음 — null 안전.
+  local lock="${settings}.lock"
+  local tmp="${settings}.tmp.$$.${RANDOM}"
+  local i=0 max=300   # 300 * 0.05s = 15s 상한
+  while ! mkdir "$lock" 2>/dev/null; do
+    # stale lock 회수: mtime 을 *읽을 수 있고*(mt>0) 15초 이상 묵었을 때만 강제 제거.
+    # ★ 5차 실측 결함: mt=0(stat 실패 — lock 이 막 사라짐)이면 age=now-0=거대값이 되어
+    #   "방금 다른 워커가 새로 만든 정상 lock" 을 15s 초과로 오판해 강제삭제 → 임계구역
+    #   동시진입 → lost update 재발(이 함수의 존재 이유 무력화). mt>0 가드로 차단 (실측 확정,
+    #   20병렬 부하 count=20·진짜 16s stale 회수 둘 다 통과). mt=0 면 강제삭제 금지·단순 재시도.
+    local mt; mt="$(_mtime_epoch "$lock")"
+    if [ "$mt" -gt 0 ]; then
+      local age=$(( $(date +%s) - mt ))
+      [ "$age" -ge 15 ] && rmdir "$lock" 2>/dev/null || true
+    fi
+    i=$((i + 1))
+    [ "$i" -ge "$max" ] && { echo "add_to_allow: lock 획득 실패 ($settings)" >&2; return 1; }
+    sleep 0.05
+  done
   jq --arg p "${pattern}" \
     '.permissions.allow = ((.permissions.allow // []) + [$p] | unique)' \
     "${settings}" > "${tmp}" && mv "${tmp}" "${settings}"
+  local rc=$?
+  rmdir "$lock" 2>/dev/null || true
+  return $rc
 }
+
+# 디렉터리/파일 mtime epoch (BSD stat). 못 읽으면 0 (호출부가 mt>0 가드로 처리). lib.sh 에 없으면 추가.
+_mtime_epoch() { stat -f %m "$1" 2>/dev/null || echo 0; }
 
 # 도구·입력·scope → claude allow 패턴 도출.
 # $1=tool $2=input_json $3=scope (exact|command-group|tool)
@@ -387,7 +415,7 @@ derive_pattern() {
   local key field
   case "$tool" in
     Bash) key="command" ;;
-    Edit|Write|MultiEdit) key="file_path" ;;
+    Edit|Write) key="file_path" ;;
     *) key="" ;;
   esac
   if [ -z "$key" ]; then
@@ -408,33 +436,38 @@ derive_pattern() {
         if [ -n "$second" ]; then prefix="$first $second"; else prefix="$first"; fi
         printf '%s(%s:*)' "${tool}" "${prefix}"
       else
-        printf '%s(%s:*)' "${tool}" "$(dirname "$field")"
+        # Edit/Write: file_path 의 디렉터리. ★ 빈 file_path → dirname '' = '.' (위험) 회피:
+        #   field 비면 tool 명만 (도구 전체 — exact 보다 좁힐 근거 없음, deny 보다 안전한 폴백).
+        if [ -z "$field" ]; then printf '%s' "${tool}"; else printf '%s(%s:*)' "${tool}" "$(dirname "$field")"; fi
       fi
       ;;
   esac
 }
 
-# claude --session-id 로 지정한 uuid → workers.list 5필드 append (§5.6, F14).
-# $1=entry_name(표시 이름) $2=pane_id $3=cwd(PROJECT_ROOT) $4=session_id(uuid) $5=entry_role
-#
-# 5차 정정 (mtime 폴링 폐기): claude --session-id <uuid> 가 jsonl 파일명을 결정함을
-#   실측 확정 (interactive 포함). 따라서 uuid 로 경로를 *직접 계산* — 디렉터리 스캔·
-#   mtime 비교·폴링 전부 불필요. 동시 부트 race 면역 (각 워커가 자기 uuid 로 1:1 매칭).
-# jsonl 파일은 워커가 첫 메시지를 처리한 *뒤*에야 생기므로, 여기서 파일 존재를 기다리지
-#   않는다. watch-asks 의 `tail -F` 가 파일 생성을 대기·따라잡으므로 경로만 정확하면 충분.
-discover_jsonl_and_record() {
-  local entry_name="$1" pane="$2" cwd="$3" session_id="$4" entry_role="$5"
-  local cwd_real cwd_encoded proj_dir jsonl
-  # claude jsonl 디렉터리 인코딩 (실측 확정, e2e probe):
-  #  1) realpath(pwd -P): macOS /var → /private/var 심볼릭 링크 정규화. claude 는 realpath 기준.
-  #  2) [^a-zA-Z0-9] → '-': claude 는 / 뿐 아니라 . _ 등 모든 비영숫자를 dash 로 치환.
-  #     leading / 도 dash 가 되어 결과가 '-private-...' 형태 (prefix dash 별도 안 붙임).
-  cwd_real="$(cd "${cwd}" 2>/dev/null && pwd -P || printf '%s' "${cwd}")"
-  cwd_encoded=$(printf '%s' "${cwd_real}" | sed 's#[^a-zA-Z0-9]#-#g')
-  proj_dir="${HOME}/.claude/projects/${cwd_encoded}"
-  jsonl="${proj_dir}/${session_id}.jsonl"
-  mkdir -p "${cwd}/.agent-harness/state"
-  # F14: 5필드 — entry_name · pane · session · jsonl · entry_role
-  printf '%s %s %s %s %s\n' "${entry_name}" "${pane}" "${session_id}" "${jsonl}" "${entry_role}" \
-    >> "${cwd}/.agent-harness/state/workers.list"
+# timeout 명령 해석: coreutils timeout / gtimeout / 폴백 (macOS 기본 환경 대응).
+# tmux wait-for 같은 블로킹 명령을 N초 상한으로 실행. 자연완료=0, timeout=124.
+# 주의 1: 폴백은 서브셸로 감싸지 않고 직접 백그라운드 → $pid 가 곧 대상 프로세스
+#   (서브셸이면 tmux wait-for 손주가 고아로 영생).
+# 주의 2: SIGKILL 사용. tmux 소스(cmd-wait-for.c) 검증 결과 — 클라이언트에 보내는
+#   시그널은 서버의 채널 woken/waiter 를 *건드리지 않는다*(SIGTERM 도 다른 대기자를
+#   안 깨움). SIGKILL 을 택한 실제 이유는 wait-for 클라이언트가 SIGTERM 을 자체
+#   핸들러로 잡아 깔끔히 종료할 수 있어 "kill 로 죽였는지(timeout)" 판별이 모호하기
+#   때문 — SIGKILL 은 핸들러 우회라 판별 명확. (채널 오염과는 무관.)
+run_with_timeout() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$secs" "$@"
+  else
+    "$@" &
+    local pid=$!
+    ( sleep "$secs"; kill -KILL "$pid" 2>/dev/null ) &
+    local watcher=$!
+    local crc=0
+    wait "$pid" 2>/dev/null || crc=$?
+    kill -KILL "$watcher" 2>/dev/null || true
+    wait "$watcher" 2>/dev/null || true
+    [ "$crc" -eq 0 ] && return 0 || return 124
+  fi
 }

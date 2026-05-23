@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 각 test-*.sh 는 마지막에 test_summary 를 호출해 종료코드로 통과/실패를 전달해야 한다.
-# RUN_INTEGRATION=1 일 때 probes/probe-deny-end-to-end.sh 도 실행 (claude 의존).
+# RUN_INTEGRATION=1 일 때 probes/probe-permission-gate.sh 도 실행 (claude 의존).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -24,7 +24,7 @@ fi
 
 # Integration probe — claude 의존, 느림. 명시적 opt-in.
 if [ "${RUN_INTEGRATION:-0}" = "1" ]; then
-  for p in probes/probe-deny-end-to-end.sh probe-watch-asks.sh; do
+  for p in probes/probe-permission-gate.sh; do
     [ -e "$p" ] || continue
     echo "=== $p (integration) ==="
     rc=0; bash "$p" || rc=$?

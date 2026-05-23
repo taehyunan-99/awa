@@ -6,7 +6,7 @@
       "Bash(rm:*)",
       "Bash(rm -rf:*)",
       "Bash(jq:*)",
-      "Bash({{HARNESS_ROOT}}/bin/watch-asks.sh:*)",
+      "Bash(tmux:*)",
       "Bash(ls:*)",
       "Bash(cat:*)",
       "Bash(date:*)",

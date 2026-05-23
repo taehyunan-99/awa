@@ -82,6 +82,14 @@ parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_MODEL 설정
       exit 1
       ;;
   esac
+  # ENTRY_ROLE 도 sed `#` 구분자에 직접 삽입되므로 ENTRY_NAME 과 동일 문자셋으로 제한.
+  # (#, &, \, " 등이 sed s#...#$role#g 를 파손 — generate_worker_settings 의 -e "s#{{ENTRY_ROLE}}#$role#g").
+  case "$ENTRY_ROLE" in
+    ""|*[!A-Za-z0-9_-]*)
+      echo "오류: 역할 이름 '$ENTRY_ROLE' 허용 문자 외 ([A-Za-z0-9_-] 만)" >&2
+      exit 1
+      ;;
+  esac
   return 0
 }
 
@@ -140,6 +148,8 @@ fi
 # WORKSPACE 하위 디렉터리 생성은 marker 게이트 통과 후로 이동 (4차 리뷰).
 # 이유: 거부 케이스에서 mkdir 부작용 leak 차단 — spec D2·E8 사용자 보호.
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
+# 6차: 게이트 state 디렉터리 (lead 가 매 사이클 ls — 데몬이 만들던 것을 이관). marker 게이트 통과 후라 leak 없음.
+mkdir -p "$WORKSPACE/state/pending-asks" "$WORKSPACE/state/incidents" "$WORKSPACE/state/removal-requests"
 
 # 5차: lead-auto-allow.yaml 을 PROJECT_ROOT/config 에 설치 (spec §841 프로젝트별 커스텀).
 # lead_auto_allow_lookup 은 ${PROJECT_ROOT}/config/lead-auto-allow.yaml 을 읽으므로,
@@ -343,17 +353,12 @@ for entry in "${WORKERS[@]}"; do
     i=$((i + 1))
     continue
   fi
-  # 5차: 워커 세션 ID 를 우리가 지정 → jsonl 파일명이 이 uuid 로 결정됨 (실측 확정).
-  # discovery 가 mtime 폴링 없이 경로를 직접 계산 → 동시 부트 race 면역.
+  # 6차: 세션 ID 를 우리가 지정 → jsonl 파일명이 이 uuid 로 결정 (디버그 추적성). 데몬 discovery 폐기로 경로 계산은 불필요.
   worker_sid="$(uuidgen | tr 'A-Z' 'a-z')"
   if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
     cmd="$cmd --settings \"$settings_path\" --session-id $worker_sid"
   fi
   bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커"
-  # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 --session-id 미적용 → jsonl 없음).
-  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-    discover_jsonl_and_record "$ENTRY_NAME" "$tgt" "$PROJECT_ROOT" "$worker_sid" "$ENTRY_ROLE" || true
-  fi
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -391,10 +396,6 @@ if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
   lead_cmd="$lead_cmd --settings \"$settings_path\" --session-id $lead_sid"
 fi
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
-# 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 --session-id 미적용 → jsonl 없음).
-if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-  discover_jsonl_and_record "LEAD" "$LEAD_PID" "$PROJECT_ROOT" "$lead_sid" "lead" || true
-fi
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
 
@@ -430,30 +431,10 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       rev_cmd="$rev_cmd --settings \"$settings_path\" --session-id $rev_sid"
     fi
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
-    # 5차: jsonl discovery 는 claude 분기에서만 (더미 AGENT_CMD 는 --session-id 미적용 → jsonl 없음).
-    if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-      discover_jsonl_and_record "$ENTRY_NAME" "$rtgt" "$PROJECT_ROOT" "$rev_sid" "$ENTRY_ROLE" || true
-    fi
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))
   done
-fi
-
-# 5차: watch-asks 데몬 기동 (모든 부트 완료 후). claude 분기에서만 (cat 더미는 jsonl 없어 무의미).
-if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-  STATE_DIR="${PROJECT_ROOT}/.agent-harness/state"
-  mkdir -p "${STATE_DIR}"
-  PROJECT_ROOT="${PROJECT_ROOT}" HARNESS_ROOT="${HARNESS_ROOT}" \
-    nohup bash "${HARNESS_ROOT}/bin/watch-asks.sh" \
-      > "${STATE_DIR}/watch-asks.stdout.log" \
-      2> "${STATE_DIR}/watch-asks.stderr.log" &
-  sleep 0.5
-  if [ -f "${STATE_DIR}/watch-asks.pid" ]; then
-    echo "watch-asks daemon started (PID $(cat "${STATE_DIR}/watch-asks.pid"))"
-  else
-    echo "경고: watch-asks 데몬 기동 확인 실패 — ${STATE_DIR}/watch-asks.stderr.log 확인" >&2
-  fi
 fi
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
