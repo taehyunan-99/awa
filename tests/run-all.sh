@@ -22,9 +22,14 @@ if [ -d unit ]; then
   done
 fi
 
-# Integration probe — claude 의존, 느림. 명시적 opt-in.
+# Integration — claude/tmux 의존, 느림. 명시적 opt-in.
+# e2e-dryrun.sh 는 AGENT_CMD=cat 더미라 claude 토큰은 안 쓰나 실제 tmux 세션을 띄우므로
+#   무조건 도는 test-*.sh 글롭이 아닌 여기(opt-in)에 둔다.
 if [ "${RUN_INTEGRATION:-0}" = "1" ]; then
-  for p in probes/probe-permission-gate.sh probes/probe-hook-merge.sh; do
+  for p in e2e-dryrun.sh \
+           probes/probe-permission-gate.sh \
+           probes/probe-matcher-and-reload.sh \
+           probes/probe-hook-merge.sh; do
     [ -e "$p" ] || continue
     echo "=== $p (integration) ==="
     rc=0; bash "$p" || rc=$?
