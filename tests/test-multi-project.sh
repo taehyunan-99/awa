@@ -26,10 +26,13 @@ tmux has-session -t agents-projectB 2>/dev/null; assert_success "$?" "agents-pro
 [ -d "$TMP1/.agent-harness" ]; assert_success "$?" "A 의 .agent-harness/"
 [ -d "$TMP2/.agent-harness" ]; assert_success "$?" "B 의 .agent-harness/"
 
-# T16.3 — 두 settings.json 각자 PROJECT_ROOT 박힘
-grep -q "$TMP1" "$TMP1/.claude/settings.json"; assert_success "$?" "A settings 에 A 경로"
-grep -q "$TMP2" "$TMP2/.claude/settings.json"; assert_success "$?" "B settings 에 B 경로"
-! grep -q "$TMP2" "$TMP1/.claude/settings.json" 2>/dev/null; assert_success "$?" "A settings 에 B 경로 없음"
+# T16.3 — 두 워커 settings 각자 PROJECT_ROOT 박힘 (격리).
+# 6차: project .claude/settings.json 은 빈 {} 로 이관 — 경로는 워커 --settings 에 박힘.
+A_DEV="$TMP1/.agent-harness/.boot-settings/dev.json"
+B_DEV="$TMP2/.agent-harness/.boot-settings/dev.json"
+grep -q "$TMP1" "$A_DEV"; assert_success "$?" "A 워커 settings 에 A 경로"
+grep -q "$TMP2" "$B_DEV"; assert_success "$?" "B 워커 settings 에 B 경로"
+! grep -q "$TMP2" "$A_DEV" 2>/dev/null; assert_success "$?" "A 워커 settings 에 B 경로 없음"
 
 # T16.4 — 같은 task id `1.md` 도 격리
 echo "## A task" > "$TMP1/.agent-harness/tasks/1.md"

@@ -36,8 +36,6 @@ mkdir -p "$PROBE_DIR/.agent-harness/state/pending-asks" \
          "$PROBE_DIR/.agent-harness/.boot-settings" \
          "$PROBE_DIR/.claude"
 
-# dev settings (PreToolUse permission-gate). matrix 는 비워 회색 유도(H2). Edit 는 게이트 통과 위해 허용.
-echo '{"permissions":{"allow":["Edit"]}}' > "$PROBE_DIR/.agent-harness/.boot-settings/dev.json"
 cat > "$PROBE_DIR/config/lead-auto-allow.yaml" <<'YAML'
 read-only:
   - "Bash(find:*)"
@@ -46,31 +44,41 @@ YAML
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh"
 
-# ── 스코프 1: project .claude/settings.json (PostToolUse log-event) — team-up 과 동일 ──
+# ── 스코프 1: project .claude/settings.json — team-up 과 동일 (6차: 빈 {}, hook 은 워커로 이관) ──
+#   이게 빈 {} 인데도 events.log 가 찍혀야 함 = PostToolUse 가 워커 --settings 에서 산다는 증명.
 sed -e "s#{{PROJECT_ROOT}}#$PROBE_DIR#g" \
     -e "s#{{HARNESS_ROOT}}#$ROOT#g" \
     "$ROOT/templates/settings.json.tpl" > "$PROBE_DIR/.claude/settings.json"
 
-# ── 스코프 2: 워커 --settings (PreToolUse permission-gate) ──
+# ── 스코프 2: 워커 --settings — generate_worker_settings 로 실제 산출(PreToolUse + PostToolUse 공존) ──
+#   team-up 과 동일 경로. dev 템플릿엔 Edit allow 가 없어 회색 → H1 게이트 걸림 방지 위해
+#   acceptEdits + Edit/Write allow 후처리 (Edit 이 확실히 게이트 없이 통과 → PostToolUse 도달 보장).
 SET="$(generate_worker_settings dev dev-1)"
+jq '.permissions.defaultMode="acceptEdits" | .permissions.allow=((.permissions.allow//[])+["Edit","Write"]|unique)' \
+   "$SET" > "$SET.tmp" && mv "$SET.tmp" "$SET"
 
 # Edit 대상 파일 (H1). 워커가 이걸 수정 → events.log 기록 기대.
 echo 'line1' > "$PROBE_DIR/target.txt"
 
 tmux kill-session -t "$SES" 2>/dev/null || true
 tmux new-session -d -s "$SES" -c "$PROBE_DIR" -x 200 -y 50
+# ★ HARNESS_WORKER pane env 주입 (team-up 이 주는 것 — log-event 가 워커명에 사용).
+tmux send-keys -t "$SES" "export HARNESS_WORKER=dev-1" Enter
 tmux send-keys -t "$SES" "cd '$PROBE_DIR' && claude --model claude-haiku-4-5-20251001 --settings '$SET' --session-id $WUUID" Enter
 
-# REPL 준비 대기 (trust 프롬프트 자동 통과)
+# REPL 준비 대기 — ★ 확정 신호로 판정 (빈 화면을 ready 로 오인하지 않도록).
+#   '❯' 단독은 부팅 중 빈 입력선에서 위양성 → 상태줄/박스 신호로 강화 (실측).
 wait_repl() {
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 70); do
     sleep 2
-    if tmux capture-pane -t "$SES" -p | grep -q 'trust this folder'; then tmux send-keys -t "$SES" Enter; fi
-    tmux capture-pane -t "$SES" -p | grep -q '❯' && return 0
+    local d; d="$(tmux capture-pane -t "$SES" -p 2>/dev/null)"
+    printf '%s' "$d" | grep -q 'trust this folder' && { tmux send-keys -t "$SES" Enter; continue; }
+    printf '%s' "$d" | grep -qE 'accept edits on|bypass permissions|for shortcuts|esc to interrupt|Welcome back' && return 0
   done
   return 1
 }
 wait_repl || { echo "FAIL: REPL 미준비"; tmux kill-session -t "$SES" 2>/dev/null; rm -rf "$PROBE_DIR"; exit 1; }
+sleep 3
 
 PASS=0; FAIL=0
 chk() { if [ "$1" = "$2" ]; then echo "  ok: $3"; PASS=$((PASS+1)); else echo "  FAIL: $3 (exp=$1 got=$2)"; FAIL=$((FAIL+1)); fi; }
@@ -78,9 +86,14 @@ chk() { if [ "$1" = "$2" ]; then echo "  ok: $3"; PASS=$((PASS+1)); else echo " 
 EVLOG="$PROBE_DIR/.agent-harness/events.log"
 
 # ── H1: PostToolUse 생존 — 워커가 파일 Edit → events.log 에 줄 기록 ──
-# Edit 는 dev.json allow 라 permission-gate 즉시 통과. PostToolUse(log-event)가 살아있으면 기록됨.
-tmux send-keys -t "$SES" "use the Edit tool to change 'line1' to 'line2' in target.txt" Enter
-sleep 18
+# Edit 는 acceptEdits + allow 라 permission-gate 즉시 통과. PostToolUse(log-event)가 살아있으면 기록됨.
+tmux send-keys -t "$SES" -l "Edit target.txt: replace the word line1 with line2"
+sleep 1; tmux send-keys -t "$SES" Enter
+# events.log 폴링 (최대 40s — 모델 응답 시간 편차 흡수).
+for _w in $(seq 1 8); do
+  sleep 5
+  [ -s "$EVLOG" ] && break
+done
 if [ -s "$EVLOG" ]; then
   chk yes yes "H1 PostToolUse 생존 (events.log 기록됨 → 두 스코프 hook 공존)"
   echo "    events.log 마지막 줄: $(tail -1 "$EVLOG")"

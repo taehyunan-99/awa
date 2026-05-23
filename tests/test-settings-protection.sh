@@ -48,7 +48,8 @@ HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" default >/dev/n
 rc=$?
 assert_success "$rc" "team-up 성공 (marker 있음)"
 sleep 0.3
-grep -q "log-event.sh" "$TMP/.claude/settings.json"; assert_success "$?" "settings.json 덮어쓰기 (hook 포함)"
+# 6차: settings.json 은 빈 {} (hook 은 워커 --settings 로 이관). 우리 템플릿으로 덮였는지 = 옛 내용 부재로 확인.
+grep -q "harness_made" "$TMP/.claude/settings.json"; assert_fail "$?" "settings.json 덮어쓰기 (옛 내용 제거됨)"
 [ -f "$TMP/.claude/.agent-harness-marker" ]; assert_success "$?" "marker 유지"
 tmux kill-session -t "agents-$T15_SAFE" 2>/dev/null || true
 rm -f "$TMP/.claude/settings.json" "$TMP/.claude/.agent-harness-marker"

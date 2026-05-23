@@ -15,6 +15,15 @@
           "command": "WORKER=\"{{ENTRY_NAME}}\" ENTRY_ROLE=\"{{ENTRY_ROLE}}\" PROJECT_ROOT=\"{{PROJECT_ROOT}}\" HARNESS_ROOT=\"{{HARNESS_ROOT}}\" bash \"{{HARNESS_ROOT}}/bin/permission-gate.sh\""
         }]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{
+          "type": "command",
+          "command": "EVENTS_LOG=\"{{PROJECT_ROOT}}/.agent-harness/events.log\" REPO_ROOT=\"{{PROJECT_ROOT}}\" bash \"{{HARNESS_ROOT}}/bin/log-event.sh\""
+        }]
+      }
     ]
   }
 }

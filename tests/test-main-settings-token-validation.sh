@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# settings.json.tpl 의 {{...}} 토큰 치환 확인 + 잔존 시 team-up fail.
+# 워커 settings 의 {{...}} 토큰 치환 확인 + 손상 템플릿 잔존 시 team-up fail.
+# 6차: project .claude/settings.json 은 빈 {} 로 이관됨 (hook 은 워커 --settings 로).
+#   따라서 토큰 치환(events.log/log-event.sh)의 검증 대상은 워커 .boot-settings/<role>.json.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
@@ -14,18 +16,24 @@ cleanup() {
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-echo "[M1] 정상 team-up — settings.json 토큰 치환 완료"
+echo "[M1] 정상 team-up — 워커 settings 토큰 치환 완료 (PostToolUse log-event)"
 HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" default >/dev/null 2>&1
 rc=$?
 assert_eq "0" "$rc" "M1 team-up 성공"
-content="$(cat "$TMP/.claude/settings.json")"
+# 6차: project settings.json 은 빈 {} — 토큰 치환 검증은 워커 settings 에서.
+proj_content="$(cat "$TMP/.claude/settings.json")"
+assert_eq "{}" "$(printf '%s' "$proj_content" | tr -d '[:space:]')" "M1 project settings 빈 {} (hook 이관)"
+# 워커 dev settings — PostToolUse(log-event) 토큰 치환 확인.
+worker_settings="$TMP/.agent-harness/.boot-settings/dev.json"
+[ -f "$worker_settings" ]; assert_success "$?" "M1 워커 dev settings 생성됨"
+content="$(cat "$worker_settings" 2>/dev/null || true)"
 # {{...}} 토큰 잔존 검증
-assert_eq "" "$(printf '%s' "$content" | grep -oE '\{\{(PROJECT_ROOT|HARNESS_ROOT)\}\}')" "M1 토큰 잔존 없음"
-# 치환 결과에 실제 경로 포함
+assert_eq "" "$(printf '%s' "$content" | grep -oE '\{\{[A-Z_]+\}\}')" "M1 토큰 잔존 없음"
+# 치환 결과에 실제 경로 포함 (PostToolUse log-event)
 assert_contains "$content" "$TMP/.agent-harness/events.log" "M1 PROJECT_ROOT 치환"
-assert_contains "$content" "$ROOT/bin/log-event.sh" "M1 HARNESS_ROOT 치환"
-# 옛 __...__ 토큰 잔존 안 함
-assert_eq "" "$(printf '%s' "$content" | grep -oE '__(PROJECT_ROOT|HARNESS_ROOT)__')" "M1 옛 토큰 부재"
+assert_contains "$content" "$ROOT/bin/log-event.sh" "M1 HARNESS_ROOT 치환 (PostToolUse)"
+# PreToolUse permission-gate 도 함께 (단일 --settings 공존 확인)
+assert_contains "$content" "$ROOT/bin/permission-gate.sh" "M1 PreToolUse permission-gate 공존"
 
 bash "$ROOT/bin/team-down.sh" --project "$TMP" >/dev/null 2>&1 || true
 

@@ -112,4 +112,20 @@ grep -q '"matcher": "\*"' "$outd"; assert_success "$?" "G10 default matcher * �
 grep -q 'permission-gate.sh' "$outd"; assert_success "$?" "G10 default 도 permission-gate command"
 ! grep -q 'log-deny' "$outd"; assert_success "$?" "G10 default log-deny 잔존 없음"
 
+echo "[G11] PostToolUse(log-event) 공존 — 6차 hook 병합 결함 수정 (--settings 단일 스코프에 둘 다)"
+# claude 는 hooks 를 스코프 간 병합 안 함 → PreToolUse + PostToolUse 가 워커 --settings 한 파일에
+# 함께 있어야 events.log 가 기록됨 (probe-hook-merge.sh 실측). 회귀 방지.
+for r in dev tester reviewer-quality unknown-role-xyz; do
+  o="$(generate_worker_settings "$r" "w-1")"
+  pre="$(jq -r '.hooks.PreToolUse[0].hooks[0].command // ""' "$o" 2>/dev/null)"
+  post="$(jq -r '.hooks.PostToolUse[0].hooks[0].command // ""' "$o" 2>/dev/null)"
+  printf '%s' "$pre" | grep -q 'permission-gate.sh'; assert_success "$?" "G11 $r PreToolUse permission-gate"
+  printf '%s' "$post" | grep -q 'log-event.sh'; assert_success "$?" "G11 $r PostToolUse log-event 공존"
+done
+
+echo "[G12] lead 는 PostToolUse 없음 (감시 대상 아님)"
+outl="$(generate_worker_settings lead LEAD)"
+! grep -q 'PostToolUse' "$outl"; assert_success "$?" "G12 lead PostToolUse 부재"
+! grep -q 'PreToolUse' "$outl"; assert_success "$?" "G12 lead PreToolUse 부재 (게이트 대상 아님)"
+
 test_summary

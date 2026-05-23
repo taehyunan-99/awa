@@ -109,7 +109,13 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   exit 1
 fi
 
-# PostToolUse hook 설정을 PROJECT_ROOT/.claude 에 머신 절대경로로 치환해 생성 (D2).
+# PROJECT_ROOT/.claude/settings.json 을 생성 (D2) + marker 기록 (사용자 보호 게이트).
+# ★ 6차: hook(PreToolUse permission-gate + PostToolUse log-event)은 전부 워커 --settings 로 이관됨.
+#   claude 는 hooks 를 스코프 간 병합하지 않고 최고 우선순위(--settings=command-line)가 통째로
+#   이긴다(실측 — probe-hook-merge.sh). 모든 에이전트가 --settings 로 뜨므로 이 파일의 hooks 는
+#   절대 적용 안 됨(죽은 설정). 따라서 settings.json.tpl 은 빈 {} — hook 을 여기 두면 "왜 안 먹지"
+#   혼란만 남는다. 이 파일의 유일한 실역할은 (1) marker 생성 트리거 (2) 사용자 기존 settings.json
+#   보호 게이트(아래 marker 없으면 덮어쓰기 거부)다.
 # 사용자 기존 settings.json 보호: marker 없으면 덮어쓰기 거부.
 if [ -f "$HARNESS_ROOT/templates/settings.json.tpl" ]; then
   MARKER="$PROJECT_ROOT/.claude/.agent-harness-marker"
@@ -125,8 +131,7 @@ if [ -f "$HARNESS_ROOT/templates/settings.json.tpl" ]; then
       -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
       "$HARNESS_ROOT/templates/settings.json.tpl" \
       > "$PROJECT_ROOT/.claude/settings.json"
-  # 광범위 토큰 검증 — 화이트리스트 (PROJECT_ROOT/HARNESS_ROOT) 외 토큰도 fail-fast.
-  # 정상 settings.json.tpl 은 두 토큰만 사용 — 그 외 잔존은 템플릿 오류.
+  # 토큰 잔존 검증 — 빈 {} 라 정상적으로는 토큰 0개. 잔존하면 템플릿 오류 (fail-fast 유지).
   if grep -qE '\{\{[A-Z_]+\}\}' "$PROJECT_ROOT/.claude/settings.json"; then
     echo "오류: $PROJECT_ROOT/.claude/settings.json 토큰 미치환: $(grep -oE '\{\{[A-Z_]+\}\}' "$PROJECT_ROOT/.claude/settings.json" | sort -u | tr '\n' ' ')" >&2
     rm -f "$PROJECT_ROOT/.claude/settings.json"
