@@ -65,4 +65,40 @@ assert_success "$?" "G5b 따옴표·역슬래시 reason 도 유효 JSON"
 r="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecisionReason')"
 assert_eq 'danger:rm "q" \back' "$r" "G5b reason 원형 보존"
 
+echo "[G6] 회색 + .response=approve-once 미리 깔림 → allow"
+# gate 가 uuid 를 생성하므로, .response 를 특정 uuid 로 못 깐다 →
+# GATE_TEST_UUID env 로 uuid 고정 (permission-gate.sh 가 테스트시 이 env 사용).
+export GATE_TEST_UUID="fixed-test-uuid"
+export GATE_POLL_MAX="1"   # 1초 상한 (테스트 가속)
+RESP_DIR="$HARNESS_PROJECT/.agent-harness/state/pending-asks"
+mkdir -p "$RESP_DIR"
+printf 'approve-once' > "$RESP_DIR/${GATE_TEST_UUID}.response"
+out="$(run_gate "Bash" '{"command":"npm test"}')"
+dec="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')"
+assert_eq "allow" "$dec" "G6 회색 approve-once → allow"
+unset GATE_TEST_UUID GATE_POLL_MAX
+
+echo "[G7] 회색 + .response 없음 → deny (fail-closed)"
+# 주의: 단위 테스트 환경엔 tmux 서버가 없어 run_with_timeout 내 tmux wait-for 가
+#   즉시 rc=0 반환 → .response 검증으로 deny. (실서버 + 실제 540s timeout 경로는
+#   run_with_timeout 자체를 Task 0 RT2/RT3 에서 검증, gate_gray E2E 는 T12 probe.)
+#   이 케이스의 핵심은 "응답 파일 없음 = deny" 라는 fail-closed 단일 방어선 검증.
+export GATE_TEST_UUID="no-resp-uuid"
+export GATE_POLL_MAX="1"
+out="$(run_gate "Bash" '{"command":"npm run build"}')"
+dec="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')"
+assert_eq "deny" "$dec" "G7 응답없음 → deny (fail-closed)"
+unset GATE_TEST_UUID GATE_POLL_MAX
+
+echo "[G8] 회색 + .response=approve-permanent:command-group → allow + 학습"
+export GATE_TEST_UUID="perm-uuid"
+export GATE_POLL_MAX="1"
+printf 'approve-permanent:command-group' > "$RESP_DIR/${GATE_TEST_UUID}.response"
+out="$(run_gate "Bash" '{"command":"npm test foo"}')"
+dec="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')"
+assert_eq "allow" "$dec" "G8 approve-permanent allow"
+learned="$(jq -r '[.permissions.allow[] | select(. == "Bash(npm test:*)")] | length' "$BOOT/dev.json")"
+assert_eq "1" "$learned" "G8 command-group 학습 (Bash(npm test:*))"
+unset GATE_TEST_UUID GATE_POLL_MAX
+
 test_summary

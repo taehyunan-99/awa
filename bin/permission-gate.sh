@@ -110,8 +110,71 @@ EOF2
   esac
 }
 
-# gate_gray 는 Task 4 에서 구현. 임시 placeholder (회색=deny).
-gate_gray() { emit_deny "gray:not-implemented"; }
+queue_pending_ask() {
+  local uuid="$1" worker="$2" role="$3" tool="$4" input="$5" gate_pid="$6" tuid="$7" channel="$8"
+  mkdir -p "${STATE_DIR}/pending-asks"
+  local f="${STATE_DIR}/pending-asks/${uuid}.json"
+  local tmp="${f}.tmp.$$.${RANDOM}"
+  jq -n --arg u "$uuid" --arg w "$worker" --arg r "$role" --arg tool "$tool" \
+        --argjson inp "$input" --argjson ts "$(timestamp)" \
+        --arg gp "$gate_pid" --arg tu "$tuid" --arg ch "$channel" \
+    '{uuid:$u, worker:$w, entry_role:$r, tool:$tool, input:$inp, timestamp:$ts, gate_pid:($gp|tonumber), tool_use_id:$tu, channel:$ch}' \
+    > "$tmp" && mv "$tmp" "$f"
+}
+
+cleanup_pending() {
+  local uuid="$1"
+  rm -f "${STATE_DIR}/pending-asks/${uuid}.json" "${STATE_DIR}/pending-asks/${uuid}.response"
+}
+
+gate_gray() {
+  local tool="$1" input="$2" tuid="${3:-}"
+  local uuid; uuid="${GATE_TEST_UUID:-$(uuidgen)}"   # pending-ask 파일명 (추적성 — uuid 유지)
+  local poll_max="${GATE_POLL_MAX:-540}"
+  # ★ 채널명 = 워커 고정 (3차 리뷰 채널 누수 해소): uuid 일회용이면 timeout 후 woken=1 채널이
+  #   tmux 서버에 영구 잔존(정리 명령 없음). 워커 고정명이면 다음 회색명령이 같은 채널 재방문
+  #   → cmd_wait_for_remove 로 정리 → 누수 상수 제한. hook 은 동기라 워커당 동시 1개만 → 충돌 X.
+  #   채널명 비영숫자 정리(tmux 안전): entry_name 의 영숫자 외 문자를 - 로.
+  local ch_safe; ch_safe="$(printf '%s' "$WORKER" | sed 's#[^a-zA-Z0-9]#-#g')"
+  local channel="${GATE_TEST_CHANNEL:-harness-gate-${ch_safe}}"
+  local resp="${STATE_DIR}/pending-asks/${uuid}.response"
+  queue_pending_ask "$uuid" "$WORKER" "$ENTRY_ROLE" "$tool" "$input" "$$" "$tuid" "$channel"
+  notify_gray_log "$uuid" "$tool"
+  # wait-for 블로킹 (서버 부재면 즉시 rc=0). run_with_timeout 무응답 상한
+  #   (macOS timeout 부재 → lib.sh 의 SIGKILL 폴백, Task 0). 결과 rc 무시 — .response 로만 판정.
+  # ★ stale woken 안전 (4차 리뷰 — .response 단일 방어선이 자가치유로 흡수): 워커 고정 채널
+  #   재사용 시 "이전 라운드 죽은 hook 에 -S → woken 잔존 → 이번 wait 즉시반환" 이 생길 수
+  #   있으나, 즉시 깬 hook 도 아래 `.response` 존재 검증을 거치므로 resp 없으면 deny → 거짓
+  #   allow 0, 회색명령 1회 거짓 deny 만(워커 재시도로 자가치유). stale 은 cmd_wait_for_remove
+  #   로 1회만 소비(실측) → 다음 wait 정상 블로킹. 3차의 lead `kill -0` wake-gating 은 race 를
+  #   못 막으면서(hook 셸 스폰~wait enqueue 사이 틈) 불필요 → 제거. hook 은 단순 유지.
+  run_with_timeout "$poll_max" tmux wait-for "$channel" >/dev/null 2>&1 || true
+  # ★ 단일 방어선: .response 존재만이 allow 근거 (서버부재·서버사망·timeout 모두 파일 없음).
+  if [ ! -f "$resp" ]; then
+    cleanup_pending "$uuid"
+    log_safe "[$(timestamp)] ${WORKER} gate DENY (응답없음) uuid=${uuid} ch=${channel}"
+    emit_deny "gray:timeout-or-no-response"
+    return
+  fi
+  local decision; decision="$(cat "$resp")"
+  cleanup_pending "$uuid"
+  case "$decision" in
+    approve-once)
+      emit_allow "gray:approve-once" ;;
+    approve-permanent:*)
+      local scope pattern
+      scope="${decision#approve-permanent:}"
+      pattern="$(derive_pattern "$tool" "$input" "$scope")"
+      add_to_allow "$ENTRY_ROLE" "$pattern"
+      emit_allow "gray:approve-permanent:${scope}" ;;
+    *)
+      emit_deny "gray:deny" ;;
+  esac
+}
+
+notify_gray_log() {
+  log_safe "[$(timestamp)] ${WORKER} ${2} → USER-ASK (uuid=${1})"
+}
 
 # 라이브러리 모드(단위 테스트)면 main 미실행 — 함수만 로드 (stdin hang 회피).
 if [ "${PERM_GATE_LIB_ONLY:-0}" != "1" ]; then
