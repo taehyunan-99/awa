@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "allow": [
+      "Write({{PROJECT_ROOT}}/**)",
+      "Edit({{PROJECT_ROOT}}/**)"
+    ],
     "deny": [
       "Bash(git push *)",
       "Bash(rm *)",
