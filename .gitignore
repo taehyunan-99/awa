@@ -1,6 +1,8 @@
 # 런타임 산출물 — 정의가 아닌 결과물 (PROJECT_ROOT 별 격리)
 .agent-harness/
-.claude/.agent-harness-marker
+
+# Claude Code 디렉터리 전체 — 개인·런타임·로컬 설정, 공유 안 함
+.claude/
 
 # 설계/계획 문서 — git 추적 안 함
 docs/
@@ -17,4 +19,3 @@ node_modules/
 .vscode/
 *.swp
 *~
-.claude/settings.json
