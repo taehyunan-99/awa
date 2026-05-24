@@ -27,7 +27,10 @@ while [ $# -gt 0 ]; do
       if ! HARNESS_PROJECT="$(_normalize_project_arg "${1#--project=}")"; then exit 1; fi
       export HARNESS_PROJECT; shift ;;
     -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
-    *) PROFILE_ARG="$1"; shift ;;
+    *)
+      # 비옵션 인자는 프로파일명. 정상 사용은 1개 — 여분이 오면 무음 무시 대신 경고.
+      [ -n "$PROFILE_ARG" ] && echo "경고: 프로파일 인자 여러 개 — '$1' 로 덮어씀(이전: '$PROFILE_ARG')" >&2
+      PROFILE_ARG="$1"; shift ;;
   esac
 done
 
@@ -44,7 +47,7 @@ source "$_DIR/lib.sh"
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 
 PROFILE="${PROFILE_ARG:-default}"
-# $1 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
+# PROFILE 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
 if [ -f "$PROFILE" ]; then
   PROFILE_FILE="$PROFILE"
 else
