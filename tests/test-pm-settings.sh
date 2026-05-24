@@ -38,4 +38,11 @@ assert_contains "$PMSET" "Bash(cat:*)" "pm cat allow (pull-read)"
 assert_not_contains "$PMSET" '"Write(' "pm 은 Write allow 없음"
 assert_not_contains "$PMSET" "Bash(rm" "pm 은 rm allow 없음"
 
+# I1: 읽기전용을 deny 로 코드 강제 (allow 부재만으론 default mode 에서 사용자 프롬프트 — pm 이
+# 사용자 창구라 자기참조. deny 는 default mode 에서 확정 차단이라 불변식을 settings 로 보장).
+_pm_deny="$(printf '%s' "$PMSET" | jq -r '.permissions.deny[]?' 2>/dev/null)"
+assert_contains "$_pm_deny" "Write" "pm deny 에 Write (읽기전용 코드 강제)"
+assert_contains "$_pm_deny" "Edit" "pm deny 에 Edit"
+assert_contains "$_pm_deny" "NotebookEdit" "pm deny 에 NotebookEdit"
+
 test_summary

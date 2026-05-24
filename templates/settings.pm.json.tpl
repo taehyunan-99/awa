@@ -17,6 +17,9 @@
       "Bash(tmux:*)"
     ],
     "deny": [
+      "Write",
+      "Edit",
+      "NotebookEdit",
       "Bash(sudo:*)",
       "Bash(dd:*)",
       "Bash(git push --force:*)",
