@@ -17,7 +17,22 @@ _normalize_project_arg() {
   fi
   ( cd "$raw" && pwd )
 }
+# --plan 옵션 정규화. 파일 존재 검사 + 절대경로화. --project 의 디렉터리 검사와 대칭.
+_normalize_plan_arg() {
+  local raw="${1:-}"
+  if [ -z "$raw" ]; then
+    echo "오류: --plan 인자 누락 (값 필요)" >&2
+    return 1
+  fi
+  if [ ! -f "$raw" ]; then
+    echo "오류: --plan 파일 없음: $raw" >&2
+    return 1
+  fi
+  ( cd "$(dirname "$raw")" && printf '%s/%s\n' "$(pwd)" "$(basename "$raw")" )
+}
 PROFILE_ARG=""
+# set -u 안전성을 위해 루프 앞에 선언 필수 (미선언 배열은 set -u 에서 unbound 오류).
+PLAN_FILES=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --project)
@@ -26,6 +41,12 @@ while [ $# -gt 0 ]; do
     --project=*)
       if ! HARNESS_PROJECT="$(_normalize_project_arg "${1#--project=}")"; then exit 1; fi
       export HARNESS_PROJECT; shift ;;
+    --plan)
+      _plan_norm="$(_normalize_plan_arg "${2:-}")" || exit 1
+      PLAN_FILES+=("$_plan_norm"); shift 2 ;;
+    --plan=*)
+      _plan_norm="$(_normalize_plan_arg "${1#--plan=}")" || exit 1
+      PLAN_FILES+=("$_plan_norm"); shift ;;
     -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
     *)
       # 비옵션 인자는 프로파일명. 정상 사용은 1개 — 여분이 오면 무음 무시 대신 경고.
@@ -399,11 +420,7 @@ for entry in "${WORKERS[@]}"; do
 done
 obf="$(boot_file LEAD)"
 { cat "$PROMPTS_DIR/roles/lead.md" 2>/dev/null || true
-  printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"
-  # pm→lead(@pm:)와 대칭인 역방향 채널. lead 가 pm 확인 필요 시 이 pane_id 로 @lead-ask: 한 줄 push.
-  # (워커→lead rm 위임의 @lead: 와 구별되는 별도 prefix — prefix 과부하 방지.)
-  # PM_PID 는 221줄에서 이미 캡처됨. pane_id(%N)는 토큰 패턴({{...}})이 아니라 잔존검증 무관.
-  printf '\n## pm pane 알림 채널\n- pm pane_id: %s — lead→pm 확인요청은 `tmux send-keys -t %s -l "@lead-ask: <확인할 내용>"` 후 Enter.\n' "$PM_PID" "$PM_PID"; } > "$obf"
+  printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
 # lead boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
 sed -e "s#{{SESSION}}#$SESSION#g" \
@@ -413,6 +430,20 @@ sed -e "s#{{SESSION}}#$SESSION#g" \
 if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf"; then
   echo "오류: $obf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$obf" | sort -u | tr '\n' ' ')" >&2
   exit 1
+fi
+
+# 11차: 확정 plan 합본 생성 (AGENT_CMD 무관 — 테스트 가능성, 워커 settings 와 동형).
+# plan 은 사용자 산출물 → LEAD boot 의 sed 치환·예약토큰 잔존검증을 거치지 않는다(별도 파일).
+# 우연히 {{HARNESS_ROOT}} 등이 들어있어도 그대로 전달되는 것이 의도.
+PLAN_BOOT_FILE=""
+if [ "${#PLAN_FILES[@]}" -gt 0 ]; then
+  PLAN_BOOT_FILE="$WORKSPACE/.boot/plan.md"
+  { printf '# 확정 plan (이번 가동의 작업 계획)\n'
+    for _pf in "${PLAN_FILES[@]}"; do
+      printf '\n## %s\n' "$(basename "$_pf")"
+      cat "$_pf"
+      printf '\n'
+    done; } > "$PLAN_BOOT_FILE"
 fi
 
 # 5차: LEAD 도 generate_worker_settings 로 settings 생성 (lead 템플릿 적용, F40).
@@ -425,6 +456,9 @@ fi
 lead_sid="$(uuidgen | tr 'A-Z' 'a-z')"
 if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
   lead_cmd="$lead_cmd --settings \"$settings_path\" --session-id $lead_sid"
+  if [ -n "$PLAN_BOOT_FILE" ]; then
+    lead_cmd="$lead_cmd --append-system-prompt-file \"$PLAN_BOOT_FILE\""
+  fi
 fi
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
