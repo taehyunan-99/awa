@@ -25,7 +25,9 @@ assert_not_contains "$DEVSET" "{{PROJECT_ROOT}}" "dev settings 토큰 치환됨"
 # 기존 hook 보존 (회귀)
 assert_contains "$DEVSET" "permission-gate.sh" "dev PreToolUse 게이트 보존"
 
-# reviewer 템플릿엔 Write allow 없음 (격리 회귀)
+# reviewer 템플릿의 Write allow 는 review/·.review-cursor 정상 산출물 경로로만 한정 (격리 회귀).
+# 10차 라이브 검증: reviewer 정상 verdict/커서 Write 가 매번 USER-ASK 회색으로 잡히는 결함 수정.
+# 코드 경로 전체 Write(dev 의 Write({PROJ}/**))는 여전히 없어야 격리(코드 수정 lead 감지)가 유지된다.
 RVOUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
   source '"$ROOT"'/bin/lib.sh
   generate_worker_settings reviewer-quality quality-rev
@@ -34,7 +36,14 @@ assert_success "$?" "reviewer settings 생성"
 RVSET="$(cat "$RVOUT")"
 # RVSET 이 비어있지 않아야 assert_not_contains 가 의미를 가짐 (빈 문자열 거짓양성 방지)
 assert_contains "$RVSET" "permissions" "reviewer settings 내용 존재"
-assert_not_contains "$RVSET" "Write(" "reviewer 는 Write allow 없음 (격리 유지)"
+# 정상 산출물 경로 Write/Edit 은 허용 (review/ verdict·.review-cursor 커서).
+assert_contains "$RVSET" "Write($TMP_PROJ/.agent-harness/review/**)" "reviewer review/ verdict Write allow"
+assert_contains "$RVSET" "Edit($TMP_PROJ/.agent-harness/review/**)" "reviewer review/ verdict Edit allow"
+assert_contains "$RVSET" "Write($TMP_PROJ/.agent-harness/.review-cursor.*)" "reviewer .review-cursor Write allow"
+assert_contains "$RVSET" "Edit($TMP_PROJ/.agent-harness/.review-cursor.*)" "reviewer .review-cursor Edit allow"
+# 코드 경로 전체 Write(dev 와 동일한 {PROJ}/** 스코프)는 없어야 격리 유지 — reviewer 가 코드를 못 고침.
+assert_not_contains "$RVSET" "Write($TMP_PROJ/**)" "reviewer 는 코드 전체 Write allow 없음 (격리 유지)"
+assert_not_contains "$RVSET" "Edit($TMP_PROJ/**)" "reviewer 는 코드 전체 Edit allow 없음 (격리 유지)"
 
 # ── C2: 실제 게이트 동작 검증 (결함 B 회귀 가드) ──────────────────────────
 # 이전 버전은 템플릿 문자열에 Write(...) 가 있는지만 검사해 버그를 통과시켰다.

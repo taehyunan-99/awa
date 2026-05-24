@@ -3,7 +3,11 @@
     "allow": [
       "Read",
       "Grep",
-      "Glob"
+      "Glob",
+      "Write({{PROJECT_ROOT}}/.agent-harness/review/**)",
+      "Edit({{PROJECT_ROOT}}/.agent-harness/review/**)",
+      "Write({{PROJECT_ROOT}}/.agent-harness/.review-cursor.*)",
+      "Edit({{PROJECT_ROOT}}/.agent-harness/.review-cursor.*)"
     ]
   },
   "hooks": {
