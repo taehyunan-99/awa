@@ -30,10 +30,15 @@ else
   assert_eq "ok" "ok" "1차 roles/reviewer.md 삭제됨"
 fi
 
+# 9차: reviewer-common.md 런타임 단일출처 존재 (부트 합본 의존)
+[ -f "$ROOT/prompts/roles/reviewer-common.md" ]
+assert_success "$?" "reviewer-common.md 존재 (reviewer 부트 합본 의존)"
+
 # 9차: pm 역할 프롬프트 검증
 pm="$(cat "$ROOT/prompts/roles/pm.md")"
 assert_contains "$pm" "사용자" "pm 은 사용자 창구"
 assert_contains "$pm" "@pm:" "pm→lead 전달 prefix"
 assert_not_contains "$pm" "dispatch.sh" "pm 은 dispatch 안 함(lead 의 일)"
+assert_contains "$pm" "읽기 전용" "pm 은 읽기전용 규약 명시"
 
 test_summary

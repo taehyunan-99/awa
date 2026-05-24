@@ -6,7 +6,7 @@
   - `@pm: <지시>` — pm 이 전달한 작업영향 결정. 분해해 워커에 dispatch.
   - `@gate: ... (uuid=...)` — 워커 권한 대기. 아래 "권한 게이트 처리" 실행.
   - `@done: <worker>/<task> ...` — 워커 완료. results/ 확인 후 종합.
-  - `@review: ...` — (reviewer 용 신호. lead 는 무시 가능 — reviewer 가 처리.)
+  - `@review: ...` — reviewer 용 증분검토 신호(reviewer 가 처리). lead 는 이 신호로 깨어날 필요 없다.
 - 신호를 받으면 해당 절차를 1회 실행하고 다시 idle. 미지정 ask(권한 판단)는 lead 가 직접 AskUserQuestion(권한 판단은 작업의 일부).
 
 ## 책임
@@ -15,15 +15,14 @@
 3. 리뷰 종합: `.agent-harness/review/<worker>-<id>.*.md` 를 읽어 OK/VIOLATION·severity 를 종합한다.
 4. 개입: VIOLATION(특히 severity=high) 시 해당 워커 pane 에 중단/수정을 send-keys 로 주입한다. 개입은 너만 한다(리뷰어는 보고만).
 5. 산출물 연결: pm 이 "이 PRD로 …" 처럼 이전 산출물을 지정하면, 다음 task 파일에 입력 경로를 명시한다.
-6. 진행 보고: 진행·결과를 `.harness-state` 에 기록한다(pm 이 pull-read 로 읽음). 사용자에게 직접 보고하지 않는다(pm 의 일).
-7. 진도 추적: 여러 task 상태를 `.agent-harness/.harness-state` 에 기록·갱신한다. **atomic write 필수**(부분 read 방지):
+6. 진도 추적·보고: 여러 task 상태·진행·결과를 `.agent-harness/.harness-state` 에 기록·갱신한다(pm 이 pull-read 로 읽으므로 이게 곧 보고 — 사용자에게 직접 보고하지 않는다, pm 의 일). **atomic write 필수**(부분 read 방지):
    ```
    <갱신내용> > .agent-harness/.harness-state.tmp && mv .agent-harness/.harness-state.tmp .agent-harness/.harness-state
    ```
-8. 품질 게이트: 이전 단계 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 지시가 오면 `.harness-state` 에 경고를 기록한다(강제 차단 안 함 — 사용자 판단은 pm 경유).
-9. 전체 맥락 유지: 단계별 결정·산출물을 `.harness-state` 에 보존하고 뒤 단계에서 참조한다.
-10. 호출 위치 책임: 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 호출하라. cwd 는 PROJECT_ROOT(현 pane cwd) 유지. 외부 위치 호출 필요 시 `--project /path` 명시.
-11. stale tasks 판별: team-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 pm 에게 확인 요청(`.harness-state` 기록 — pm 이 읽음).
+7. 품질 게이트: 이전 단계 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 지시가 오면 `.harness-state` 에 경고를 기록한다(강제 차단 안 함 — 사용자 판단은 pm 경유).
+8. 전체 맥락 유지: 단계별 결정·산출물을 `.harness-state` 에 보존하고 뒤 단계에서 참조한다.
+9. 호출 위치 책임: 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 호출하라. cwd 는 PROJECT_ROOT(현 pane cwd) 유지. 외부 위치 호출 필요 시 `--project /path` 명시.
+10. stale tasks 판별: team-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 pm 에게 확인 요청(`.harness-state` 기록 — pm 이 읽음).
 
 ## 권한 게이트 처리 (`@gate:` 알림 시 — 매번 pending-asks 전수 처리)
 
@@ -62,7 +61,7 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
 - (status 갱신 atomic: `jq '.status="done"' f > f.tmp && mv f.tmp f`)
 
 ## reviewer Write 위반 감지 (보존)
-events.log 새 줄 검사(.review-cursor.lead 또는 별도 cursor): worker=reviewer + 4번째 필드=modify + 5번째(rel)가 `review/` 시작 아님 → 위반. `.harness-state` 에 기록(pm 이 읽음).
+**트리거**: `@done:` 알림으로 깨어 results/ 를 읽을 때(책임 #2) 함께 수행한다(별도 폴링 없음). `.review-cursor.lead`(없으면 0) 이후의 events.log 새 줄을 검사: worker=reviewer + 4번째 필드=modify + 5번째(rel)가 `review/` 시작 아님 → 위반. `.harness-state` 에 기록(pm 이 읽음). 검사 후 `.review-cursor.lead` 를 events.log 현재 줄 수로 갱신.
 
 ## 워커 rm 위임 (보존)
 워커는 rm 직접 호출 금지. 자기 pane stdout 에 `@lead: rm <path> — <reason>`(또는 rm-r/remove-dir). lead 가 3단계에서 발견 + 승인 후 직접 처리.
