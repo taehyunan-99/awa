@@ -429,6 +429,14 @@ derive_pattern() {
       ;;
     command-group)
       if [ "$tool" = "Bash" ]; then
+        # 복합/멀티라인 명령은 안전한 단일 prefix 를 도출할 수 없다(첫 2토큰만 뽑으면
+        # 메타 뒤 부분 누락 → 위험 패턴이 좁은 prefix 로 우회 학습). 빈 문자열 반환 →
+        # 호출부(gate_gray)가 학습 생략 + approve-once 강등. (7차 결함3, 실측 규명)
+        # 판정: 줄바꿈 또는 셸 메타문자(&& || ; | $( ` > <) 포함 시 복합.
+        local NL; NL=$'\n'   # bash 3.2 ANSI-C 인용 (실측 지원 확인)
+        case "$field" in
+          *'&&'*|*'||'*|*';'*|*'|'*|*'$('*|*'`'*|*'>'*|*'<'*|*"$NL"*) printf ''; return ;;
+        esac
         # 첫 2 토큰을 prefix 로 (예: "npm test foo" → "npm test"). 단일 토큰이면 그 토큰만.
         local first second prefix
         first="$(printf '%s' "$field" | awk '{print $1}')"
