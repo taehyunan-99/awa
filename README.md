@@ -84,7 +84,6 @@ SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
   | 신호 | 방향 | 발신 | 의미 |
   |---|---|---|---|
   | `@pm:` | pm → lead | pm 이 send-keys | 작업영향 결정 전달(새 작업·스펙변경·우선순위). lead 가 분해해 dispatch. |
-  | `@lead-ask:` | lead → pm | lead 가 send-keys | lead 가 막혀 pm 판단 요청(모호한 task·사용자 판단·단계전이). pm 이 사용자와 의논 후 `@pm:` 로 회신. |
   | `@lead:` | worker → lead | 워커 stdout 표기 | rm 위임(`@lead: rm <path> — <reason>`). lead 가 발견 후 승인·대행. |
   | `@gate:` | watcher → lead | watcher 가 send-keys | pending-asks 권한 대기. lead 가 전수 처리. |
   | `@done:` | watcher → lead | watcher 가 send-keys | 워커 완료(`@done: <worker>/<task>`). lead 가 results/ 확인·종합. |
@@ -124,11 +123,20 @@ bash tests/run-all.sh
 
 - 가동: `bin/team-up.sh feature-team` (워커 + review 윈도우 + 모델 차등)
 - 초회 가동 시 claude 가 폴더 신뢰를 1회 묻습니다 — team-up 이 자동 통과하나, 응답이 없으면 각 pane 에서 수동 Enter(트러스트 확인) 필요할 수 있습니다.
-- 단계 자동 전이 안 함 — 사용자가 pm 과 의논해 PRD→Arch→구현 단계를 수동 진행(pm→lead 전달)
+- 단계 자동 전이 안 함 — 사용자가 pm 과 의논해 PRD→Arch→구현 단계를 수동 진행(pm→lead 전달). 단, `--plan` 으로 확정 plan 을 주입해 가동하면 LEAD 가 그 plan 을 분해·배정 트리 출력 후 사용자 승인(AskUserQuestion)을 받아 실행 착수한다(plan 실행은 자동전이가 아님 — 11차).
 - 감시: watcher 가 events.log·pending-asks 를 폴링해 lead/reviewer 를 send-keys 로 깨움(약한 신호 scope 즉시 / 강한 신호 done 후 의미 판정)
 - 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`
 - 실측 프로브(claude 기동): `tests/probes/probe-{loop,hook}.sh` (수동)
 - 3차(PROJECT_ROOT 분리): 임의 프로젝트 작업·동시 가동 지원. 설계: `docs/superpowers/specs/2026-05-20-project-root-separation-design.md`
+
+## 확정 plan 자동주입 (11차)
+
+Phase0(계획)에서 만든 확정 plan 문서를 가동 시 LEAD 에 자동주입한다.
+
+- 가동: `bin/team-up.sh --project <repo> --plan PRD.md --plan ARCH.md feature-team` (`--plan` 반복 가능)
+- 여러 plan 파일은 `.agent-harness/.boot/plan.md` 단일 합본(고정 헤더 `# 확정 plan (이번 가동의 작업 계획)` + 파일별 `## <파일명>`)으로 cat 된 뒤, claude 분기에서 `--append-system-prompt-file` 로 LEAD 에 주입된다(send-keys 무관, 공식 보장 경로).
+- LEAD 는 고정 헤더로 plan 주입을 인지 → boot 직후 분해 → 배정 트리 출력 → AskUserQuestion 승인 게이트 → dispatch. plan 미주입(`--plan` 없음)이면 기존대로 `@pm:` 지시 대기(하위호환).
+- team-down 은 `--plan` 을 무시한다(team-up 과 인자 대칭).
 
 ## 권한 모델 (4차 P0)
 
@@ -140,7 +148,7 @@ bash tests/run-all.sh
 - **pm**: 읽기전용 — `Write`·`Edit`·`NotebookEdit` deny 로 코드 강제(사용자 창구, 파일 안 씀).
 - **lead**: 차단 없음 (조정자, `bypassPermissions`).
 
-> **게이트 판단 vs 작업영향 결정 — 창구 경계**: 워커의 회색 명령에 대한 *권한 게이트 판단*은 lead 가 직접 AskUserQuestion 으로 사용자에게 묻는다(즉시 판단 = 작업의 일부, watcher `@gate:` 로 깨워짐). 반면 *작업영향 결정*(새 작업·스펙변경·단계전이)은 pm 창구를 거친다(lead 가 막히면 `@lead-ask:` 로 pm 에 위임). 즉 "사용자 창구는 pm" 원칙은 작업 결정에 적용되며, 권한 게이트는 그 예외다.
+> **push-pull 창구 경계 (11차)**: PM 은 사용자 요청 전달 창구다(사용자가 pull). 단계 전이(PRD→Arch→구현 같은 *완료 단계에서 다음 단계로*)·스펙 변경 같은 "무엇을" 결정은 PM 창구를 거친다(사용자↔pm→`@pm:`→lead). 반면 LEAD 는 *작업 실행 판단*을 사용자에게 **직접 push(AskUserQuestion)** 한다 — 워커 회색 명령의 권한 게이트 판단(watcher `@gate:` 로 깨워짐), stale task·품질 게이트 진행 여부, 확정 plan 배정 트리 승인 등. 판단 불필요한 진도는 `.harness-state` 기록으로 조용히 보고(pm 이 pull-read). (9차의 `@lead-ask:` LEAD→PM 역방향 위임은 11차에 제거 — LEAD 가 막히면 PM 우회가 아니라 사용자에게 직접 push 한다.)
 
 ### 한계 (정직성)
 
