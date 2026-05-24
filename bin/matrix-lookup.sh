@@ -46,6 +46,19 @@ matrix_lookup() {
             prefix="${pinner% \*}"
             prefix_match "$prefix" "$field" && { printf '%s' "$pat"; return 0; }
             ;;
+          *'*'*)
+            # 결함 B: Edit/Write 의 file_path 스코프 glob (예: Write(/proj/**), Edit(/proj/*)).
+            # ':*'·' *'(Bash prefix glob)에 안 걸린 나머지 inner glob 을 경로 의미론으로 매칭.
+            # scope_match(lib.sh)에 위임: **→.* / *→[^/]* / .→\. + ^...$ 앵커 (DRY).
+            # ★ Edit|Write 한정: command 엔 '/' 가 흔해 Bash 의 중간 glob(예: Bash(git * main))을
+            #   경로 의미론(scope_match)으로 처리하면 오작동 → file_path 도구만 위임 (안전).
+            #   Bash 패턴은 거의 ':*'/' *' 형식이라 이 케이스 도달 전 위에서 잡힘.
+            case "$tool" in
+              Edit|Write)
+                scope_match "$field" "$pinner" && { printf '%s' "$pat"; return 0; }
+                ;;
+            esac
+            ;;
           *)
             [ "$field" = "$pinner" ] && { printf '%s' "$pat"; return 0; }
             ;;
