@@ -52,4 +52,21 @@ assert_fail "$?" "--project 값 누락 → 비-0 종료"
 bash "$ROOT/bin/team-up.sh" --project /nonexistent/path/xyz 2>/dev/null
 assert_fail "$?" "--project 경로 없음 → 비-0 종료"
 
+# 케이스 5: 등호형 --project=/path (분리형과 동등 동작)
+PROJ_C="$(mktemp -d)"; ( cd "$PROJ_C" && git init -q )
+SES_C="$(HARNESS_PROJECT="$PROJ_C" bash -c "source $ROOT/bin/lib.sh; resolve_session")"
+bash "$ROOT/bin/team-up.sh" "default" "--project=$PROJ_C" >/dev/null 2>&1
+sleep 0.8
+tmux has-session -t "$SES_C" 2>/dev/null
+assert_success "$?" "등호형 --project=/path: 세션 $SES_C 생성"
+[ -d "$PROJ_C/.agent-harness" ]
+assert_success "$?" "등호형 --project=/path: PROJ_C 에 .agent-harness"
+bash "$ROOT/bin/team-down.sh" "--project=$PROJ_C" >/dev/null 2>&1
+tmux kill-session -t "$SES_C" 2>/dev/null || true
+rm -rf "$PROJ_C"
+
+# 케이스 6: 알 수 없는 옵션(-*) → 즉시 거부 (오타 침묵 무시 방지)
+bash "$ROOT/bin/team-up.sh" --bogus-flag 2>/dev/null
+assert_fail "$?" "미지 옵션 --bogus-flag → 비-0 종료"
+
 test_summary

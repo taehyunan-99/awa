@@ -43,8 +43,10 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     grep -qxF "$uuid" "$SEEN" 2>/dev/null && continue
     pane_alive "$LEAD_PANE" || continue   # M2: 죽은 pane 이면 seen 마킹 보류(살아나면 재시도)
     printf '%s\n' "$uuid" >> "$SEEN"
-    tmux send-keys -t "$LEAD_PANE" -l "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리." 2>/dev/null && \
-      tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null || true
+    # -l 과 Enter 를 독립 실행: && 체이닝이면 -l 성공·Enter 실패 시 텍스트만 입력되고 미제출
+    # (half-sent) 되며 || true 가 그걸 삼킨다. set -e 없으니 분리해도 루프 안 죽음 (send_prompt 와 동형).
+    tmux send-keys -t "$LEAD_PANE" -l "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리." 2>/dev/null
+    tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
   done
 
   # 2) events.log 증가 → reviewer 깨움(디바운스) + done 라인이면 lead 도
@@ -55,8 +57,8 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     if [ "$((now - debounced_rev))" -ge "$REV_DEBOUNCE" ]; then
       for rp in $REVIEWER_PANES; do
         pane_alive "$rp" || continue
-        tmux send-keys -t "$rp" -l "@review: events.log 새 줄. 증분 검토." 2>/dev/null && \
-          tmux send-keys -t "$rp" Enter 2>/dev/null || true
+        tmux send-keys -t "$rp" -l "@review: events.log 새 줄. 증분 검토." 2>/dev/null
+        tmux send-keys -t "$rp" Enter 2>/dev/null
       done
       debounced_rev="$now"
     fi
@@ -66,8 +68,8 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       | while IFS= read -r wt; do
           [ -n "$wt" ] || continue
           pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@done: $wt 완료. results/ 확인 후 종합." 2>/dev/null && \
-            tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null || true
+          tmux send-keys -t "$LEAD_PANE" -l "@done: $wt 완료. results/ 확인 후 종합." 2>/dev/null
+          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
         done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
   fi

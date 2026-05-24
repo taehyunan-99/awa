@@ -111,12 +111,12 @@ bash tests/run-all.sh
 
 ## 에이전트 하네스 (2차)
 
-판단형 메인(프로젝트 관리자) + `/loop`·Monitor 상주 감시 리뷰어 + scope 사전차단 + 모델 차등.
+사용자 창구(pm) + 순수 오케스트레이터(lead) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등.
 
 - 가동: `bin/team-up.sh feature-team` (워커 + review 윈도우 + 모델 차등)
 - 초회 가동 시 claude 가 폴더 신뢰를 1회 묻습니다 — team-up 이 자동 통과하나, 응답이 없으면 각 pane 에서 수동 Enter(트러스트 확인) 필요할 수 있습니다.
-- 메인은 단계 자동 전이 안 함 — 사용자가 PRD→Arch→구현 단계를 수동 진행
-- 감시: 약한 신호(scope, 즉시) / 강한 신호(done 후 의미 판정)
+- 단계 자동 전이 안 함 — 사용자가 pm 과 의논해 PRD→Arch→구현 단계를 수동 진행(pm→lead 전달)
+- 감시: watcher 가 events.log·pending-asks 를 폴링해 lead/reviewer 를 send-keys 로 깨움(약한 신호 scope 즉시 / 강한 신호 done 후 의미 판정)
 - 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`
 - 실측 프로브(claude 기동): `tests/probes/probe-{loop,hook}.sh` (수동)
 - 3차(PROJECT_ROOT 분리): 임의 프로젝트 작업·동시 가동 지원. 설계: `docs/superpowers/specs/2026-05-20-project-root-separation-design.md`
