@@ -77,9 +77,18 @@ SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
 ## 통신 메커니즘
 
 - 명령 주입: `tmux send-keys -l` (텍스트/Enter 분리)
-- 완료 동기화: `tmux wait-for` (폴링 없는 블로킹, race-safe)
+- 완료 감지: watcher 데몬이 `events.log`·`pending-asks/` 를 폴링해 관련 pane 을 깨움(과거 `wait-for` 블로킹 대체).
 - 결과 전달: `<PROJECT_ROOT>/.agent-harness/results/<id>.md` 파일
 - 디버그: `tmux capture-pane -p`
+- **역할간 신호 프로토콜** — pane 에 주입되는 텍스트 prefix 로 발신자/의도를 구분(코드 파싱이 아닌 수신 에이전트가 해석):
+  | 신호 | 방향 | 발신 | 의미 |
+  |---|---|---|---|
+  | `@pm:` | pm → lead | pm 이 send-keys | 작업영향 결정 전달(새 작업·스펙변경·우선순위). lead 가 분해해 dispatch. |
+  | `@lead-ask:` | lead → pm | lead 가 send-keys | lead 가 막혀 pm 판단 요청(모호한 task·사용자 판단·단계전이). pm 이 사용자와 의논 후 `@pm:` 로 회신. |
+  | `@lead:` | worker → lead | 워커 stdout 표기 | rm 위임(`@lead: rm <path> — <reason>`). lead 가 발견 후 승인·대행. |
+  | `@gate:` | watcher → lead | watcher 가 send-keys | pending-asks 권한 대기. lead 가 전수 처리. |
+  | `@done:` | watcher → lead | watcher 가 send-keys | 워커 완료(`@done: <worker>/<task>`). lead 가 results/ 확인·종합. |
+  | `@review:` | watcher → reviewer | watcher 가 send-keys | events.log 증분 검토(디바운스). reviewer 가 1회 실행. |
 - 워커 식별: pane title=워커명 (team-up 이 split-window -P 의 pane_id 로 정확히 설정하고 `allow-set-title off` 로 셸 escape 로부터 보존)
 - 부트 프롬프트는 `{{HARNESS_ROOT}}` 토큰을 통해 도구 절대경로를 박는다. team-up 이 sed 치환으로 실제 경로로 변환. 워커는 항상 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 도구 호출.
 
