@@ -136,8 +136,11 @@ bash tests/run-all.sh
 
 - **dev**: `git push`, `rm` (절대경로 포함), `gh pr` 차단. `templates/settings.dev.json.tpl`.
 - **tester**: `rm` 만 차단.
-- **reviewer (quality)**: *prompt 단계 제약*. 기술적 차단 불가 (claude PreToolUse hook deny + acceptEdits 공존 시 무효 — probe 36). lead 가 `permission-events.log`·`events.log` 감시.
-- **lead**: 차단 없음 (조정자).
+- **reviewer (quality)**: `review/` 와 `.review-cursor.*` 에만 Write 허용(verdict·커서 기록), 그 외 Write 는 *prompt 단계 제약* + 게이트 회색(코드 수정 시 lead 감지). 기술적 완전차단 불가 (claude PreToolUse hook deny + acceptEdits 공존 시 무효 — probe 36). lead 가 `permission-gate.log`·`events.log` 감시.
+- **pm**: 읽기전용 — `Write`·`Edit`·`NotebookEdit` deny 로 코드 강제(사용자 창구, 파일 안 씀).
+- **lead**: 차단 없음 (조정자, `bypassPermissions`).
+
+> **게이트 판단 vs 작업영향 결정 — 창구 경계**: 워커의 회색 명령에 대한 *권한 게이트 판단*은 lead 가 직접 AskUserQuestion 으로 사용자에게 묻는다(즉시 판단 = 작업의 일부, watcher `@gate:` 로 깨워짐). 반면 *작업영향 결정*(새 작업·스펙변경·단계전이)은 pm 창구를 거친다(lead 가 막히면 `@lead-ask:` 로 pm 에 위임). 즉 "사용자 창구는 pm" 원칙은 작업 결정에 적용되며, 권한 게이트는 그 예외다.
 
 ### 한계 (정직성)
 
