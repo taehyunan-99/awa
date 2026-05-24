@@ -29,4 +29,23 @@ prefix_match "x" "";        assert_fail "$?" "P3 빈 field → 비매칭"
 prefix_match "a.b" "a.b c"; assert_success "$?" "P3 glob메타(.) 리터럴 매칭"
 prefix_match "a.b" "axb c"; assert_fail "$?" "P3 glob메타(.) 오매칭 안 함"
 
+echo "[P4] matrix_lookup 통합 (.boot-settings allow 단어경계)"
+# 임시 PROJECT_ROOT 에 .boot-settings/dev.json 을 깔고 matrix_lookup 호출.
+PT="$(mktemp -d)"
+mkdir -p "$PT/.agent-harness/.boot-settings"
+cat > "$PT/.agent-harness/.boot-settings/dev.json" <<'JSON'
+{"permissions":{"allow":["Bash(git add:*)","Bash(echo *)"]}}
+JSON
+export PROJECT_ROOT="$PT"
+out="$(matrix_lookup dev Bash '{"command":"git add ."}')"
+assert_eq "Bash(git add:*)" "$out" "P4 :* git add . 통과"
+matrix_lookup dev Bash '{"command":"git addfoo x"}' >/dev/null
+assert_fail "$?" "P4 :* git addfoo 차단(단어경계)"
+out="$(matrix_lookup dev Bash '{"command":"echo hi"}')"
+assert_eq "Bash(echo *)" "$out" "P4 space-glob echo hi 통과"
+matrix_lookup dev Bash '{"command":"echofoo"}' >/dev/null
+assert_fail "$?" "P4 space-glob echofoo 차단(단어경계)"
+rm -rf "$PT"
+unset PROJECT_ROOT
+
 test_summary

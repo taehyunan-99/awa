@@ -39,16 +39,12 @@ matrix_lookup() {
         case "$pinner" in
           *':*')
             prefix="${pinner%:\*}"
-            case "$field" in
-              "$prefix"*) printf '%s' "$pat"; return 0 ;;
-            esac
+            prefix_match "$prefix" "$field" && { printf '%s' "$pat"; return 0; }
             ;;
           *' *')
             # space-glob 형식 (4차 P0 컨벤션): prefix 뒤 공백+*
             prefix="${pinner% \*}"
-            case "$field" in
-              "$prefix"*) printf '%s' "$pat"; return 0 ;;
-            esac
+            prefix_match "$prefix" "$field" && { printf '%s' "$pat"; return 0; }
             ;;
           *)
             [ "$field" = "$pinner" ] && { printf '%s' "$pat"; return 0; }
