@@ -45,8 +45,4 @@ unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT
 
 rm -rf "$PA_PARENT" "$PB_PARENT"
 
-# T9.bis — wait-worker.sh 의 CHANNEL 정의가 SESSION 포함하는지 정적 검증
-grep -q 'CHANNEL="done-\$SESSION-\$WORKER-\$TASK_ID"' "$ROOT/bin/wait-worker.sh"
-assert_success "$?" "wait-worker CHANNEL SESSION prefix 포함"
-
 test_summary

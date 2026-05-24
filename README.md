@@ -35,8 +35,8 @@ echo "# T1: 로그인 버그 수정" > ~/work/projectA/.agent-harness/tasks/T1.m
 ~/.../bin/dispatch.sh dev T1
 # 외부 셸에서:  ~/.../bin/dispatch.sh --project ~/work/projectA dev T1
 
-# 4) 완료 대기
-~/.../bin/wait-worker.sh dev T1 300
+# 4) 완료는 watcher(셸 데몬)가 감지해 lead 를 깨운다 — 수동 대기 불필요.
+#    진행상황은 events.log / results/ 를 읽어 확인.
 
 # 5) 결과 확인
 cat ~/work/projectA/.agent-harness/results/T1.md

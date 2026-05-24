@@ -103,7 +103,7 @@ fix_session_indexing() {
 }
 
 # 세션 로컬로 pane title 자동 리네임 비활성화. 전역 ~/.tmux.conf 불변.
-# spec §6: dispatch/wait-worker 가 pane title=워커명으로 워커를 조회하므로,
+# spec §6: dispatch 가 pane title=워커명으로 워커를 조회하므로,
 # 워커 셸의 OSC title escape 가 select-pane -T 로 지정한 title 을
 # 덮어쓰지 못하도록 세션 로컬로 고정한다.
 #
