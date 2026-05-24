@@ -138,6 +138,7 @@ generate_worker_settings() {
     tester) tpl_name="test" ;;
     reviewer-*) tpl_name="reviewer" ;;
     lead|LEAD) tpl_name="lead" ;;
+    pm|PM) tpl_name="pm" ;;
     *) tpl_name="default" ;;
   esac
   local tpl="$HARNESS_ROOT/templates/settings.${tpl_name}.json.tpl"
