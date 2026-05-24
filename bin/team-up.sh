@@ -349,7 +349,6 @@ bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label
   return 0
 }
 
-
 # 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입.
 # 타겟은 split 단계에서 캡처한 pane_id (index 재배열 면역).
 # 워커 boot 는 1차 그대로: _common.md + roles/<역할>.md + {{WORKER_NAME}} 치환.
