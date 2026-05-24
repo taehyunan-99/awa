@@ -15,6 +15,9 @@ read-only:
   - "Bash(wc:*)"
   - "Bash(file:*)"
   - "Bash(stat:*)"
+  - "Bash(diff:*)"
+  - "Bash(which:*)"
+  - "Bash(echo:*)"
   - "Read"
   - "Glob"
   - "Grep"
@@ -44,3 +47,15 @@ dev-deps:
   - "Bash(npm ci:*)"
   - "Bash(pip install -r:*)"
   - "Bash(cargo fetch:*)"
+safe-fs:
+  # 안전한 파일시스템 생성. rm 류는 danger-check(rm-recursive)·워커 deny 가 차단.
+  # chmod 는 +x 만 — chmod 777/o+w 는 danger-check(chmod-world)가 잡음.
+  - "Bash(mkdir:*)"
+  - "Bash(touch:*)"
+  - "Bash(chmod +x:*)"
+git-write:
+  # 로컬 git 쓰기 (add/commit 만). push/force/reset --hard/clean -f 는 danger·deny 차단.
+  # checkout/switch 는 git checkout -- file/. 가 작업 파괴(데이터손실)라 의도적 제외 →
+  # 회색으로 두어 사람이 1회 인지.
+  - "Bash(git add:*)"
+  - "Bash(git commit:*)"
