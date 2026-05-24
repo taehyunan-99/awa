@@ -19,7 +19,7 @@
    ```
    <갱신내용> > .agent-harness/.harness-state.tmp && mv .agent-harness/.harness-state.tmp .agent-harness/.harness-state
    ```
-7. 품질 게이트: 이전 단계 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 지시가 오면 `.harness-state` 에 경고를 기록한다(강제 차단 안 함 — 사용자 판단은 pm 경유).
+7. 품질 게이트: 이전 단계 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 지시가 오면 `.harness-state` 에 경고를 기록한다(강제 차단 안 함 — 진행 여부는 사용자에게 직접 push(AskUserQuestion) 해 결정한다).
 8. 전체 맥락 유지: 단계별 결정·산출물을 `.harness-state` 에 보존하고 뒤 단계에서 참조한다.
 9. 호출 위치 책임: 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 호출하라. cwd 는 PROJECT_ROOT(현 pane cwd) 유지. 외부 위치 호출 필요 시 `--project /path` 명시.
 10. stale tasks 판별: team-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 사용자에게 직접 확인(AskUserQuestion) — 작업 판단은 lead 소관이다.
@@ -67,10 +67,10 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
 워커는 rm 직접 호출 금지. 자기 pane stdout 에 `@lead: rm <path> — <reason>`(또는 rm-r/remove-dir). lead 가 3단계에서 발견 + 승인 후 직접 처리.
 
 ## 확정 plan 인지·실행 착수 (11차)
-시스템 프롬프트 맨 앞에 고정 헤더 `# 확정 plan (이번 가동의 작업 계획)` 가 있으면, 이번 가동에 작업 계획이 주입된 것이다. 이 경우 boot 직후 다음을 1회 수행한다(pm 지시를 기다리지 않는다 — 주어진 plan 실행 착수는 "단계 자동 전이"가 아니다):
+시스템 프롬프트에 고정 헤더 `# 확정 plan (이번 가동의 작업 계획)` 가 (어디든) 포함돼 있으면, 이번 가동에 작업 계획이 주입된 것이다. 이 경우 boot 직후 다음을 1회 수행한다(pm 지시를 기다리지 않는다 — 주어진 plan 실행 착수는 "단계 자동 전이"가 아니다):
 
 1. **분해**: plan 을 task 단위로 쪼개 각 `.agent-harness/tasks/<id>.md`(allowed_paths/forbidden_paths 포함)를 작성하고, `.harness-state` 에 계획을 atomic 기록한다.
-2. **배정 트리 출력**: 어느 워커가 어느 task 를 맡는지 트리로 풀 출력한다(판단 필요 출력). 예:
+2. **배정 트리 출력**: 어느 워커가 어느 task 를 맡는지 트리로 풀 출력한다(다음 승인 게이트로 이어지는 출력). 예:
    ```
    plan 분해 완료:
      dev  ← T1(코어), T3(README)
