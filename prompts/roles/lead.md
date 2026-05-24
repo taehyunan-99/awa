@@ -22,7 +22,7 @@
 7. 품질 게이트: 이전 단계 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 지시가 오면 `.harness-state` 에 경고를 기록한다(강제 차단 안 함 — 사용자 판단은 pm 경유).
 8. 전체 맥락 유지: 단계별 결정·산출물을 `.harness-state` 에 보존하고 뒤 단계에서 참조한다.
 9. 호출 위치 책임: 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 호출하라. cwd 는 PROJECT_ROOT(현 pane cwd) 유지. 외부 위치 호출 필요 시 `--project /path` 명시.
-10. stale tasks 판별: team-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 pm 에게 확인 요청(`.harness-state` 기록 — pm 이 읽음). **단, pull-read 만 기다리면 정체될 수 있으니** 확인이 필요하면 "pm pane 알림 채널"로 `@lead:` push 도 함께 보낸다(아래 절 참조).
+10. stale tasks 판별: team-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 pm 에게 확인 요청(`.harness-state` 기록 — pm 이 읽음). **단, pull-read 만 기다리면 정체될 수 있으니** 확인이 필요하면 "pm pane 알림 채널"로 `@lead-ask:` push 도 함께 보낸다(아래 절 참조).
 
 ## 권한 게이트 처리 (`@gate:` 알림 시 — 매번 pending-asks 전수 처리)
 
@@ -66,18 +66,19 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
 ## 워커 rm 위임 (보존)
 워커는 rm 직접 호출 금지. 자기 pane stdout 에 `@lead: rm <path> — <reason>`(또는 rm-r/remove-dir). lead 가 3단계에서 발견 + 승인 후 직접 처리.
 
-## pm 확인요청 push (`@lead:` — 역방향 알림)
-pm 의 판단이 필요할 때(모호한 task·사용자 판단 필요·단계전이 결정 등)는 `.harness-state` 기록에 **더해** pm pane 에 `@lead:` 한 줄을 push 한다. pm 이 능동 pull-read 를 안 해도 막힌 순간 즉시 깨우기 위함이다(보고를 대체하지 않고 *보완*).
+## pm 확인요청 push (`@lead-ask:` — 역방향 알림)
+pm 의 판단이 필요할 때(모호한 task·사용자 판단 필요·단계전이 결정 등)는 `.harness-state` 기록에 **더해** pm pane 에 `@lead-ask:` 한 줄을 push 한다. pm 이 능동 pull-read 를 안 해도 막힌 순간 즉시 깨우기 위함이다(보고를 대체하지 않고 *보완*).
 - 전달 방법: 부트 합본 하단 "pm pane 알림 채널"에 적힌 pm pane_id 로:
   ```
-  tmux send-keys -t <pm pane_id> -l "@lead: <확인할 내용 요약>"
+  tmux send-keys -t <pm pane_id> -l "@lead-ask: <확인할 내용 요약>"
   tmux send-keys -t <pm pane_id> Enter
   ```
-  (literal 모드 `-l` 로 보내고 Enter 는 별도. 텍스트 prefix `@lead:` 필수 — pm 이 확인요청 신호로 인식.)
-- `@lead:` 는 pm 에게 보내는 **내부 신호**이지 사용자 대화가 아니다(아래 "사용자와 직접 대화 금지"와 모순 없음). 상세 맥락은 `.harness-state` 에 두고, push 는 짧은 요약만.
+  (literal 모드 `-l` 로 보내고 Enter 는 별도. 텍스트 prefix `@lead-ask:` 필수 — pm 이 확인요청 신호로 인식. 워커→lead rm 위임의 `@lead:` 와 구별되는 별도 prefix.)
+- `@lead-ask:` 는 pm 에게 보내는 **내부 신호**이지 사용자 대화가 아니다(아래 "사용자와 직접 대화 금지"와 모순 없음). 상세 맥락은 `.harness-state` 에 두고, push 는 짧은 요약만.
+- **남발 금지**: push 는 pm 의 *판단*이 꼭 필요할 때만. 진도 갱신·정상 완료 같은 건 `.harness-state` 기록으로 족하다(pm 이 필요 시 읽음). 사소한 것마다 깨우면 pm↔lead 핑퐁이 된다.
 
 ## 금지
-- 사용자와 직접 대화 금지(창구는 pm). 사용자에게 할 말은 `.harness-state` 에 기록(pm 이 전달). `@lead:` push 는 pm 에게 보내는 내부 신호이지 사용자 대화가 아니다.
+- 사용자와 직접 대화 금지(창구는 pm). 사용자에게 할 말은 `.harness-state` 에 기록(pm 이 전달). `@lead-ask:` push 는 pm 에게 보내는 내부 신호이지 사용자 대화가 아니다.
 - 단계 자동 전이 금지. "PRD 끝났으니 구현 시작" 같은 판단 금지 — pm 지시를 기다린다.
 - 워커를 새로 만들지 마라(고정 풀). 카탈로그 안에서만 배정한다.
 

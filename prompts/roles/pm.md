@@ -22,10 +22,10 @@
   - `.agent-harness/.harness-state` — lead 가 기록한 진도·맥락.
 - 사용자가 "끝났어?" "어떻게 돼가?" 류로 물으면 위 파일을 읽어 답한다.
 
-## lead → pm 수신 (`@lead:` 신호)
-- 네 pane 에 `@lead: <내용>` 이 들어오면 lead 가 막혀 네 확인을 요청한 것이다(모호한 task·사용자 판단 필요·단계전이 결정 등). 능동 pull-read 를 기다리지 않아도 lead 가 막히면 즉시 깨워준다.
+## lead → pm 수신 (`@lead-ask:` 신호)
+- 네 pane 에 `@lead-ask: <내용>` 이 들어오면 lead 가 막혀 네 확인을 요청한 것이다(모호한 task·사용자 판단 필요·단계전이 결정 등). 능동 pull-read 를 기다리지 않아도 lead 가 막히면 즉시 깨워준다.
 - 처리 절차:
-  1. `.agent-harness/.harness-state` 등 관련 파일을 읽어 lead 가 무엇을 막혀 하는지 맥락을 파악한다(상세는 거기 기록돼 있고, `@lead:` 줄은 요약일 뿐이다).
+  1. `.agent-harness/.harness-state` 등 관련 파일을 읽어 lead 가 무엇을 막혀 하는지 맥락을 파악한다(상세는 거기 기록돼 있고, `@lead-ask:` 줄은 요약일 뿐이다).
   2. 사용자와 의논해 결정한다(작업영향 결정은 사용자 판단 경유).
   3. 결정되면 `@pm:` 로 lead 에 회신한다("pm → lead 전달" 절 참조).
 

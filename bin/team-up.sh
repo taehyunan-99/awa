@@ -400,9 +400,10 @@ done
 obf="$(boot_file LEAD)"
 { cat "$PROMPTS_DIR/roles/lead.md" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"
-  # pm→lead(@pm:)와 대칭인 역방향 채널. lead 가 pm 확인 필요 시 이 pane_id 로 @lead: 한 줄 push.
+  # pm→lead(@pm:)와 대칭인 역방향 채널. lead 가 pm 확인 필요 시 이 pane_id 로 @lead-ask: 한 줄 push.
+  # (워커→lead rm 위임의 @lead: 와 구별되는 별도 prefix — prefix 과부하 방지.)
   # PM_PID 는 221줄에서 이미 캡처됨. pane_id(%N)는 토큰 패턴({{...}})이 아니라 잔존검증 무관.
-  printf '\n## pm pane 알림 채널\n- pm pane_id: %s — lead→pm 확인요청은 `tmux send-keys -t %s -l "@lead: <확인할 내용>"` 후 Enter.\n' "$PM_PID" "$PM_PID"; } > "$obf"
+  printf '\n## pm pane 알림 채널\n- pm pane_id: %s — lead→pm 확인요청은 `tmux send-keys -t %s -l "@lead-ask: <확인할 내용>"` 후 Enter.\n' "$PM_PID" "$PM_PID"; } > "$obf"
 # lead boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
 sed -e "s#{{SESSION}}#$SESSION#g" \
