@@ -24,7 +24,7 @@ while [ $# -gt 0 ]; do
     --project=*)
       if ! HARNESS_PROJECT="$(_normalize_project_arg "${1#--project=}")"; then exit 1; fi
       export HARNESS_PROJECT; shift ;;
-    --plan)  shift 2 ;;
+    --plan) shift; [ $# -gt 0 ] && shift || true ;;
     --plan=*) shift ;;
     -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
     *) shift ;;

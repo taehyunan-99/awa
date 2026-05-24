@@ -75,4 +75,10 @@ sleep 0.8
 bash "$ROOT/bin/team-down.sh" --project "$PROJ" --plan "$PLAN_A" >/dev/null 2>&1
 assert_success "$?" "team-down --plan: 미지옵션 오류 없이 무시 (대칭)"
 
+# 케이스 8: team-down --plan 값 누락(team-up 인자 실수 복붙) → set -e 사망 없이 정상 정리.
+bash "$ROOT/bin/team-up.sh" --project "$PROJ" --plan "$PLAN_A" default >/dev/null 2>&1
+sleep 0.8
+bash "$ROOT/bin/team-down.sh" --project "$PROJ" --plan >/dev/null 2>&1
+assert_success "$?" "team-down --plan 값누락: set -e 사망 없이 무시 (대칭)"
+
 test_summary
