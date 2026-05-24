@@ -30,7 +30,7 @@ assert_eq "0" "$?" "E2E dispatch 성공"
 
 # 9차: 블로킹 done 대기 제거(watcher 데몬 대체). dummy-worker 의 wait-for -S 신호를
 # 직접 받아 결과파일 쓰기 완료를 동기 확인(sleep 추측 대신 신호 동기).
-SESSION_OVERRIDE="$SESSION_OVERRIDE" tmux wait-for "done-${SESSION_OVERRIDE}-dev-E1" 2>/dev/null || sleep 1
+tmux wait-for "done-${SESSION_OVERRIDE}-dev-E1" 2>/dev/null || sleep 1
 
 [ -f "$TMP_PROJ/.agent-harness/results/E1.md" ]; assert_eq "0" "$?" "결과 파일 생성됨"
 RES="$(cat "$TMP_PROJ/.agent-harness/results/E1.md")"
