@@ -28,9 +28,9 @@ assert_eq "0" "$rc" "team-up default 성공 종료"
 tmux has-session -t "$SESSION_OVERRIDE" 2>/dev/null
 assert_eq "0" "$?" "세션 생성됨"
 
-# 페인 3개 (lead1 + 워커2 — reviewer 워커 제거·일원화)
+# 9차: 페인 5개 (lead1 + pm + watcher + 워커2 — pm/watcher pane 추가)
 N="$(tmux list-panes -t "$SESSION_OVERRIDE:0" | wc -l | tr -d ' ')"
-assert_eq "3" "$N" "페인 3개"
+assert_eq "5" "$N" "페인 5개 (lead+pm+watcher+워커2)"
 
 # 워커 title 결정적 검증: split-window -P 로 캡처한 pane_id 로 title 설정하므로
 # select-layout 의 index 재배열과 무관하게 dev/test 가 정확히 걸려야 하고,
@@ -38,6 +38,9 @@ assert_eq "3" "$N" "페인 3개"
 TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{pane_title}' | sort | tr '\n' ',')"
 assert_contains "$TITLES" "dev" "워커 title dev 설정됨(layout 무관, pane_id 기반)"
 assert_contains "$TITLES" "test" "워커 title test 설정됨"
+# 9차: pm·watcher pane title
+assert_contains "$TITLES" "PM" "pm pane title 설정됨"
+assert_contains "$TITLES" "watcher" "watcher pane title 설정됨"
 assert_contains "$TITLES" "LEAD" "lead title 설정됨"
 
 # title 보존 결정적 검증: 워커 페인을 실제 셸로 띄워 OSC0 escape 를 흘려도
