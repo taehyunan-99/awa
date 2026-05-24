@@ -30,7 +30,10 @@ RVOUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
   source '"$ROOT"'/bin/lib.sh
   generate_worker_settings reviewer-quality quality-rev
 ')"
+assert_success "$?" "reviewer settings 생성"
 RVSET="$(cat "$RVOUT")"
+# RVSET 이 비어있지 않아야 assert_not_contains 가 의미를 가짐 (빈 문자열 거짓양성 방지)
+assert_contains "$RVSET" "permissions" "reviewer settings 내용 존재"
 assert_not_contains "$RVSET" "Write(" "reviewer 는 Write allow 없음 (격리 유지)"
 
 test_summary
