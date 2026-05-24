@@ -76,6 +76,9 @@ grep -q "lead pane_id:" "$PROJ/.agent-harness/.boot/PM.md" 2>/dev/null \
 # 4) boot 합본 토큰 치환
 has "$PROJ/.agent-harness/.boot/dev.md" "워커 dev boot 합본"
 has "$PROJ/.agent-harness/.boot/LEAD.md" "LEAD boot 합본"
+# 역방향 채널(@lead:): LEAD boot 에 pm pane 알림 채널 주입 (PM boot 의 lead 채널과 대칭)
+grep -q "pm pane_id:" "$PROJ/.agent-harness/.boot/LEAD.md" 2>/dev/null \
+  && chk yes yes "LEAD boot 에 pm 채널" || chk yes no "LEAD pm 채널"
 if [ -f "$PROJ/.agent-harness/.boot/dev.md" ]; then
   grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$PROJ/.agent-harness/.boot/dev.md" \
     && chk no yes "dev boot 토큰 잔존(실패)" || chk yes yes "dev boot 토큰 전부 치환"
