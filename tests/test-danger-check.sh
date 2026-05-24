@@ -66,6 +66,11 @@ assert_eq "sensitive-write" "$(dc "echo x > '/etc/sudoers'")" "D6 홑따옴표 �
 assert_eq "sensitive-write" "$(dc 'touch "/Users/x/.ssh/authorized_keys"')" "D6 따옴표 touch 인자"
 assert_eq "sensitive-write" "$(dc 'echo x >    /etc/sudoers')" "D6 공백 다수"
 assert_eq "sensitive-write" "$(dc 'echo x>/etc/sudoers')" "D6 공백 없음"
+# >| (noclobber 강제 덮어쓰기) 우회 차단 — 한 글자 추가로 가드 우회되던 구멍.
+assert_eq "sensitive-write" "$(dc 'echo x >| /etc/sudoers')" "D6 >| clobber 시스템"
+assert_eq "sensitive-write" "$(dc 'cat key >| ~/.ssh/authorized_keys')" "D6 >| clobber ssh"
+assert_eq "sensitive-write" "$(dc 'echo S=1 >| .env')" "D6 >| clobber .env"
+assert_eq "sensitive-write" "$(dc 'echo x >|/etc/sudoers')" "D6 >| 붙임"
 
 echo "[D7] ★ 오탐 금지: 정상 명령은 SAFE (gray 핑퐁 회귀 방지)"
 assert_eq "SAFE" "$(dc 'echo hello')" "D7 echo hello"
@@ -79,6 +84,8 @@ assert_eq "SAFE" "$(dc 'echo x > .envrc')" "D7 .envrc (.env 아님)"
 assert_eq "SAFE" "$(dc 'touch .github/workflows/ci.yml')" "D7 .github"
 assert_eq "SAFE" "$(dc 'cp a.txt b.txt')" "D7 cp 일반"
 assert_eq "SAFE" "$(dc 'mv old.js new.js')" "D7 mv 일반"
+assert_eq "SAFE" "$(dc 'echo x >| out.txt')" "D7 >| 일반 파일 (정상 clobber)"
+assert_eq "SAFE" "$(dc 'cat hosts | grep /etc/hosts')" "D7 파이프+텍스트 /etc"
 
 echo "[D8] ★ 오탐 금지: 텍스트 안 민감경로는 SAFE (커밋메시지·따옴표 리터럴)"
 assert_eq "SAFE" "$(dc 'git commit -m "add .env support"')" "D8 커밋 메시지 .env"

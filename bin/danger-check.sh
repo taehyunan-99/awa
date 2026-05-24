@@ -51,11 +51,12 @@ danger_check() {
     #   회피 한계(변수치환 $P·따옴표분할 /et"c"/)는 셸 AST 미재구현 → 워커 deny + claude 권한모델이 다층 방어.
     # SENS_PATH: 절대 시스템 경로 + 홈 dotdir(.ssh/.aws/.gnupg) + 홈 dotfile(.bashrc 등).
     local SENS_PATH='(/etc/|/System/|/private/etc/|/usr/(bin|lib|sbin)/|(~|/(home|Users|root)/[^[:space:]]*)/\.(ssh|aws|gnupg)/|(~|/(home|Users|root)/[^[:space:]]*)/\.(bash(rc|_profile|_login|_logout)|zshrc|zprofile|profile|netrc|pgpass))'
-    # 가드1: 리다이렉트(> >>) 직후 (선택적 따옴표) 민감 경로.
-    re=">>?[[:space:]]*['\"]?${SENS_PATH}"
+    # 가드1: 리다이렉트(> >> >|) 직후 (선택적 따옴표) 민감 경로.
+    #   >| 는 noclobber 강제 덮어쓰기 표준 형식 — 한 글자 추가로 가드 우회되던 구멍(실측) → \|? 로 흡수.
+    re=">>?\|?[[:space:]]*['\"]?${SENS_PATH}"
     [[ "$cmd" =~ $re ]] && { echo sensitive-write; return 0; }
     # 가드2: 리다이렉트 직후 .env/.credentials 파일 (경로 세그먼트 끝).
-    re=">>?[[:space:]]*['\"]?([^[:space:]'\"]*/)?(\.env|\.credentials)(['\"[:space:]]|$|;|&|\|)"
+    re=">>?\|?[[:space:]]*['\"]?([^[:space:]'\"]*/)?(\.env|\.credentials)(['\"[:space:]]|$|;|&|\|)"
     [[ "$cmd" =~ $re ]] && { echo sensitive-write; return 0; }
     # 가드3: 파일 변형 명령(touch/chmod/cp/mv/ln/tee/install) 인자에 민감 경로.
     re="(^|[^a-zA-Z0-9_])(touch|chmod|cp|mv|ln|tee|install)([[:space:]]+[^[:space:];&|]*)*[[:space:]]+['\"]?[^[:space:]'\"]*${SENS_PATH}"
