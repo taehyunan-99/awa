@@ -338,6 +338,20 @@ timestamp() {
   date +%s
 }
 
+# claude 의 Bash(prefix:*) 단어경계 의미론과 일치하는 prefix 매칭 (공식문서+probe 실측 확정,
+# 8차). field 가 prefix 로 시작하고 prefix 직후가 (a)문자열 끝 또는 (b)공백일 때만 매칭.
+# bash 3.2: case glob, "$prefix" 따옴표가 prefix 내 glob 메타(.·*)를 리터럴 처리(실측).
+# $1=prefix $2=field → exit 0(매칭) | 1(비매칭)
+prefix_match() {
+  local prefix="$1" field="$2"
+  [ -n "$prefix" ] || return 1            # 빈 prefix → 비매칭(전체매칭 폭주 방어)
+  [ "$field" = "$prefix" ] && return 0    # 정확 일치(끝 경계)
+  case "$field" in
+    "$prefix "*) return 0 ;;              # prefix + 공백 경계
+  esac
+  return 1
+}
+
 # 로그 한 줄을 최대 400 byte (이하) 로 truncate + append (SIGPIPE 가드).
 # 파일 줄 최대 = 400 byte 데이터 + newline 1 byte = 401 byte.
 # 한글 1자=3byte 고려. ${#line} 은 문자 수라 byte 와 다름 → head -c 로 byte 단위.
