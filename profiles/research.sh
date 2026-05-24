@@ -7,3 +7,4 @@ WORKERS=(
 )
 REVIEWERS=("quality-rev:reviewer-quality:haiku")
 LEAD_MODEL="opus"
+PM_MODEL="sonnet"

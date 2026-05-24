@@ -6,3 +6,4 @@ WORKERS=(
 )
 REVIEWERS=("spec-rev:reviewer-spec:sonnet" "quality-rev:reviewer-quality:haiku" "arch-rev:reviewer-arch:opus")
 LEAD_MODEL="opus"
+PM_MODEL="sonnet"

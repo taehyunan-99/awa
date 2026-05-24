@@ -217,6 +217,10 @@ fix_session_titles "$SESSION"
 LEAD_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
 tmux select-pane -t "$LEAD_PID" -T "LEAD"
 
+# pm pane: 윈도우0 에 lead 옆으로 split (사용자 창구). pane_id 캡처(layout 면역).
+PM_PID="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+tmux select-pane -t "$PM_PID" -T "PM"
+
 # 워커 페인 분할.
 # split-window -P -F '#{pane_id}' 로 새 페인의 영속 pane_id(%N) 를 즉시 캡처.
 # pane_id 는 select-layout 의 pane index 재배열에도 불변이므로,
@@ -345,14 +349,6 @@ bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label
   return 0
 }
 
-# /loop 주입 헬퍼: 프롬프트 파일이 있을 때만 (T10 전이면 no-op).
-inject_loop() {  # $1=pane_id(또는 target) $2=loop프롬프트파일
-  local pid="$1" pf="$2"
-  [ -f "$pf" ] || return 0
-  tmux send-keys -t "$pid" -l "/loop $(tr '\n' ' ' < "$pf")"
-  sleep 1
-  tmux send-keys -t "$pid" Enter
-}
 
 # 워커별 부트스트랩 합본 생성 + 치환, claude 실행, boot 읽기 지시 주입.
 # 타겟은 split 단계에서 캡처한 pane_id (index 재배열 면역).
@@ -429,7 +425,32 @@ if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
 fi
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-inject_loop "$LEAD_PID" "$PROMPTS_DIR/loop/lead.md"
+
+# pm 부트: roles/pm.md 합본 + pm 템플릿 settings. 사용자 창구.
+pbf="$(boot_file PM)"
+{ cat "$PROMPTS_DIR/roles/pm.md" 2>/dev/null || true
+  printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"
+  printf '\n## lead pane 전달 채널\n- lead pane_id: %s — pm→lead 지시는 `tmux send-keys -t %s -l "@pm: <지시>"` 후 Enter.\n' "$LEAD_PID" "$LEAD_PID"; } > "$pbf"
+_tmp_pbf="$pbf.tmp"
+sed -e "s#{{SESSION}}#$SESSION#g" \
+    -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
+    "$pbf" > "$_tmp_pbf" && mv "$_tmp_pbf" "$pbf"
+if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$pbf"; then
+  echo "오류: $pbf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$pbf" | sort -u | tr '\n' ' ')" >&2
+  exit 1
+fi
+pm_cmd="$(agent_cmd_for "${PM_MODEL:-sonnet}")"
+settings_path=""
+if ! settings_path="$(generate_worker_settings "pm" "PM")"; then
+  echo "오류: PM settings 생성 실패 — 부트 중단" >&2
+  exit 1
+fi
+pm_sid="$(uuidgen | tr 'A-Z' 'a-z')"
+if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
+  pm_cmd="$pm_cmd --settings \"$settings_path\" --session-id $pm_sid"
+fi
+bootstrap_pane "$PM_PID" "PM" "$pm_cmd" "PM"
+send_prompt "$PM_PID" "$pbf 를 읽고 그 규약을 그대로 따르라. 사용자와 대화할 준비를 하라."
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
@@ -464,10 +485,25 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     fi
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
-    inject_loop "$rtgt" "$PROMPTS_DIR/loop/reviewer.md"
     j=$((j + 1))
   done
 fi
+
+# watcher 데몬 기동 (9차). 윈도우0 에 셸 pane 으로 split — 세션 kill 시 자동 사망.
+# lead/reviewer pane_id + state 경로를 env 로 주입(index 재배열 면역).
+# AGENT_CMD=cat 더미 모드에서도 watcher 는 실셸로 기동 (감시 로직 검증 가능).
+WATCHER_PANE="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+tmux select-pane -t "$WATCHER_PANE" -T "watcher"
+# reviewer pane_id 목록 (공백구분). 리뷰어 없으면 빈 문자열(set -u 안전 — watcher 가드).
+_rev_panes=""
+if [ "${#REV_PIDS[@]}" -gt 0 ]; then
+  _rev_panes="${REV_PIDS[*]}"
+fi
+# 윈도우0 레이아웃 재적용 (watcher pane 추가분 반영).
+tmux select-layout -t "$SESSION:0" "$LAYOUT"
+# watcher 기동: pane 에 env 세팅 후 watcher.sh 실행 명령 주입.
+tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
+tmux send-keys -t "$WATCHER_PANE" Enter
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
 echo "attach: tmux attach -t $SESSION"
