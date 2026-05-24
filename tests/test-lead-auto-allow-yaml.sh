@@ -55,6 +55,8 @@ out="$(lead_auto_allow_lookup Bash '{"command":"diff -u a b"}')"
 assert_eq "read-only:Bash(diff:*)" "$out" "Y10 diff → read-only"
 out="$(lead_auto_allow_lookup Bash '{"command":"which jq"}')"
 assert_eq "read-only:Bash(which:*)" "$out" "Y10 which → read-only"
+out="$(lead_auto_allow_lookup Bash '{"command":"echo hi"}')"
+assert_eq "read-only:Bash(echo:*)" "$out" "Y10 echo → read-only"
 
 echo "[Y11] 의도적 회색 유지 (안전등급 차이로 사람 1회 승인)"
 lead_auto_allow_lookup Bash '{"command":"bash ./test.sh"}' >/dev/null
