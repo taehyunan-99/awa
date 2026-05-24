@@ -27,6 +27,7 @@ fi
 #   무조건 도는 test-*.sh 글롭이 아닌 여기(opt-in)에 둔다.
 if [ "${RUN_INTEGRATION:-0}" = "1" ]; then
   for p in e2e-dryrun.sh \
+           watcher-integration.sh \
            probes/probe-permission-gate.sh \
            probes/probe-matcher-and-reload.sh \
            probes/probe-hook-merge.sh; do
