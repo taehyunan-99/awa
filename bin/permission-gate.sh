@@ -169,8 +169,15 @@ gate_gray() {
       local scope pattern
       scope="${decision#approve-permanent:}"
       pattern="$(derive_pattern "$tool" "$input" "$scope")"
-      add_to_allow "$ENTRY_ROLE" "$pattern"
-      emit_allow "gray:approve-permanent:${scope}" ;;
+      # 복합/멀티라인 명령은 derive_pattern 이 빈 문자열 반환(안전 prefix 불가) →
+      # 학습 생략하고 이번 1회만 allow 로 강등 (7차 결함3). 학습 가능 패턴만 영구화.
+      if [ -z "$pattern" ]; then
+        emit_allow "gray:approve-permanent-downgraded-to-once"
+      else
+        add_to_allow "$ENTRY_ROLE" "$pattern"
+        emit_allow "gray:approve-permanent:${scope}"
+      fi
+      ;;
     *)
       emit_deny "gray:deny" ;;
   esac
