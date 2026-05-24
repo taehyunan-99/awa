@@ -76,4 +76,12 @@ echo "[A12] derive_pattern exact 는 복합이어도 그대로 (학습 강등은
 out="$(derive_pattern "Bash" '{"command":"cd x && ls"}' "exact")"
 assert_eq "Bash(cd x && ls)" "$out" "A12 exact 는 불변"
 
+echo "[A13] add_to_allow 빈 패턴은 settings 미변경 (방어적 가드)"
+echo '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$BOOTSET/devg.json"
+add_to_allow devg ""
+cnt="$(jq '.permissions.allow | length' "$BOOTSET/devg.json")"
+assert_eq "1" "$cnt" "A13 빈 패턴 추가 안 됨 (length 그대로 1)"
+content="$(cat "$BOOTSET/devg.json")"
+assert_not_contains "$content" '""' "A13 빈 문자열 패턴 미삽입"
+
 test_summary

@@ -370,6 +370,8 @@ summarize_input() {
 # $1=entry_role $2=pattern
 add_to_allow() {
   local entry_role="$1" pattern="$2"
+  # 방어적 가드: 빈 패턴은 settings.allow 를 오염시키므로 무시 (7차 결함3 이중 방어).
+  [ -n "$pattern" ] || return 0
   local settings="${PROJECT_ROOT}/.agent-harness/.boot-settings/${entry_role}.json"
   [ -f "$settings" ] || return 1
   local lock="${settings}.lock"
