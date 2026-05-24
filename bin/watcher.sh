@@ -19,6 +19,8 @@ STATE_DIR="${STATE_DIR:-}"
 EVENTS="${EVENTS:-}"
 SEEN="${SEEN:-$STATE_DIR/.watcher-seen}"
 REV_DEBOUNCE="${REV_DEBOUNCE:-3}"
+# REV_DEBOUNCE 가 비정수로 주입되면 산술 비교에서 데몬이 즉사 → 정수 아니면 기본값으로.
+case "$REV_DEBOUNCE" in ''|*[!0-9]*) REV_DEBOUNCE=3 ;; esac
 
 # 대상 pane 생존 확인 (M2 — 죽은 pane 조용한 깨움 유실 방지).
 pane_alive() {

@@ -37,7 +37,7 @@ SEEN="$TMP_STATE/.watcher-seen" \
 REV_DEBOUNCE=2 \
   bash "$ROOT/bin/watcher.sh" &
 WPID=$!
-sleep 1.5  # 첫 폴링 사이클 보장
+sleep 2.5  # 첫 폴링 사이클 보장 (여유 — CI 부하 대비, OLD 재발화 검증 엄격화)
 
 # --- 케이스 0: 기동 전 done 라인 재발화 방지 (R4 — last_events 초기화) ---
 DUMP_INIT="$(tmux capture-pane -p -t "$LEAD_PANE")"
