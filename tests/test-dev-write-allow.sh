@@ -80,4 +80,42 @@ assert_eq "danger" "$v" "dev Write 프로젝트 .env → danger (cred-file-edit)
 v="$(gate_verdict dev Write '{"file_path":"/tmp/other-elsewhere/foo.py"}')"
 assert_eq "gray" "$v" "dev Write 프로젝트 밖 → gray (matrix 확대 안 됨)"
 
+# ── C-1: path traversal auto-allow 우회 차단 (10차 리뷰) ─────────────────────
+# {PROJECT_ROOT}/** glob 은 .* 로 풀려 `..` 세그먼트를 텍스트로 흡수한다.
+# scope_match 가 path 의 `..` 세그먼트를 거부해야 matrix(auto-allow) 가 안 된다.
+# verdict 가 matrix 만 아니면 됨(gray/danger 무관).
+v="$(gate_verdict dev Write "{\"file_path\":\"$TMP_PROJ/../../../etc/sudoers.d/evil\"}")"
+assert_eq "1" "$([ "$v" != "matrix" ] && echo 1 || echo 0)" "dev Write traversal sudoers.d → matrix 아님 (auto-allow 차단)"
+
+v="$(gate_verdict dev Write "{\"file_path\":\"$TMP_PROJ/sub/../../etc/crontab\"}")"
+assert_eq "1" "$([ "$v" != "matrix" ] && echo 1 || echo 0)" "dev Write traversal crontab → matrix 아님 (auto-allow 차단)"
+
+# ── I-1: 정규식 메타문자 미이스케이프 (10차 리뷰) — scope_match 직접 단위테스트 ──
+# pat 의 `+` 등 정규식 메타가 literal 로 이스케이프돼야 의도보다 넓게 매칭되지 않는다.
+SM_RC="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  if scope_match "/proj/ab.py" "/proj/a+b.py"; then echo 0; else echo 1; fi
+')"
+assert_eq "1" "$SM_RC" "scope_match /proj/ab.py vs /proj/a+b.py → 불일치 (+ literal)"
+
+SM_RC2="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  if scope_match "/secret" "/secre+t"; then echo 0; else echo 1; fi
+')"
+assert_eq "1" "$SM_RC2" "scope_match /secret vs /secre+t → 불일치 (+ literal)"
+
+# scope_match traversal 직접 단위테스트: path 의 `..` 세그먼트는 항상 불일치.
+SM_TR="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  if scope_match "/proj/../etc/x" "/proj/**"; then echo 0; else echo 1; fi
+')"
+assert_eq "1" "$SM_TR" "scope_match /proj/../etc/x vs /proj/** → 불일치 (.. 세그먼트 거부)"
+
+# scope_match 정상 파일명 회귀: `..` 가 세그먼트 일부면(점 두개) 거부하지 않는다.
+SM_OK="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  if scope_match "/proj/a..b/x.py" "/proj/**"; then echo 0; else echo 1; fi
+')"
+assert_eq "0" "$SM_OK" "scope_match /proj/a..b/x.py vs /proj/** → 일치 (점 두개는 세그먼트 일부)"
+
 test_summary

@@ -179,6 +179,13 @@ session_exists() {
 scope_match() {
   local path="$1" pat="$2" re=""
   local i ch
+  # C-1: path traversal 차단 (10차 리뷰). ** → .* 로 풀리면 `..` 세그먼트를
+  # 텍스트로 흡수해 {PROJECT_ROOT}/../../etc/... 가 auto-allow 된다.
+  # path 가 `..` 라는 디렉터리 세그먼트를 포함하면 무조건 불일치.
+  # 세그먼트 경계 기준 판정 — /proj/a..b/x 같은 정상 파일명은 오탐 안 함.
+  case "/$path/" in
+    *'/../'*) return 1 ;;
+  esac
   for (( i=0; i<${#pat}; i++ )); do
     ch="${pat:i:1}"
     case "$ch" in
@@ -186,6 +193,11 @@ scope_match() {
         if [ "${pat:i+1:1}" = '*' ]; then re+='.*'; i=$((i+1)); else re+='[^/]*'; fi ;;
       '.') re+='\.' ;;
       '/') re+='/' ;;
+      # I-1: 정규식 메타 이스케이프 (10차 리뷰). glob 메타가 아닌 일반 문자가
+      # 정규식 특수문자면 \ 로 literal 화 — pat 의 +()[]{}$^|?\ 가 정규식
+      # 으로 해석돼 의도보다 넓게 매칭되는 것을 막는다.
+      '\' | '^' | '$' | '[' | ']' | '|' | '(' | ')' | '+' | '?' | '{' | '}')
+        re+="\\$ch" ;;
       *) re+="$ch" ;;
     esac
   done
