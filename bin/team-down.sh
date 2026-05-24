@@ -89,6 +89,7 @@ rm -rf "${STATE_DIR:?STATE_DIR unset}/pending-asks" \
        "${STATE_DIR}/incidents" \
        "${STATE_DIR}/removal-requests" 2>/dev/null || true
 rm -f "${STATE_DIR}/permission-gate.log" 2>/dev/null || true
+rm -f "${STATE_DIR}/.watcher-seen" 2>/dev/null || true
 rmdir "${STATE_DIR}" 2>/dev/null || true
 
 # settings.json + marker 정리 (marker 자체도 마지막에). 다음 team-up 이 재생성.
