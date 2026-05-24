@@ -457,8 +457,9 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   for entry in "${REVIEWERS[@]}"; do
     parse_entry "$entry"
     rbf="$(boot_file "$ENTRY_NAME")"
+    # 리뷰어 부트: roles/<리뷰어역할>.md + reviewer-common.md 합본 (정체성+공통절차).
     # sed `#` 구분자 (HARNESS_ROOT 절대경로의 `/` 충돌 회피).
-    cat "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" \
+    cat "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" "$PROMPTS_DIR/roles/reviewer-common.md" \
       | sed -e "s#{{SESSION}}#$SESSION#g" \
             -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" > "$rbf" 2>/dev/null || : > "$rbf"
     # `[ -s "$rbf" ]` 가드: 리뷰어 역할 파일이 없거나 비어있으면 빈 boot 허용 (의도된 묵살).

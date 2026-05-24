@@ -9,12 +9,12 @@ assert_contains "$lead_content" "단계" "lead 단계전이 금지 규약"
 assert_contains "$lead_content" ".harness-state" "lead harness-state 규약"
 assert_contains "$lead_content" "카탈로그" "lead 워커 카탈로그 사용"
 
-revl="$(cat "$ROOT/prompts/loop/reviewer.md")"
-assert_contains "$revl" "events.log" "reviewer loop 가 events.log 감시"
-assert_contains "$revl" ".review-cursor" "reviewer loop 커서 사용"
+revl="$(cat "$ROOT/prompts/roles/reviewer-common.md")"
+assert_contains "$revl" "events.log" "reviewer 공통절차가 events.log 감시"
+assert_contains "$revl" ".review-cursor" "reviewer 공통절차 커서 사용"
 
-lead_loop="$(cat "$ROOT/prompts/loop/lead.md")"
-assert_contains "$lead_loop" "review/" "lead loop 가 review/ 감시"
+lead_loop="$(cat "$ROOT/prompts/roles/lead.md")"
+assert_contains "$lead_loop" "review/" "lead 가 review/ 감시"
 
 for r in spec quality arch; do
   if [ -f "$ROOT/prompts/roles/reviewer-$r.md" ]; then
@@ -29,5 +29,11 @@ if [ -f "$ROOT/prompts/roles/reviewer.md" ]; then
 else
   assert_eq "ok" "ok" "1차 roles/reviewer.md 삭제됨"
 fi
+
+# 9차: pm 역할 프롬프트 검증
+pm="$(cat "$ROOT/prompts/roles/pm.md")"
+assert_contains "$pm" "사용자" "pm 은 사용자 창구"
+assert_contains "$pm" "@pm:" "pm→lead 전달 prefix"
+assert_not_contains "$pm" "dispatch.sh" "pm 은 dispatch 안 함(lead 의 일)"
 
 test_summary
