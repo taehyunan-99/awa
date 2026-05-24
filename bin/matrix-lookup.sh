@@ -102,9 +102,7 @@ lead_auto_allow_lookup() {
         case "$pinner" in
           *':*')
             prefix="${pinner%:\*}"
-            case "$field" in
-              "$prefix"*) printf '%s:%s' "$catname" "$pat"; return 0 ;;
-            esac
+            prefix_match "$prefix" "$field" && { printf '%s:%s' "$catname" "$pat"; return 0; }
             ;;
           *)
             [ "$field" = "$pinner" ] && { printf '%s:%s' "$catname" "$pat"; return 0; }
