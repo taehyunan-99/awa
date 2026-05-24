@@ -20,7 +20,8 @@ assert_eq "0" "$rc" "generate_worker_settings pm 성공"
 
 # 산출 경로가 .boot-settings/pm.json 인지
 assert_contains "$OUT" ".boot-settings/pm.json" "pm settings 경로"
-[ -f "$OUT" ]; assert_success "$?" "pm settings 파일 존재"
+[ -f "$OUT" ]
+assert_success "$?" "pm settings 파일 존재"
 
 PMSET="$(cat "$OUT")"
 # pm 은 hook 없음 (게이트 비대상)
