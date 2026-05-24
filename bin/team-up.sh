@@ -17,6 +17,7 @@ _normalize_project_arg() {
   fi
   ( cd "$raw" && pwd )
 }
+PROFILE_ARG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --project)
@@ -25,7 +26,8 @@ while [ $# -gt 0 ]; do
     --project=*)
       if ! HARNESS_PROJECT="$(_normalize_project_arg "${1#--project=}")"; then exit 1; fi
       export HARNESS_PROJECT; shift ;;
-    *) break ;;
+    -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
+    *) PROFILE_ARG="$1"; shift ;;
   esac
 done
 
@@ -41,7 +43,7 @@ source "$_DIR/lib.sh"
 # prompts 디렉터리 — 기본 $HARNESS_ROOT/prompts, 테스트 fixture 용 PROMPTS_DIR env override.
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 
-PROFILE="${1:-default}"
+PROFILE="${PROFILE_ARG:-default}"
 # $1 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
 if [ -f "$PROFILE" ]; then
   PROFILE_FILE="$PROFILE"
