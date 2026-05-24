@@ -25,7 +25,7 @@ SES_B="$(HARNESS_PROJECT="$PROJ_B" bash -c "source $ROOT/bin/lib.sh; resolve_ses
 
 # 케이스 1: --project 가 프로파일명 앞 (기존에도 됨)
 bash "$ROOT/bin/team-up.sh" --project "$PROJ_A" default >/dev/null 2>&1
-sleep 0.3
+sleep 0.8  # team-up 의 .agent-harness 마커 생성 여유 (저사양/CI 간헐 실패 방어)
 tmux has-session -t "$SES_A" 2>/dev/null
 assert_success "$?" "--project 앞: 세션 $SES_A 생성"
 # .agent-harness 가 PROJ_A 안에 생성됐는지 (PROJECT_ROOT 인식 증거)
@@ -35,7 +35,7 @@ bash "$ROOT/bin/team-down.sh" --project "$PROJ_A" >/dev/null 2>&1
 
 # 케이스 2: --project 가 프로파일명 뒤 (결함 C — 예전엔 무시됨)
 bash "$ROOT/bin/team-up.sh" default --project "$PROJ_B" >/dev/null 2>&1
-sleep 0.3
+sleep 0.8  # team-up 의 .agent-harness 마커 생성 여유 (저사양/CI 간헐 실패 방어)
 tmux has-session -t "$SES_B" 2>/dev/null
 assert_success "$?" "--project 뒤: 세션 $SES_B 생성 (결함 C 수정)"
 [ -d "$PROJ_B/.agent-harness" ]
