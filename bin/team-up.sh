@@ -456,9 +456,11 @@ fi
 lead_sid="$(uuidgen | tr 'A-Z' 'a-z')"
 if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
   lead_cmd="$lead_cmd --settings \"$settings_path\" --session-id $lead_sid"
-  if [ -n "$PLAN_BOOT_FILE" ]; then
-    lead_cmd="$lead_cmd --append-system-prompt-file \"$PLAN_BOOT_FILE\""
-  fi
+fi
+# 11차: plan 주입은 settings 와 독립 관심사 — 별도 블록으로 분리(결합도 제거).
+# claude 분기에서만(cat 더미는 cmd 에 안 붙음, 합본 생성은 위에서 이미 AGENT_CMD 무관).
+if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$PLAN_BOOT_FILE" ]; then
+  lead_cmd="$lead_cmd --append-system-prompt-file \"$PLAN_BOOT_FILE\""
 fi
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
 send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
