@@ -51,4 +51,37 @@ echo "[A8] derive_pattern exact (Edit → file_path)"
 out="$(derive_pattern "Edit" '{"file_path":"/a/b.py"}' "exact")"
 assert_eq "Edit(/a/b.py)" "$out" "A8 Edit exact"
 
+echo "[A9] derive_pattern command-group 멀티라인 → 빈 문자열 (학습 불가)"
+ml='{"command":"cd /tmp\n\n# 테스트\nrm -f x\n./todo.sh add y"}'
+out="$(derive_pattern "Bash" "$ml" "command-group")"
+assert_eq "" "$out" "A9 멀티라인 → 빈 문자열"
+
+echo "[A10] derive_pattern command-group 셸 메타문자 → 빈 문자열"
+for meta_cmd in 'cd x && ls' 'a || b' 'ls; pwd' 'grep x | wc -l' 'echo \$(date)' 'echo x > f' 'cat < f'; do
+  out="$(derive_pattern "Bash" "$(jq -nc --arg c "$meta_cmd" '{command:$c}')" "command-group")"
+  assert_eq "" "$out" "A10 메타 [$meta_cmd] → 빈 문자열"
+done
+out="$(derive_pattern "Bash" '{"command":"echo `date`"}' "command-group")"
+assert_eq "" "$out" "A10 백틱 → 빈 문자열"
+
+echo "[A11] derive_pattern command-group 단순 명령은 정상 prefix 유지 (회귀)"
+out="$(derive_pattern "Bash" '{"command":"npm test foo"}' "command-group")"
+assert_eq "Bash(npm test:*)" "$out" "A11 단순 2토큰 유지"
+out="$(derive_pattern "Bash" '{"command":"git add file.sh"}' "command-group")"
+assert_eq "Bash(git add:*)" "$out" "A11 git add 유지"
+out="$(derive_pattern "Bash" '{"command":"ls"}' "command-group")"
+assert_eq "Bash(ls:*)" "$out" "A11 단일 토큰 유지"
+
+echo "[A12] derive_pattern exact 는 복합이어도 그대로 (학습 강등은 command-group 만)"
+out="$(derive_pattern "Bash" '{"command":"cd x && ls"}' "exact")"
+assert_eq "Bash(cd x && ls)" "$out" "A12 exact 는 불변"
+
+echo "[A13] add_to_allow 빈 패턴은 settings 미변경 (방어적 가드)"
+echo '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$BOOTSET/devg.json"
+add_to_allow devg ""
+cnt="$(jq '.permissions.allow | length' "$BOOTSET/devg.json")"
+assert_eq "1" "$cnt" "A13 빈 패턴 추가 안 됨 (length 그대로 1)"
+content="$(cat "$BOOTSET/devg.json")"
+assert_not_contains "$content" '""' "A13 빈 문자열 패턴 미삽입"
+
 test_summary

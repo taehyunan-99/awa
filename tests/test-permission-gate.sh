@@ -107,6 +107,32 @@ assert_eq "allow" "$dec" "G8 approve-permanent allow"
 learned="$(jq -r '[.permissions.allow[] | select(. == "Bash(npm test:*)")] | length' "$BOOT/dev.json")"
 assert_eq "1" "$learned" "G8 command-group 학습 (Bash(npm test:*))"
 unset GATE_TEST_UUID GATE_POLL_MAX
+
+echo "[G9] 회색 + approve-permanent:command-group + 복합명령 → allow 하되 학습 안 함 (강등)"
+# 복합 명령(&&)으로 검증 — rm 등 별도 의미를 끌어들이지 않는 순수 복합 케이스.
+export GATE_TEST_UUID="compound-uuid"
+export GATE_POLL_MAX="1"
+printf 'approve-permanent:command-group' > "$RESP_DIR/${GATE_TEST_UUID}.response"
+before="$(jq '.permissions.allow | length' "$BOOT/dev.json")"
+out="$(run_gate "Bash" '{"command":"cd src && ./run.sh build"}')"
+dec="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')"
+assert_eq "allow" "$dec" "G9 복합명령 approve-permanent → allow (강등)"
+after="$(jq '.permissions.allow | length' "$BOOT/dev.json")"
+assert_eq "$before" "$after" "G9 복합명령은 학습 안 됨 (allow length 불변)"
+clean="$(jq -r '[.permissions.allow[] | select(test("\n"))] | length' "$BOOT/dev.json")"
+assert_eq "0" "$clean" "G9 줄바꿈 든 패턴 0"
+unset GATE_TEST_UUID GATE_POLL_MAX
+
+echo "[G10] 회색 + approve-permanent + 단순명령은 정상 학습 (G9 강등이 단순명령엔 영향 없음 회귀)"
+export GATE_TEST_UUID="simple-uuid"
+export GATE_POLL_MAX="1"
+printf 'approve-permanent:command-group' > "$RESP_DIR/${GATE_TEST_UUID}.response"
+out="$(run_gate "Bash" '{"command":"yarn lint src"}')"
+dec="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecision')"
+assert_eq "allow" "$dec" "G10 단순명령 approve-permanent → allow"
+learned="$(jq -r '[.permissions.allow[] | select(. == "Bash(yarn lint:*)")] | length' "$BOOT/dev.json")"
+assert_eq "1" "$learned" "G10 단순명령은 정상 학습 (Bash(yarn lint:*))"
+unset GATE_TEST_UUID GATE_POLL_MAX
 unset GATE_SKIP_WAIT
 
 test_summary
