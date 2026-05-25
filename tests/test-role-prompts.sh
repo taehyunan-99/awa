@@ -43,4 +43,14 @@ assert_contains "$pm" "@pm:" "pm→lead 전달 prefix"
 assert_not_contains "$pm" "dispatch.sh" "pm 은 dispatch 안 함(lead 의 일)"
 assert_contains "$pm" "읽기 전용" "pm 은 읽기전용 규약 명시"
 
+# --- 5축 공통 토대 (_common.md) ---
+COMMON="$(cat "$ROOT/prompts/_common.md")"
+assert_contains "$COMMON" 'status: DONE|PARTIAL|BLOCKED' "_common ②출력계약 status 헤더"
+assert_contains "$COMMON" 'EVIDENCE' "_common ③ EVIDENCE 섹션"
+assert_contains "$COMMON" 'HYPOTHESIS' "_common ③ HYPOTHESIS 섹션"
+assert_contains "$COMMON" 'confirmed|likely|speculative' "_common ③ confidence 버킷(숫자% 금지)"
+assert_contains "$COMMON" 'BLOCKED' "_common ④ BLOCKED 프로토콜"
+assert_contains "$COMMON" 'ASSUMED:' "_common ⑤ assume-and-flag"
+assert_contains "$COMMON" 'wait-for -S done-{{SESSION}}-{{WORKER_NAME}}' "_common 완료신호 보존(회귀)"
+
 test_summary
