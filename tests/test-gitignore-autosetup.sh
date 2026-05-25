@@ -26,6 +26,16 @@ run_up "$T2"
 cnt="$(grep -c '^\.agent-harness/$' "$T2/.gitignore")"
 assert_eq "1" "$cnt" "GI2 .agent-harness 1줄 (중복 없음)"; rm -rf "$T2"
 
+echo "[GI4] trailing newline 없는 기존 .gitignore: 첫 룰이 병합되지 않음"
+T4="$(mktemp -d)"; ( cd "$T4" && git init -q )
+printf 'node_modules/' > "$T4/.gitignore"   # newline 없이 끝남
+run_up "$T4"
+g4="$(cat "$T4/.gitignore" 2>/dev/null || true)"
+assert_contains "$g4" "node_modules/" "GI4a 기존 룰 보존"
+assert_eq "1" "$(grep -cxF 'node_modules/' "$T4/.gitignore")" "GI4b node_modules/ 독립 1줄"
+assert_eq "1" "$(grep -cxF '.agent-harness/' "$T4/.gitignore")" "GI4c .agent-harness/ 독립 1줄"
+rm -rf "$T4"
+
 echo "[GI3] 비 git repo: .gitignore 생성 안 함"
 T3="$(mktemp -d)"; run_up "$T3"
 assert_eq "0" "$([ -f "$T3/.gitignore" ] && echo 1 || echo 0)" "GI3 비repo 는 .gitignore 없음"; rm -rf "$T3"

@@ -190,6 +190,10 @@ fi
 # 12차: 타깃 .gitignore 에 하네스 산출물 멱등 자동추가 (git repo 만). 구 "안내" → "자동".
 if [ "$PROJECT_ROOT_IS_GIT" = "1" ]; then
   _gi="$PROJECT_ROOT/.gitignore"
+  # 기존 파일이 newline 없이 끝나면 첫 append 가 마지막 줄에 병합됨 → 사전 보정.
+  if [ -f "$_gi" ] && [ -n "$(tail -c1 "$_gi" 2>/dev/null)" ]; then
+    printf '\n' >> "$_gi"
+  fi
   for _pat in ".agent-harness/" ".claude/" "config/.lead-auto-allow-marker" "config/*.bak"; do
     if [ ! -f "$_gi" ] || ! grep -qxF "$_pat" "$_gi" 2>/dev/null; then
       printf '%s\n' "$_pat" >> "$_gi"
