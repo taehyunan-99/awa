@@ -126,6 +126,22 @@ boot_file() {
   printf '%s/.boot/%s.md' "$WORKSPACE" "$worker"
 }
 
+# 역할명 → 역할 프롬프트 파일 절대경로. roles/*/<role>.md 글롭 단일매칭 (파츠화).
+# 0개=오류(없는 역할), 2개+=오류(역할명 중복 — 고유성 위반). fail-fast.
+# 외부 전역 미의존(순수) — $1 로 prompts_dir 받음. macOS BSD find 호환(-mindepth/-maxdepth OK, 실측).
+resolve_role_file() {  # $1=prompts_dir $2=role → echo 경로, rc 0/1
+  local pdir="$1" role="$2" matches n
+  matches="$(find "$pdir/roles" -mindepth 2 -maxdepth 2 -type f -name "$role.md" 2>/dev/null)"
+  n="$(printf '%s\n' "$matches" | grep -c . || true)"
+  if [ "$n" -eq 0 ]; then
+    echo "오류: 역할 '$role' 프롬프트 없음 (roles/*/$role.md 매칭 0)" >&2; return 1
+  elif [ "$n" -gt 1 ]; then
+    echo "오류: 역할 '$role' 중복 ($n 개) — 역할명 고유해야 함:" >&2
+    printf '%s\n' "$matches" >&2; return 1
+  fi
+  printf '%s\n' "$matches"
+}
+
 # 워커 역할 → settings 사본 산출 (5차: 2 인자).
 # $1=entry_role (settings 파일명 결정: dev/test/reviewer-*/lead/...) → echo path
 # $2=entry_name (settings 의 {{ENTRY_NAME}} 토큰 치환값 — WORKER env 통일, F22 옵션 A)
