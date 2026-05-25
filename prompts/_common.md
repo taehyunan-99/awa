@@ -9,7 +9,7 @@
    - 작업 요약
 4. 완료 신호를 보낸다. 반드시 마지막에 이 명령을 실행한다:
    tmux wait-for -S done-{{SESSION}}-{{WORKER_NAME}}-<id>
-   주의: 위 채널명의 `done-...-...-<id>` 부분 중 `done-{{SESSION}}-{{WORKER_NAME}}` 은 이미 가동 시 치환되어 박혀있다(예: `done-agents-projectA-dev`). 너의 task id 만 채우고 다른 부분은 변형하지 마라.
+   주의: 위 채널명의 `done-...-...-<id>` 부분 중 `done-{{SESSION}}-{{WORKER_NAME}}` 은 이미 가동 시 치환되어 박혀있다(예: `done-agenphony-projectA-dev`). 너의 task id 만 채우고 다른 부분은 변형하지 마라.
 5. 다음 지시를 대기한다. 임의로 다른 작업을 시작하지 않는다.
 
 ## 금지

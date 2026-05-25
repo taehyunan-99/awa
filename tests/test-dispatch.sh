@@ -17,7 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$ROOT/bin/team-up.sh" default >/dev/null
+bash "$ROOT/bin/agenphony-up.sh" default >/dev/null
 sleep 0.3
 
 # 작업 파일 준비

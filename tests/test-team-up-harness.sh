@@ -23,9 +23,9 @@ REVIEWERS=("qual:reviewer-quality:haiku")
 LEAD_MODEL="opus"
 EOF
 
-AGENT_CMD="cat" bash "$ROOT/bin/team-up.sh" "$PROF" >/dev/null 2>&1
+AGENT_CMD="cat" bash "$ROOT/bin/agenphony-up.sh" "$PROF" >/dev/null 2>&1
 rc=$?
-assert_success "$rc" "team-up 2윈도우 가동"
+assert_success "$rc" "agenphony-up 2윈도우 가동"
 
 wins="$(tmux list-windows -t "$S" -F '#{window_index}' | tr '\n' ' ')"
 assert_contains "$wins" "0" "window 0(team) 존재"

@@ -25,7 +25,7 @@ if [ "${PERM_GATE_LIB_ONLY:-0}" != "1" ]; then
   WORKER="${WORKER:-unknown}"
   ENTRY_ROLE="${ENTRY_ROLE:-default}"
   STATE_DIR="${PROJECT_ROOT}/.agent-harness/state"
-  mkdir -p "${STATE_DIR}"   # ★ 5차: log_safe 가 state/ 없으면 로그 소실. team-up Step3 가 보통 만들지만 부트순서 의존 제거 (hook 자기보장 — 견고).
+  mkdir -p "${STATE_DIR}"   # ★ 5차: log_safe 가 state/ 없으면 로그 소실. agenphony-up Step3 가 보통 만들지만 부트순서 의존 제거 (hook 자기보장 — 견고).
   export LOG="${STATE_DIR}/permission-gate.log"   # hook 이 직접 설정 (데몬 폐기)
 else
   trap - EXIT   # 라이브러리 모드는 trap 해제 (source 종료 시 deny 발행 방지)

@@ -15,11 +15,11 @@ else
   assert_eq "0건" "0건" "prompts/ 에 @lead-ask 잔존 0건"
 fi
 
-# 2) team-up.sh 코드에 @lead-ask·pm pane 알림 채널 주입 0건.
-if grep -n "lead-ask\|pm pane 알림 채널" "$ROOT/bin/team-up.sh" >/dev/null 2>&1; then
-  assert_eq "0건" "발견됨" "team-up.sh 에 @lead-ask 잔존: $(grep -n 'lead-ask\|pm pane 알림 채널' "$ROOT/bin/team-up.sh")"
+# 2) agenphony-up.sh 코드에 @lead-ask·pm pane 알림 채널 주입 0건.
+if grep -n "lead-ask\|pm pane 알림 채널" "$ROOT/bin/agenphony-up.sh" >/dev/null 2>&1; then
+  assert_eq "0건" "발견됨" "agenphony-up.sh 에 @lead-ask 잔존: $(grep -n 'lead-ask\|pm pane 알림 채널' "$ROOT/bin/agenphony-up.sh")"
 else
-  assert_eq "0건" "0건" "team-up.sh 에 @lead-ask 채널 주입 0건"
+  assert_eq "0건" "0건" "agenphony-up.sh 에 @lead-ask 채널 주입 0건"
 fi
 
 # 3) 산출된 LEAD boot 합본에 @lead-ask·pm pane_id 채널 0건 (실제 가동 산출물).
@@ -28,7 +28,7 @@ SES="$(HARNESS_PROJECT="$PROJ" bash -c "source $ROOT/bin/lib.sh; resolve_session
 cleanup() { tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$PROJ"; }
 trap cleanup EXIT
 
-bash "$ROOT/bin/team-up.sh" --project "$PROJ" default >/dev/null 2>&1
+bash "$ROOT/bin/agenphony-up.sh" --project "$PROJ" default >/dev/null 2>&1
 sleep 0.8
 LEAD_BOOT="$PROJ/.agent-harness/.boot/LEAD.md"
 [ -f "$LEAD_BOOT" ]
@@ -38,6 +38,6 @@ if grep -qF "lead-ask" "$LEAD_BOOT" 2>/dev/null; then
 else
   assert_eq "0건" "0건" "LEAD boot 에 @lead-ask 잔존 0건"
 fi
-bash "$ROOT/bin/team-down.sh" --project "$PROJ" >/dev/null 2>&1
+bash "$ROOT/bin/agenphony-down.sh" --project "$PROJ" >/dev/null 2>&1
 
 test_summary

@@ -21,7 +21,7 @@ cd "$PA"
 source "$ROOT/bin/lib.sh" 2>/dev/null
 SESS_A="$(resolve_session)"
 CH_A="done-$SESS_A-dev-T1"
-assert_eq "done-agents-projectA-dev-T1" "$CH_A" "projectA 채널"
+assert_eq "done-agenphony-projectA-dev-T1" "$CH_A" "projectA 채널"
 cd "$ORIG_PWD"
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT
 
@@ -36,7 +36,7 @@ cd "$PB"
 source "$ROOT/bin/lib.sh" 2>/dev/null
 SESS_B="$(resolve_session)"
 CH_B="done-$SESS_B-dev-T1"
-assert_eq "done-agents-projectB-dev-T1" "$CH_B" "projectB 채널"
+assert_eq "done-agenphony-projectB-dev-T1" "$CH_B" "projectB 채널"
 cd "$ORIG_PWD"
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT
 

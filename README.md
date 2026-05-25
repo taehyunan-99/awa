@@ -7,11 +7,11 @@ tmux 페인마다 Claude Code 인스턴스를 띄우고 역할/제약을 부여�
 - tmux 3.6+ (`send-keys -l`, `wait-for`, `capture-pane` 사용)
 - `claude` CLI 설치 및 PATH 등록
 - prefix는 tmux 기본값(C-b) 가정. `~/.tmux.conf`는 이 repo가 수정하지 않음.
-- 사용자 전역 tmux 의 base-index/pane-base-index 설정과 무관하게 동작 (team-up 이 세션 로컬로 인덱스·title 옵션을 고정).
+- 사용자 전역 tmux 의 base-index/pane-base-index 설정과 무관하게 동작 (agenphony-up 이 세션 로컬로 인덱스·title 옵션을 고정).
 
 ## 철학
 
-세션은 일회용. git 으로 버전 관리되는 `profiles/` + `prompts/` 정의로부터 `team-up.sh` 가 매번 동일한 팀을 재생성한다. 세션 상태를 저장/복원하지 않는다.
+세션은 일회용. git 으로 버전 관리되는 `profiles/` + `prompts/` 정의로부터 `agenphony-up.sh` 가 매번 동일한 팀을 재생성한다. 세션 상태를 저장/복원하지 않는다.
 
 ## 사용법
 
@@ -20,13 +20,13 @@ tmux 페인마다 Claude Code 인스턴스를 띄우고 역할/제약을 부여�
 ```bash
 # 1) 프로젝트로 이동 후 팀 가동 (작업 대상 = 현재 cwd 의 git toplevel)
 cd ~/work/projectA
-~/Desktop/Repo/Practice/tmux-agent-team/bin/team-up.sh feature-team
+~/Desktop/Repo/Practice/agenphony/bin/agenphony-up.sh feature-team
 # 또는 어디서든:
-#   ~/.../bin/team-up.sh --project ~/work/projectA feature-team
+#   ~/.../bin/agenphony-up.sh --project ~/work/projectA feature-team
 # 주의: --project 는 프로파일/위치 인자 앞에 와야 인식된다
 #       (`--project ~/x default`, `--project=~/x default` 형식).
 
-tmux attach -t agents-projectA   # 세션명은 basename 기반 자동
+tmux attach -t agenphony-projectA   # 세션명은 basename 기반 자동
 
 # 2) 작업 지시 작성
 echo "# T1: 로그인 버그 수정" > ~/work/projectA/.agent-harness/tasks/T1.md
@@ -42,30 +42,30 @@ echo "# T1: 로그인 버그 수정" > ~/work/projectA/.agent-harness/tasks/T1.m
 cat ~/work/projectA/.agent-harness/results/T1.md
 
 # 6) 팀 정리 (tasks/results 는 보존, 런타임만 정리)
-~/.../bin/team-down.sh   # cwd=projectA 기준
-# 또는:  ~/.../bin/team-down.sh --project ~/work/projectA
+~/.../bin/agenphony-down.sh   # cwd=projectA 기준
+# 또는:  ~/.../bin/agenphony-down.sh --project ~/work/projectA
 ```
 
 ## 멀티 프로젝트 동시 가동
 
-서로 다른 프로젝트라면 동시에 가동 가능. SESSION 은 `agents-<basename>` 자동.
+서로 다른 프로젝트라면 동시에 가동 가능. SESSION 은 `agenphony-<basename>` 자동.
 
 ```bash
 # 셸 1
-cd ~/work/projectA && ~/.../bin/team-up.sh default
+cd ~/work/projectA && ~/.../bin/agenphony-up.sh default
 # 셸 2
-cd ~/work/projectB && ~/.../bin/team-up.sh default
-# → tmux 에 agents-projectA·agents-projectB 두 세션 공존
+cd ~/work/projectB && ~/.../bin/agenphony-up.sh default
+# → tmux 에 agenphony-projectA·agenphony-projectB 두 세션 공존
 ```
 
 basename 충돌 시(둘 다 `auth/`) 후행 가동만 거부. 회피:
 ```bash
-SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
+SESSION_OVERRIDE="agenphony-auth2" ~/.../bin/agenphony-up.sh default
 ```
 
 ## 프로파일
 
-`profiles/*.sh` 로 팀 구성을 정의. `bin/team-up.sh <프로파일명>` 으로 선택.
+`profiles/*.sh` 로 팀 구성을 정의. `bin/agenphony-up.sh <프로파일명>` 으로 선택.
 
 - `default` — 워커: dev / test, 리뷰어: quality-rev
 - `code-review` — 워커: security, 리뷰어: spec-rev / quality-rev / arch-rev
@@ -88,8 +88,8 @@ SESSION_OVERRIDE="agents-auth2" ~/.../bin/team-up.sh default
   | `@gate:` | watcher → lead | watcher 가 send-keys | pending-asks 권한 대기. lead 가 전수 처리. |
   | `@done:` | watcher → lead | watcher 가 send-keys | 워커 완료(`@done: <worker>/<task>`). lead 가 results/ 확인·종합. |
   | `@review:` | watcher → reviewer | watcher 가 send-keys | events.log 증분 검토(디바운스). reviewer 가 1회 실행. |
-- 워커 식별: pane title=워커명 (team-up 이 split-window -P 의 pane_id 로 정확히 설정하고 `allow-set-title off` 로 셸 escape 로부터 보존)
-- 부트 프롬프트는 `{{HARNESS_ROOT}}` 토큰을 통해 도구 절대경로를 박는다. team-up 이 sed 치환으로 실제 경로로 변환. 워커는 항상 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 도구 호출.
+- 워커 식별: pane title=워커명 (agenphony-up 이 split-window -P 의 pane_id 로 정확히 설정하고 `allow-set-title off` 로 셸 escape 로부터 보존)
+- 부트 프롬프트는 `{{HARNESS_ROOT}}` 토큰을 통해 도구 절대경로를 박는다. agenphony-up 이 sed 치환으로 실제 경로로 변환. 워커는 항상 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 도구 호출.
 
 ## 환경변수
 
@@ -121,8 +121,8 @@ bash tests/run-all.sh
 
 사용자 창구(pm) + 순수 오케스트레이터(lead) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등.
 
-- 가동: `bin/team-up.sh feature-team` (워커 + review 윈도우 + 모델 차등)
-- 초회 가동 시 claude 가 폴더 신뢰를 1회 묻습니다 — team-up 이 자동 통과하나, 응답이 없으면 각 pane 에서 수동 Enter(트러스트 확인) 필요할 수 있습니다.
+- 가동: `bin/agenphony-up.sh feature-team` (워커 + review 윈도우 + 모델 차등)
+- 초회 가동 시 claude 가 폴더 신뢰를 1회 묻습니다 — agenphony-up 이 자동 통과하나, 응답이 없으면 각 pane 에서 수동 Enter(트러스트 확인) 필요할 수 있습니다.
 - 단계 자동 전이 안 함 — 사용자가 pm 과 의논해 PRD→Arch→구현 단계를 수동 진행(pm→lead 전달). 단, `--plan` 으로 확정 plan 을 주입해 가동하면 LEAD 가 그 plan 을 분해·배정 트리 출력 후 사용자 승인(AskUserQuestion)을 받아 실행 착수한다(plan 실행은 자동전이가 아님 — 11차).
 - 감시: watcher 가 events.log·pending-asks 를 폴링해 lead/reviewer 를 send-keys 로 깨움(약한 신호 scope 즉시 / 강한 신호 done 후 의미 판정)
 - 설계: `docs/superpowers/specs/2026-05-19-agent-harness-design.md`
@@ -133,10 +133,10 @@ bash tests/run-all.sh
 
 Phase0(계획)에서 만든 확정 plan 문서를 가동 시 LEAD 에 자동주입한다.
 
-- 가동: `bin/team-up.sh --project <repo> --plan PRD.md --plan ARCH.md feature-team` (`--plan` 반복 가능)
+- 가동: `bin/agenphony-up.sh --project <repo> --plan PRD.md --plan ARCH.md feature-team` (`--plan` 반복 가능)
 - 여러 plan 파일은 `.agent-harness/.boot/plan.md` 단일 합본(고정 헤더 `# 확정 plan (이번 가동의 작업 계획)` + 파일별 `## <파일명>`)으로 cat 된 뒤, claude 분기에서 `--append-system-prompt-file` 로 LEAD 에 주입된다(send-keys 무관, 공식 보장 경로).
 - LEAD 는 고정 헤더로 plan 주입을 인지 → boot 직후 분해 → 배정 트리 출력 → AskUserQuestion 승인 게이트 → dispatch. plan 미주입(`--plan` 없음)이면 기존대로 `@pm:` 지시 대기(하위호환).
-- team-down 은 `--plan` 을 무시한다(team-up 과 인자 대칭).
+- agenphony-down 은 `--plan` 을 무시한다(agenphony-up 과 인자 대칭).
 
 ## 권한 모델 (4차 P0)
 

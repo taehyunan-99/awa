@@ -11,15 +11,15 @@ printf '# PRD\nproduct 요구사항\n' > "$PROJ/PRD.md"
 printf '# ARCH\n아키텍처 결정\n' > "$PROJ/ARCH.md"
 SES="$(HARNESS_PROJECT="$PROJ" bash -c "source $ROOT/bin/lib.sh; resolve_session")"
 
-echo "=== team-up --plan PRD.md --plan ARCH.md (cat 더미) ==="
-bash "$ROOT/bin/team-up.sh" --project "$PROJ" --plan "$PROJ/PRD.md" --plan "$PROJ/ARCH.md" default >/dev/null 2>&1
+echo "=== agenphony-up --plan PRD.md --plan ARCH.md (cat 더미) ==="
+bash "$ROOT/bin/agenphony-up.sh" --project "$PROJ" --plan "$PROJ/PRD.md" --plan "$PROJ/ARCH.md" default >/dev/null 2>&1
 sleep 0.8
 
 echo "=== 산출 .boot/plan.md ==="
 cat "$PROJ/.agent-harness/.boot/plan.md" 2>/dev/null || echo "(plan.md 없음 — FAIL)"
 
-echo "=== team-down + cleanup ==="
-bash "$ROOT/bin/team-down.sh" --project "$PROJ" >/dev/null 2>&1
+echo "=== agenphony-down + cleanup ==="
+bash "$ROOT/bin/agenphony-down.sh" --project "$PROJ" >/dev/null 2>&1
 tmux kill-session -t "$SES" 2>/dev/null || true
 rm -rf "$PROJ"
 echo "probe 완료."

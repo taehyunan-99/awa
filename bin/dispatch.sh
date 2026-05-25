@@ -44,7 +44,7 @@ fi
 
 # 세션 확인
 if ! tmux has-session -t "$SESSION" 2>/dev/null; then
-  echo "오류: 세션 '$SESSION' 없음. team-up.sh 먼저 실행." >&2
+  echo "오류: 세션 '$SESSION' 없음. agenphony-up.sh 먼저 실행." >&2
   exit 1
 fi
 
