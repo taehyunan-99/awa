@@ -40,7 +40,10 @@ plan 을 검증·팀편성해 발진 명령을 출력한다. 4단계:
 - 명령을 출력하고 "`!` 로 실행하세요" 안내. **직접 실행 금지.**
 
 ## 서브커맨드: list
-→ `list` 절(아래) 따름.
+`bash <하네스>/bin/agenphony-list.sh` 로 실행해 살아있는 `agenphony-*` 세션을 나열한다(토큰0 셸). **`bash` 로 호출** — 실행권한 의존 제거(P11).
+- 표시: 세션명 · 프로젝트경로(@agenphony-project) · 워커구성(pane title 집계, LEAD/PM/watcher 제외).
+- 각 세션의 `tmux attach -t <세션>` 진입 명령을 함께 출력 → 사용자가 `!` 로 진입(직접 attach 금지).
+- 0개면 "`agpn stage` 로 시작하세요" 안내.
 
 ## usage
 인자 없음·미지원 시:
