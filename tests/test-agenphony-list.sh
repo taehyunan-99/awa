@@ -39,4 +39,22 @@ tmux kill-session -t "$S" 2>/dev/null || true; rm -rf "$TMP"
 assert_contains "$out" "dev2" "L3a dev 2개 집계"
 assert_contains "$out" "test1" "L3b test 1개 집계"
 
+echo "[L4] reviewer 는 별도 review window → 워커구성에서 제외 (회귀 가드)"
+# 실 agenphony-up 은 reviewer 를 window1(review)에 두고 워커는 window0 에 둔다.
+# list-panes -s 로 전 window 를 긁으면 reviewer 가 워커구성에 섞임 → window0 한정으로 차단.
+TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; S="agenphony-$SAFE"
+tmux new-session -d -s "$S" -c "$TMP"
+tmux set-option -t "$S" @agenphony-project "$TMP"
+WIN="$(tmux list-windows -t "$S" -F '#{window_index}' | head -1)"
+tmux select-pane -t "$S:$WIN" -T "dev"
+pm="$(tmux split-window -t "$S:$WIN" -d -P -F '#{pane_id}')"; tmux select-pane -t "$pm" -T "watcher"
+# 별도 review window 에 reviewer (실 구조 모사).
+tmux new-window -t "$S" -n review
+RWIN="$(tmux list-windows -t "$S" -F '#{window_index} #{window_name}' | awk '$2=="review"{print $1}')"
+tmux select-pane -t "$S:$RWIN" -T "quality-rev"
+out="$(bash "$ROOT/bin/agenphony-list.sh" 2>&1 || true)"
+tmux kill-session -t "$S" 2>/dev/null || true; rm -rf "$TMP"
+assert_contains "$out" "dev1" "L4a dev 워커 집계됨"
+assert_not_contains "$out" "quality-rev" "L4b reviewer 는 워커구성에 안 섞임"
+
 test_summary
