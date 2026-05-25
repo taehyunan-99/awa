@@ -62,8 +62,12 @@ done
 tmux select-layout -t "$SES" tiled 2>/dev/null || true
 
 # --- LEAD 에 실 claude 기동 ---
-# 관측용 최소 기동: --settings/--session-id 없이 기본 claude. trust 화면 자동 통과.
-tmux send-keys -t "$LEAD_PANE" -l "claude"
+# 관측용 최소 기동: --settings/--session-id 없이 기본 claude.
+# --dangerously-skip-permissions: 관측 격리라 권한게이트 불필요. 이게 없으면 LEAD 가
+#   .harness-state atomic write(cat>tmp && mv) 시 권한 다이얼로그에서 멈춰 사람 개입을
+#   요구한다 → "LEAD 단독 종합" 순수 관측이 깨지고 재현이 번거로움. 임시 PROJECT_ROOT
+#   (mktemp)에서만 도는 격리 관측이라 안전.
+tmux send-keys -t "$LEAD_PANE" -l "claude --dangerously-skip-permissions"
 tmux send-keys -t "$LEAD_PANE" Enter
 # REPL 준비 폴링 (agenphony-up wait_repl 패턴 축약).
 ready=0
@@ -73,7 +77,9 @@ for _i in $(seq 1 60); do
   # 위로 밀려 false negative → 영구 폴링 hang(실측 2026-05-25). agenphony-up
   # bootstrap_pane 과 동일 정책. [[wait-repl-pattern-fragility]] 회피.
   dump="$(tmux capture-pane -t "$LEAD_PANE" -p -S -200 2>/dev/null)"
-  if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust'; then
+  # trust 화면 + --dangerously-skip-permissions 첫 실행 경고 수락 화면 모두 기본선택 Enter 통과.
+  # (경고 화면이 안 뜨면 안 매칭될 뿐 — 안전망.)
+  if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust|accept the risk|bypass permissions and continue|skip all permission'; then
     tmux send-keys -t "$LEAD_PANE" Enter; continue
   fi
   if printf '%s' "$dump" | grep -qE 'Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'; then

@@ -72,10 +72,22 @@ RESULT="${M3_RESULT:-$WS/m3-result.txt}"
   echo "F-환각(없는 것 끼임): [${hallucination:-없음}]"
 } > "$RESULT"
 
+# --- 회차 누적 기록 (2~3회 재현 추적) ---
+# 각 채점 결과를 한 줄로 append → 여러 회차 재현을 한눈에 (M1·M4 의 "3회 재현" 수준 격상).
+RUNS_LOG="${M3_RUNS_LOG:-/tmp/m3-runs.log}"
+if [ -z "$confusion" ] && [ -z "$missing" ] && [ -z "$hallucination" ]; then
+  verdict="PASS (오배달0)"
+else
+  verdict="FAIL (혼선:[${confusion:-}] 누락:[${missing:-}] 환각:[${hallucination:-}])"
+fi
+printf '%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$verdict" "$PROJ" >> "$RUNS_LOG"
+
 # --- assert ---
 echo "=== M3 채점 결과 ==="
 assert_eq "" "$confusion"     "F-혼선 0 (각 task 결과가 올바른 task 에 귀속)"
 assert_eq "" "$missing"       "F-누락 0 (done 6개 모두 종합)"
 assert_eq "" "$hallucination" "F-환각 0 (안 읽은 task 안 끼움)"
 echo "결과 파일: $RESULT"
+echo "--- 누적 회차 ($RUNS_LOG) ---"
+cat "$RUNS_LOG" 2>/dev/null | sed 's/^/  /'
 test_summary
