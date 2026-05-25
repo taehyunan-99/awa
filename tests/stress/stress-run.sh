@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 # 13차+: 다수 워커 LEAD 부담 스트레스 실행. watcher-integration.sh 패턴을 N워커 확장.
 # 더미 세션(claude 없음·토큰0) + watcher 백그라운드 → done N·gate K 동시 주입 →
-# capture-pane 으로 LEAD pane 수신 신호 수집 → 발생-처리 집합 대조(M1·M4) → 결과 파일.
+# LEAD pane(cat sink)이 수신 신호를 파일에 그대로 기록 → 발생-처리 집합 대조(M1·M4) → 결과 파일.
+#
+# I-1 수정: LEAD pane 을 interactive shell 로 두면 watcher send-keys 가 셸 명령으로 해석돼
+#   재가공(echo·command not found·프롬프트 redraw)되고, 큰 N 의 버스트 끝(마지막 1~2 워커)이
+#   영구히 깨진 토큰으로 남아 capture-pane 정규식 추출에 안 잡힌다(거짓 FAIL, timeout 까지도 회복 불가).
+#   → LEAD pane 을 `cat > sink` 수동 싱크로 바꿔 send-keys 라인을 가공 없이 파일에 적재한다.
+#   여기에 "expected 전부 도착까지 폴링(timeout 상한)"을 더해 빠른 종료 + 진짜 유실 구분을 보존.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ../assert.sh
@@ -13,14 +19,18 @@ RESULT="${STRESS_RESULT:-$(mktemp -d)/stress-result.txt}"
 SES="stress_$$"
 TMP_STATE="$(mktemp -d)"
 EVENTS="$TMP_STATE/events.log"
+LEAD_SINK="$TMP_STATE/lead.sink"   # LEAD pane 수신 신호를 가공 없이 적재
 mkdir -p "$TMP_STATE/pending-asks"
 : > "$EVENTS"   # 빈 events.log (watcher last_events=0 초기화)
+: > "$LEAD_SINK"
 
 cleanup() { tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$TMP_STATE"; }
 trap cleanup EXIT
 
 # 더미 세션: LEAD pane 1개 (워커 pane 은 토폴로지 동형용 — 부하는 스크립트가 직접 주입).
-tmux new-session -d -s "$SES" -x 200 -y 50
+# LEAD pane 은 interactive shell 대신 `cat > sink` 수동 싱크 — send-keys 라인을 셸 가공 없이
+# 그대로 파일에 적재(I-1: 큰 N 버스트 끝 토큰 mangling 방지).
+tmux new-session -d -s "$SES" -x 200 -y 50 "cat > '$LEAD_SINK'"
 LEAD_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
 WORKERS=""
 i=0
@@ -41,17 +51,29 @@ sleep 2.5   # 첫 폴링 사이클 보장
 GATE_UUIDS="g1 g2 g3"
 inject_done_lines "$EVENTS" "$WORKERS" "T"
 inject_pending_asks "$TMP_STATE/pending-asks" "$GATE_UUIDS"
-sleep 4   # watcher 가 누적분 수거·주입할 여유 (1초 폴링 × 부하 여유)
 
-# --- 수집·대조 ---
-DUMP="$(tmux capture-pane -p -S -500 -t "$LEAD_PANE")"
+# --- 수집: expected 전부 도착할 때까지 폴링 (timeout 상한) ---
+# 고정 sleep 은 N 에 비례 안 해 큰 N 에서 마지막 워커 알림 미도착→거짓 FAIL.
+# watcher 가 N 개 @done 을 send-keys 로 순차 주입하므로 도착이 N 에 비례해 늘어난다.
+# LEAD_SINK(cat) 에 적재된 신호를 폴링 — expected 가 다 보이면 즉시 종료, timeout 까지
+# 안 오면 그게 실측 유실(도착률 한계).
 expected_done="$(i=0; for w in $WORKERS; do i=$((i+1)); printf '%s/T%s\n' "$w" "$i"; done)"
-processed_done="$(extract_done_ids "$DUMP")"
-miss_done="$(missing_ids "$expected_done" "$processed_done")"
-
 expected_gate="$(printf '%s\n' $GATE_UUIDS | sort -u)"
-processed_gate="$(extract_gate_ids "$DUMP")"
-miss_gate="$(missing_ids "$expected_gate" "$processed_gate")"
+TIMEOUT="${STRESS_TIMEOUT:-20}"   # 초 상한
+DUMP=""; processed_done=""; processed_gate=""; miss_done=""; miss_gate=""
+waited=0
+while :; do
+  DUMP="$(cat "$LEAD_SINK" 2>/dev/null || true)"
+  processed_done="$(extract_done_ids "$DUMP")"
+  processed_gate="$(extract_gate_ids "$DUMP")"
+  miss_done="$(missing_ids "$expected_done" "$processed_done")"
+  miss_gate="$(missing_ids "$expected_gate" "$processed_gate")"
+  [ -z "$miss_done" ] && [ -z "$miss_gate" ] && break
+  # timeout 까지 다 안 오면 그 미도착이 실측 유실 신호 — 루프 탈출해 그대로 판정.
+  awk "BEGIN{exit !($waited >= $TIMEOUT)}" && break
+  sleep 0.5
+  waited="$(awk "BEGIN{print $waited + 0.5}")"
+done
 
 # --- 결과 파일 (heavy-task-offload: 요약만 대화로) ---
 {
