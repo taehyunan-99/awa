@@ -40,4 +40,14 @@ echo "[A4] missing_ids — 유실 없으면 빈 출력"
 miss2="$(missing_ids "$processed" "$processed")"
 assert_eq "" "$miss2" "A4 유실 없음 → 빈 문자열"
 
+echo "[A5] extract_* — 매칭 0건이어도 set -e 호출자에서 안전 (I-1 회귀)"
+# grep -oE 는 매칭 0건이면 rc=1 → pipefail 하 파이프라인 rc=1 → set -e 호출자 사망.
+# 함수가 || true 로 흡수해 빈 출력+rc0 을 보장해야 한다.
+( set -e
+  z1="$(extract_done_ids "마커 없는 잡음 라인")"
+  z2="$(extract_gate_ids "uuid 없는 라인")"
+  [ -z "$z1" ] && [ -z "$z2" ]
+)
+assert_eq "0" "$?" "A5 0건 매칭 시 set -e 환경 생존 (빈 출력·rc0)"
+
 test_summary

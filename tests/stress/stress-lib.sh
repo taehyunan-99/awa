@@ -6,18 +6,20 @@
 # watcher 송신 형식: "@done: <worker>/<task> 완료. ..."
 extract_done_ids() {  # $1=capture 덤프 → 줄당 worker/task, sort -u
   printf '%s\n' "$1" \
-    | grep -oE '@done: [A-Za-z0-9_-]+/[A-Za-z0-9_-]+' \
+    | { grep -oE '@done: [A-Za-z0-9_-]+/[A-Za-z0-9_-]+' || true; } \
     | sed 's/^@done: //' \
     | sort -u
+  # grep no-match rc1 흡수 — set -e 호출자(stress-run) 0건 측정 시 사망 방지
 }
 
 # @gate 알림 라인에서 uuid 만 뽑아 고유 정렬.
 # watcher 송신 형식: "@gate: 워커 승인 대기 (uuid=<uuid>). ..."
 extract_gate_ids() {  # $1=capture 덤프 → 줄당 uuid, sort -u
   printf '%s\n' "$1" \
-    | grep -oE 'uuid=[A-Za-z0-9_-]+' \
+    | { grep -oE 'uuid=[A-Za-z0-9_-]+' || true; } \
     | sed 's/^uuid=//' \
     | sort -u
+  # grep no-match rc1 흡수 — set -e 호출자(stress-run) 0건 측정 시 사망 방지
 }
 
 # 발생 집합(줄단위) 중 처리 집합에 없는 식별자 (유실). 둘 다 정렬돼 들어온다고 가정 안 함 — 내부 정렬.
