@@ -16,10 +16,11 @@ mkdir -p "$TMP_STATE/pending-asks"
 printf '%s\tdev\tOLD\tdone\t-\n' "ts-old" > "$EVENTS"
 
 cleanup() {
+  [ -n "${WPID:-}" ] && { kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null; }
   tmux kill-session -t "$SES" 2>/dev/null || true
   rm -rf "$TMP_STATE"
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-kill) 에 좀비 잔존(실측)
 
 # lead pane (window0 pane1), reviewer pane (split)
 tmux new-session -d -s "$SES" -x 200 -y 50

@@ -26,7 +26,7 @@ mkdir -p "$TMP_STATE/pending-asks"
 
 WPID=""   # watcher 백그라운드 PID (cleanup 에서 직접 kill — 1초 좀비 잔존 race 제거)
 cleanup() { [ -n "$WPID" ] && { kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null; }; tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$TMP_STATE"; }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-kill) 에 좀비 잔존(실측)
 
 # 더미 세션: LEAD pane 1개 (워커 pane 은 토폴로지 동형용 — 부하는 스크립트가 직접 주입).
 # LEAD pane 은 interactive shell 대신 `cat > sink` 수동 싱크 — send-keys 라인을 셸 가공 없이

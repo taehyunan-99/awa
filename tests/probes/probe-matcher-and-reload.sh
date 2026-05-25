@@ -3,7 +3,8 @@
 # P6(b): add_to_allow 후 claude 가 settings 재읽기(reload) 하는지 관찰.
 #   ※ P6(a) hook allow vs settings.deny 는 4차 docs 로 확정 종료 (deny > hook allow, probe 불요).
 set -uo pipefail
-[ "${RUN_INTEGRATION:-0}" = "1" ] || { echo "SKIP (RUN_INTEGRATION 미설정)"; exit 0; }
+# RUN_LIVE=1 일 때만 (실제 claude REPL·토큰). 더미 RUN_INTEGRATION 과 분리.
+[ "${RUN_LIVE:-0}" = "1" ] || { echo "SKIP (RUN_LIVE 미설정)"; exit 0; }
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
 
@@ -25,6 +26,17 @@ wait_repl() {
 #     통과하면 colon-asterisk 가 claude 와 정합 (matrix_lookup 패턴 형식 확정).
 PROBE_DIR="$(mktemp -d)"
 SES="probeP1_$$"
+# 중간 사망(kill·에러·timeout)에도 단계별 세션·임시디렉터리 정리 — 좀비 세션 다음 실행 오염 방지.
+# P1/P7/P8 3단계가 순차로 변수를 점증 정의하므로 ${var:-} 가드로 '정의된 것만' 정리.
+cleanup() {
+  for s in "${SES:-}" "${P7_SES:-}" "${P8_SES:-}"; do
+    [ -n "$s" ] && tmux kill-session -t "$s" 2>/dev/null || true
+  done
+  for d in "${PROBE_DIR:-}" "${P7_DIR:-}" "${P8_DIR:-}"; do
+    [ -n "$d" ] && rm -rf "$d"
+  done
+}
+trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-kill) 에 좀비 잔존(실측)
 mkdir -p "$PROBE_DIR/.claude"
 cat > "$PROBE_DIR/.claude/settings.json" <<'JSON'
 { "permissions": { "allow": ["Bash(echo:*)"] } }

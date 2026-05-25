@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # 통합 probe: permission-gate hook 의 wait-for 게이트 전 경로.
-# RUN_INTEGRATION=1 일 때만 (실제 claude REPL + tmux). CI skip.
+# RUN_LIVE=1 일 때만 (실제 claude REPL·토큰 + tmux). 더미 RUN_INTEGRATION 과 분리. CI skip.
 set -uo pipefail
-[ "${RUN_INTEGRATION:-0}" = "1" ] || { echo "SKIP (RUN_INTEGRATION 미설정)"; exit 0; }
+[ "${RUN_LIVE:-0}" = "1" ] || { echo "SKIP (RUN_LIVE 미설정)"; exit 0; }
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
 
 PROBE_DIR="$(mktemp -d)"
 SES="probe6_$$"
 WUUID="$(uuidgen)"
+# 중간 사망(kill·에러·timeout)에도 세션·임시디렉터리 정리 — 좀비 세션이 다음 실행 오염 방지.
+cleanup() { tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$PROBE_DIR"; }
+trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-kill) 에 좀비 잔존(실측)
 # settings 생성 (dev 템플릿 + permission-gate).
 # ★ HARNESS_PROJECT export 필수 (3차 리뷰): lib.sh:27 이 PROJECT_ROOT 를 resolve_project_root
 #   로 무조건 재대입 → HARNESS_PROJECT 우선. 안 주면 PROJECT_ROOT 가 ROOT(repo)로 덮어써져
