@@ -53,4 +53,8 @@ assert_contains "$COMMON" 'BLOCKED' "_common ④ BLOCKED 프로토콜"
 assert_contains "$COMMON" 'ASSUMED:' "_common ⑤ assume-and-flag"
 assert_contains "$COMMON" 'wait-for -S done-{{SESSION}}-{{WORKER_NAME}}' "_common 완료신호 보존(회귀)"
 
+res_c="$(cat "$(resolve_role_file "$ROOT/prompts" researcher)")"
+assert_contains "$res_c" "budget" "researcher.md ⑤ budget"
+assert_contains "$res_c" "추측" "researcher.md ① 추측 단정 금지"
+
 test_summary
