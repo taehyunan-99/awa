@@ -18,4 +18,7 @@ dev_c="$(cat "$(resolve_role_file "$ROOT/prompts" dev)")"
 assert_contains "$dev_c" "budget" "dev.md ⑤ effort budget 명시"
 assert_contains "$dev_c" "EVIDENCE" "dev.md ③ evidence 구체화"
 
+test_c="$(cat "$(resolve_role_file "$ROOT/prompts" tester)")"
+assert_contains "$test_c" "budget" "tester.md ⑤ effort budget 명시"
+
 test_summary
