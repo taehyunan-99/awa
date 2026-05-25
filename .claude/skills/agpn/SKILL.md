@@ -1,0 +1,33 @@
+---
+name: agpn
+description: agenphony 하네스 진입점. plan(계획 위임)·stage(plan 검증+팀편성+발진명령)·list(세션 목록) 서브커맨드. /agpn <서브커맨드>.
+---
+
+# agpn — agenphony 하네스 진입점
+
+첫 인자(서브커맨드)로 분기한다: `plan` / `stage` / `list`. 인자 없음·미지원 → usage.
+
+**공통 규약 (토큰·보안):**
+- 본 스킬 본체는 토큰0 작업(파싱·파일I/O·대화·스킬 위임). 4축 리뷰만 Agent subagent.
+- 라이브 tmux(`agenphony-up`, `tmux attach`)는 **절대 직접 실행하지 말 것** — 완성된 명령을 출력하고 사용자가 `!` 로 실행하게 한다(claude `-p`·직접 실행 금지).
+
+## 서브커맨드: plan
+사용자 아이디어 → 계획 설계. superpowers 스킬로 위임:
+1. `superpowers:brainstorming` 스킬을 Skill 도구로 호출(설계 대화).
+2. 완료되면 `superpowers:writing-plans` 스킬을 호출(plan 작성).
+산출물은 `docs/superpowers/plans/YYYY-MM-DD-<name>.md`. 완료 후 "이제 `/agpn stage` 로 검증·가동하세요" 안내.
+
+## 서브커맨드: stage
+→ `stage` 절(아래) 따름.
+
+## 서브커맨드: list
+→ `list` 절(아래) 따름.
+
+## usage
+인자 없음·미지원 시:
+```
+agpn <서브커맨드>
+  plan [아이디어]   계획 설계(brainstorming→writing-plans 위임)
+  stage [plan]      plan 검증·팀편성·발진 명령 출력
+  list              살아있는 agenphony 세션 목록
+```
