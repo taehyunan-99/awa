@@ -57,4 +57,8 @@ res_c="$(cat "$(resolve_role_file "$ROOT/prompts" researcher)")"
 assert_contains "$res_c" "budget" "researcher.md ⑤ budget"
 assert_contains "$res_c" "추측" "researcher.md ① 추측 단정 금지"
 
+sec_c="$(cat "$(resolve_role_file "$ROOT/prompts" security)")"
+assert_contains "$sec_c" "budget" "security.md ⑤ budget"
+assert_contains "$sec_c" "file:line" "security.md ③ 취약점 위치 file:line"
+
 test_summary
