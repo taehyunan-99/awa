@@ -15,4 +15,8 @@ assert_contains "$content" "Edit" "Edit 금지 명시"
 assert_contains "$content" "permission-gate" "lead 감지: hook 게이트 명시"
 assert_contains "$content" "review/" "Write 허용 경로 명시"
 
+revc="$(cat "$(resolve_role_file "$ROOT/prompts" reviewer-common)")"
+assert_contains "$revc" "Bash" "reviewer-common ① Bash 금지 명시"
+assert_contains "$revc" "신뢰" "reviewer-common ① 금지 근거(신뢰성)"
+
 test_summary
