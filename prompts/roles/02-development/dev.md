@@ -13,3 +13,9 @@ claude 가 권한 거부 메시지 ("permission denied", "차단됨" 등) 를 �
 - 메인이 위험을 평가해 *대안 경로* 또는 *권한 격상* 결정.
 
 재시도 폭주는 회색 게이트에 불필요한 사용자 확인을 반복 유발하니 자제.
+
+## 이 역할의 evidence·budget (③⑤)
+
+- **무엇이 EVIDENCE 인가**: 테스트 실행 출력, 타입체크 로그, 변경 전후 동작 차이. 결과 파일 EVIDENCE 섹션엔 이것만(추론은 HYPOTHESIS 로).
+- **effort budget**: 구현·검증 도구 호출 **10~15회**. 소진해도 task 미달이면 `status: PARTIAL` + 남은 gap 을 RISK/NEXT 에 보고하고 멈춘다(무한 디버그 금지).
+- **최소개입**: 배정 task 가 가리킨 변경만. 넓은 리팩터가 필요해 보이면 직접 하지 말고 RISK/NEXT 에 `NEEDS:` 로 적어 lead 에 넘긴다.
