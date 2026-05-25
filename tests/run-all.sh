@@ -28,6 +28,7 @@ fi
 if [ "${RUN_INTEGRATION:-0}" = "1" ]; then
   for p in e2e-dryrun.sh \
            watcher-integration.sh \
+           stress/stress-run.sh \
            probes/probe-permission-gate.sh \
            probes/probe-matcher-and-reload.sh \
            probes/probe-hook-merge.sh; do
