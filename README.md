@@ -74,6 +74,20 @@ SESSION_OVERRIDE="agenphony-auth2" ~/.../bin/agenphony-up.sh default
 
 새 팀: `profiles/<name>.sh` 추가 (`SESSION`, `LAYOUT`, `WORKERS=("이름:역할[:모델]" ...)`, 선택 `REVIEWERS=(...)`, `LEAD_MODEL`), 필요 시 `prompts/roles/<역할>.md` 추가. `bin/` 은 수정 불필요.
 
+## 역할 추가 (파츠화 확장)
+
+새 역할 추가:
+1. `prompts/roles/NN-part/<역할>.md` 작성 (첫 줄 = 한 줄 desc. 5축 형식 — _common.md 참조).
+2. 프로파일에 `WORKERS+=("이름:<역할>:모델")` 또는 `REVIEWERS+=(...)` 엔트리 추가.
+3. 끝 — up 이 `roles/*/<역할>.md` 글롭으로 자동 해석·카탈로그 등록. **프롬프트는 코드수정 0.**
+
+권한(settings)은 자동이 아니다:
+- 새 역할 권한이 기존 군(dev/test/reviewer/lead/pm)과 같으면 추가 작업 없음(default 또는 같은 case).
+- 다르면 `bin/lib.sh` 의 `generate_worker_settings` case 에 1줄 추가 + 필요시 `templates/settings.<군>.json.tpl`. (reviewer-* 는 글롭이라 자동.)
+
+불변식: 역할명은 전 파트에서 고유 (= 파일명). 중복 시 `resolve_role_file` 가 fail-fast.
+새 파트: `roles/NN-newpart/` 디렉터리 생성 후 위 1~2. 번호 append.
+
 ## 통신 메커니즘
 
 - 명령 주입: `tmux send-keys -l` (텍스트/Enter 분리)
