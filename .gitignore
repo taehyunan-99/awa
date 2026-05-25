@@ -8,6 +8,9 @@
 # 설계/계획 문서 — git 추적 안 함
 docs/
 
+# superpowers brainstorming/visual-companion 로컬 세션 산출물
+.superpowers/
+
 # 캐시 / OS / 에디터
 *.log
 .DS_Store
