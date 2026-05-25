@@ -50,4 +50,22 @@ echo "[A5] extract_* — 매칭 0건이어도 set -e 호출자에서 안전 (I-1
 )
 assert_eq "0" "$?" "A5 0건 매칭 시 set -e 환경 생존 (빈 출력·rc0)"
 
+echo "[A6] inject_done_lines — events.log 에 N개 done 라인을 워커별로 append"
+TMP="$(mktemp -d)"; EV="$TMP/events.log"
+inject_done_lines "$EV" "dev1 dev2 dev3" "T"
+# 워커 3명 × task 1개 = 3 done 라인. 형식: ts\tworker\tT<i>\tdone\t-
+cnt="$(awk -F'\t' '$4=="done"{c++} END{print c+0}' "$EV")"
+assert_eq "3" "$cnt" "A6a done 라인 3개"
+ids="$(awk -F'\t' '$4=="done"{print $2"/"$3}' "$EV" | sort -u)"
+assert_eq "dev1/T1
+dev2/T2
+dev3/T3" "$ids" "A6b 워커별 식별자 정확"
+
+echo "[A7] inject_pending_asks — state/pending-asks/ 에 K개 .json 생성"
+mkdir -p "$TMP/state/pending-asks"
+inject_pending_asks "$TMP/state/pending-asks" "u1 u2 u3 u4"
+jcnt="$(ls "$TMP/state/pending-asks"/*.json 2>/dev/null | wc -l | tr -d ' ')"
+assert_eq "4" "$jcnt" "A7 pending-asks 4개 .json"
+rm -rf "$TMP"
+
 test_summary

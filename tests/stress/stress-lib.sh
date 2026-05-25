@@ -30,3 +30,24 @@ missing_ids() {  # $1=발생(개행구분) $2=처리(개행구분) → 유실 �
     <(printf '%s\n' "$1" | grep -v '^$' | sort -u) \
     <(printf '%s\n' "$2" | grep -v '^$' | sort -u)
 }
+
+# events.log 에 워커별 done 라인을 append. 워커 i 의 task 는 <prefix><i> (1-based).
+# watcher.sh 가 $4=="done" 로 감지하는 탭5필드 형식(ts\tworker\ttask\tdone\t-).
+inject_done_lines() {  # $1=events.log $2=워커명(공백구분) $3=task prefix
+  local ev="$1" prefix="$3" i=0 w
+  for w in $2; do
+    i=$((i+1))
+    printf '%s\t%s\t%s%s\tdone\t-\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$w" "$prefix" "$i" >> "$ev"
+  done
+}
+
+# state/pending-asks/ 에 uuid 별 .json 을 생성 (gate 부하).
+# watcher.sh 가 *.json 을 감지해 @gate: 주입. 최소 필드만(uuid). uuid 에 점(.) 금지 — extract_gate_ids 패턴과 정합.
+inject_pending_asks() {  # $1=pending-asks 디렉터리 $2=uuid(공백구분)
+  local dir="$1" u
+  mkdir -p "$dir"
+  for u in $2; do
+    printf '{"uuid":"%s"}\n' "$u" > "$dir/$u.json"
+  done
+}
