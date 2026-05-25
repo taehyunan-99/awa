@@ -24,7 +24,8 @@ mkdir -p "$TMP_STATE/pending-asks"
 : > "$EVENTS"   # 빈 events.log (watcher last_events=0 초기화)
 : > "$LEAD_SINK"
 
-cleanup() { tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$TMP_STATE"; }
+WPID=""   # watcher 백그라운드 PID (cleanup 에서 직접 kill — 1초 좀비 잔존 race 제거)
+cleanup() { [ -n "$WPID" ] && { kill "$WPID" 2>/dev/null; wait "$WPID" 2>/dev/null; }; tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$TMP_STATE"; }
 trap cleanup EXIT
 
 # 더미 세션: LEAD pane 1개 (워커 pane 은 토폴로지 동형용 — 부하는 스크립트가 직접 주입).
@@ -45,6 +46,7 @@ WORKERS="${WORKERS# }"
 SESSION="$SES" LEAD_PANE="$LEAD_PANE" REVIEWER_PANES="" \
 STATE_DIR="$TMP_STATE" EVENTS="$EVENTS" SEEN="$TMP_STATE/.watcher-seen" \
   bash "$ROOT/bin/watcher.sh" &
+WPID=$!
 sleep 2.5   # 첫 폴링 사이클 보장
 
 # --- 부하 주입: done N개 + gate K개 동시 ---
@@ -80,10 +82,10 @@ done
   echo "# LEAD 부담 스트레스 결과 ($(date -u +%FT%TZ))"
   echo "워커 수 N=$N, gate K=$(printf '%s\n' $GATE_UUIDS | wc -w | tr -d ' ')"
   echo "## M1 (done 신호 유실)"
-  echo "발생: $(printf '%s\n' "$expected_done" | wc -l | tr -d ' ') / 처리: $(printf '%s\n' "$processed_done" | grep -c . || true)"
+  echo "발생: $(printf '%s\n' "$expected_done" | grep -c . || true) / 처리: $(printf '%s\n' "$processed_done" | grep -c . || true)"
   echo "유실: [${miss_done:-없음}]"
   echo "## M4 (gate 신호 유실)"
-  echo "발생: $(printf '%s\n' "$expected_gate" | wc -l | tr -d ' ') / 처리: $(printf '%s\n' "$processed_gate" | grep -c . || true)"
+  echo "발생: $(printf '%s\n' "$expected_gate" | grep -c . || true) / 처리: $(printf '%s\n' "$processed_gate" | grep -c . || true)"
   echo "유실: [${miss_gate:-없음}]"
 } > "$RESULT"
 
