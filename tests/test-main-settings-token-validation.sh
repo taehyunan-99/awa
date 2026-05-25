@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 워커 settings 의 {{...}} 토큰 치환 확인 + 손상 템플릿 잔존 시 team-up fail.
+# 워커 settings 의 {{...}} 토큰 치환 확인 + 손상 템플릿 잔존 시 agenphony-up fail.
 # 6차: project .claude/settings.json 은 빈 {} 로 이관됨 (hook 은 워커 --settings 로).
 #   따라서 토큰 치환(events.log/log-event.sh)의 검증 대상은 워커 .boot-settings/<role>.json.
 set -uo pipefail
@@ -10,16 +10,16 @@ ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 
 cleanup() {
-  tmux kill-session -t "agents-$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')" 2>/dev/null || true
+  tmux kill-session -t "agenphony-$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')" 2>/dev/null || true
   rm -rf "$TMP"
 }
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-echo "[M1] 정상 team-up — 워커 settings 토큰 치환 완료 (PostToolUse log-event)"
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" default >/dev/null 2>&1
+echo "[M1] 정상 agenphony-up — 워커 settings 토큰 치환 완료 (PostToolUse log-event)"
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" default >/dev/null 2>&1
 rc=$?
-assert_eq "0" "$rc" "M1 team-up 성공"
+assert_eq "0" "$rc" "M1 agenphony-up 성공"
 # 6차: project settings.json 은 빈 {} — 토큰 치환 검증은 워커 settings 에서.
 proj_content="$(cat "$TMP/.claude/settings.json")"
 assert_eq "{}" "$(printf '%s' "$proj_content" | tr -d '[:space:]')" "M1 project settings 빈 {} (hook 이관)"
@@ -35,7 +35,7 @@ assert_contains "$content" "$ROOT/bin/log-event.sh" "M1 HARNESS_ROOT 치환 (Pos
 # PreToolUse permission-gate 도 함께 (단일 --settings 공존 확인)
 assert_contains "$content" "$ROOT/bin/permission-gate.sh" "M1 PreToolUse permission-gate 공존"
 
-bash "$ROOT/bin/team-down.sh" --project "$TMP" >/dev/null 2>&1 || true
+bash "$ROOT/bin/agenphony-down.sh" --project "$TMP" >/dev/null 2>&1 || true
 
 echo "[M2] 손상된 템플릿 — 토큰 잔존 시 fail-fast"
 # fixture: harness 전체 사본 + 템플릿에 sed 가 못 잡는 화이트리스트 외 토큰 박기.
@@ -45,7 +45,7 @@ TMP2="$(mktemp -d)"
 SAFE2="$(printf '%s' "$(basename "$TMP2")" | sed 's/[^A-Za-z0-9_-]/_/g')"
 # trap 확장 — M2 자원도 EXIT 시 자동 정리. assert 중간 fail 도 leak 차단.
 cleanup_m2() {
-  tmux kill-session -t "agents-$SAFE2" 2>/dev/null || true
+  tmux kill-session -t "agenphony-$SAFE2" 2>/dev/null || true
   rm -rf "$TMP2" "$FIX_HARNESS"
 }
 trap 'cleanup; cleanup_m2' EXIT
@@ -59,10 +59,10 @@ cat > "$FIX_HARNESS/templates/settings.json.tpl" <<'TPL'
 TPL
 
 ( cd "$TMP2" && git init -q )
-out="$(HARNESS_PROJECT="$TMP2" AGENT_CMD=cat bash "$FIX_HARNESS/bin/team-up.sh" default 2>&1)"
+out="$(HARNESS_PROJECT="$TMP2" AGENT_CMD=cat bash "$FIX_HARNESS/bin/agenphony-up.sh" default 2>&1)"
 rc=$?
 
-assert_fail "$rc" "M2 손상된 토큰 — team-up 실패"
+assert_fail "$rc" "M2 손상된 토큰 — agenphony-up 실패"
 assert_contains "$out" "토큰 미치환" "M2 잔존 검증 메시지"
 
 test_summary

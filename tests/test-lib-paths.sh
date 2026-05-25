@@ -10,8 +10,8 @@ assert_eq "$ROOT" "$HARNESS_ROOT" "HARNESS_ROOT 가 하네스 루트"
 assert_eq "$PROJECT_ROOT/.agent-harness" "$WORKSPACE" "WORKSPACE 경로"
 assert_eq "agents" "$SESSION_DEFAULT" "기본 세션명"
 
-# SESSION 미설정 → 자동명 폴백 (T3): agents-<basename of PROJECT_ROOT>
-sess_auto="agents-$(basename "$PROJECT_ROOT")"
+# SESSION 미설정 → 자동명 폴백 (T3): agenphony-<basename of PROJECT_ROOT>
+sess_auto="agenphony-$(basename "$PROJECT_ROOT")"
 assert_eq "${sess_auto}:0.2" "$(target_of 2)" "SESSION 미설정 → 자동명 폴백"
 assert_eq "${sess_auto}:0.4" "$(target_of 4)" "페인 인덱스 4 → target"
 

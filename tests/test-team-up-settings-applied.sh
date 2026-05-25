@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# team-up 후 .boot-settings/<role>.json 6 파일 생성 + 매핑 검증.
+# agenphony-up 후 .boot-settings/<role>.json 6 파일 생성 + 매핑 검증.
 # AGENT_CMD=cat 으로 더미 실행 — claude 부재 환경에서도 동작.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -8,7 +8,7 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
-SESSION="agents-$SAFE"
+SESSION="agenphony-$SAFE"
 
 cleanup() {
   tmux kill-session -t "$SESSION" 2>/dev/null || true
@@ -18,9 +18,9 @@ trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
 # feature-team 프로파일: dev/test/researcher 워커 + 3 reviewer.
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" feature-team >/dev/null 2>&1
 rc=$?
-assert_eq "0" "$rc" "team-up 성공"
+assert_eq "0" "$rc" "agenphony-up 성공"
 
 BOOTSET="$TMP/.agent-harness/.boot-settings"
 [ -d "$BOOTSET" ]; assert_success "$?" ".boot-settings 디렉터리 생성"

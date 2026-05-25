@@ -1,8 +1,9 @@
 # 런타임 산출물 — 정의가 아닌 결과물 (PROJECT_ROOT 별 격리)
 .agent-harness/
 
-# Claude Code 디렉터리 전체 — 개인·런타임·로컬 설정, 공유 안 함
-.claude/
+# Claude Code 개인·런타임 설정만 ignore, skills 는 공유 (R5: .claude/ 통째면 !예외 안 먹힘)
+.claude/*
+!.claude/skills
 
 # 설계/계획 문서 — git 추적 안 함
 docs/

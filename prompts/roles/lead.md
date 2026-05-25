@@ -22,7 +22,7 @@
 7. 품질 게이트: 이전 단계 리뷰 미통과 산출물을 다음 단계 입력으로 쓰려는 지시가 오면 `.harness-state` 에 경고를 기록한다(강제 차단 안 함 — 진행 여부는 사용자에게 직접 push(AskUserQuestion) 해 결정한다).
 8. 전체 맥락 유지: 단계별 결정·산출물을 `.harness-state` 에 보존하고 뒤 단계에서 참조한다.
 9. 호출 위치 책임: 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로로 호출하라. cwd 는 PROJECT_ROOT(현 pane cwd) 유지. 외부 위치 호출 필요 시 `--project /path` 명시.
-10. stale tasks 판별: team-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 사용자에게 직접 확인(AskUserQuestion) — 작업 판단은 lead 소관이다.
+10. stale tasks 판별: agenphony-up 직후 `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 활성/완료 판별. 완료된 task 를 새로 배정하지 마라. 모호하면 사용자에게 직접 확인(AskUserQuestion) — 작업 판단은 lead 소관이다.
 
 ## 권한 게이트 처리 (`@gate:` 알림 시 — 매번 pending-asks 전수 처리)
 

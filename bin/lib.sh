@@ -70,7 +70,7 @@ _session_autoname() {
   local b safe
   b="$(basename "$PROJECT_ROOT")"
   safe="$(printf '%s' "$b" | sed 's/[^A-Za-z0-9_-]/_/g')"
-  printf 'agents-%s' "$safe"
+  printf 'agenphony-%s' "$safe"
 }
 
 # SESSION 결정 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION env > 자동명.

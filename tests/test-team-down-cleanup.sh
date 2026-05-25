@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# team-down 이 .boot-settings/ 제거 확인.
+# agenphony-down 이 .boot-settings/ 제거 확인.
 # T19: state 디렉터리 정리(게이트 안) 검증. 6차: 데몬 폐기 — watch-asks/tail-pids 단언 제거.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -8,7 +8,7 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
-SESSION="agents-$SAFE"
+SESSION="agenphony-$SAFE"
 
 cleanup() {
   tmux kill-session -t "$SESSION" 2>/dev/null || true
@@ -17,9 +17,9 @@ cleanup() {
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/team-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" feature-team >/dev/null 2>&1
 
-# team-up 후 권한 산출물 + 사용자 흔적 만들기.
+# agenphony-up 후 권한 산출물 + 사용자 흔적 만들기.
 WS="$TMP/.agent-harness"
 mkdir -p "$WS/.boot-settings"
 echo '{"x":"y"}' > "$WS/.boot-settings/dev.json"
@@ -34,8 +34,8 @@ echo '{}' > "$WS/state/pending-asks/u1.json"
 echo '{}' > "$WS/state/incidents/i1.json"
 echo "ts dev - PRE Bash" > "$WS/state/permission-gate.log"   # 6차 게이트 로그 정리 검증
 
-# team-down 실행
-HARNESS_PROJECT="$TMP" bash "$ROOT/bin/team-down.sh" >/dev/null 2>&1
+# agenphony-down 실행
+HARNESS_PROJECT="$TMP" bash "$ROOT/bin/agenphony-down.sh" >/dev/null 2>&1
 
 [ ! -d "$WS/.boot-settings" ]; assert_success "$?" ".boot-settings 제거"
 
@@ -44,7 +44,7 @@ HARNESS_PROJECT="$TMP" bash "$ROOT/bin/team-down.sh" >/dev/null 2>&1
 assert_success "$?" ".boot/*.md 제거 (기존 동작)"
 
 # T19/6차: state 디렉터리 + 게이트 로그 정리 단언 (데몬 폐기 — 데몬 파일 단언 제거).
-echo "[D-state] team-down 후 pending-asks/incidents/removal 정리"
+echo "[D-state] agenphony-down 후 pending-asks/incidents/removal 정리"
 [ ! -d "$WS/state/pending-asks" ]; assert_success "$?" "pending-asks 정리"
 [ ! -d "$WS/state/incidents" ]; assert_success "$?" "incidents 정리"
 [ ! -d "$WS/state/removal-requests" ]; assert_success "$?" "state/removal-requests 제거"

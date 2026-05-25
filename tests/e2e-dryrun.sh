@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# e2e dry-run: AGENT_CMD=cat 더미로 team-up→상태검사→team-down 전 배선을 무해 검증.
+# e2e dry-run: AGENT_CMD=cat 더미로 agenphony-up→상태검사→agenphony-down 전 배선을 무해 검증.
 #   실 claude 미기동(토큰 0·TCC 위험 0). 검증 대상:
 #   - 세션/윈도우/페인 구성 (lead + 워커 + 리뷰어, window0/1, 인덱스 고정)
 #   - pane title (LEAD·워커명·리뷰어명)
 #   - settings.json marker 생성 + 워커별 .boot-settings/*.json 생성 + hook 공존
 #   - boot 합본 파일 (.boot/*.md) 토큰 치환
 #   - lead-auto-allow.yaml·state 디렉터리 설치
-#   - team-down 정리 (런타임 산출물 제거, marker 제거)
+#   - agenphony-down 정리 (런타임 산출물 제거, marker 제거)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
@@ -20,8 +20,8 @@ has() { if [ -e "$1" ]; then echo "  ok: $2"; PASS=$((PASS+1)); else echo "  FAI
 
 echo "=== dry-run: profile=$PROFILE  proj=$PROJ ==="
 
-# team-up (더미 cat 엔진). REPL 폴링은 cat 분기라 sleep 0.2 만 — 빠름.
-AGENT_CMD=cat bash bin/team-up.sh --project "$PROJ" "$PROFILE" 2>&1 | sed 's/^/  [up] /'
+# agenphony-up (더미 cat 엔진). REPL 폴링은 cat 분기라 sleep 0.2 만 — 빠름.
+AGENT_CMD=cat bash bin/agenphony-up.sh --project "$PROJ" "$PROFILE" 2>&1 | sed 's/^/  [up] /'
 
 SES="$(HARNESS_PROJECT="$PROJ" bash -c 'source bin/lib.sh; resolve_session')"
 echo "=== 세션=$SES ==="
@@ -94,10 +94,10 @@ has "$PROJ/.agent-harness/state/pending-asks" "state/pending-asks 디렉터리"
 [ -f "$ROOT/bin/wait-worker.sh" ] && chk no yes "wait-worker.sh 잔존(실패)" || chk yes yes "wait-worker.sh 삭제됨"
 [ -f "$ROOT/bin/watcher.sh" ] && chk yes yes "watcher.sh 존재" || chk yes no "watcher.sh 없음(실패)"
 
-# 6) team-down 정리
-echo "=== team-down ==="
-bash bin/team-down.sh --project "$PROJ" 2>&1 | sed 's/^/  [down] /'
-tmux has-session -t "$SES" 2>/dev/null && chk no yes "team-down 후 세션 잔존(실패)" || chk yes yes "team-down 세션 종료"
+# 6) agenphony-down 정리
+echo "=== agenphony-down ==="
+bash bin/agenphony-down.sh --project "$PROJ" 2>&1 | sed 's/^/  [down] /'
+tmux has-session -t "$SES" 2>/dev/null && chk no yes "agenphony-down 후 세션 잔존(실패)" || chk yes yes "agenphony-down 세션 종료"
 [ -f "$PROJ/.claude/settings.json" ] && chk no yes "settings.json 잔존(실패)" || chk yes yes "settings.json 정리"
 [ -f "$PROJ/.claude/.agent-harness-marker" ] && chk no yes "marker 잔존(실패)" || chk yes yes "marker 정리"
 [ -d "$PROJ/.agent-harness/.boot-settings" ] && chk no yes ".boot-settings 잔존(실패)" || chk yes yes ".boot-settings 정리"
