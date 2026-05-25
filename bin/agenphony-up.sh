@@ -262,6 +262,9 @@ tmux select-layout -t "$SESSION:0" "$LAYOUT"
 # continuum 오염 방지: 이 세션 자동저장 사실상 비활성화
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
+# 12차: PROJECT_ROOT 를 세션옵션으로 기록 — agenphony-list 가 읽는 안정적 출처.
+tmux set-option -t "$SESSION" @agenphony-project "$PROJECT_ROOT" 2>/dev/null || true
+
 # review 윈도우(window 1) 생성 — REVIEWERS 정의·비어있지 않을 때만.
 # 가드 순서 중요: 존재 확인(+x) 먼저, 그 다음에만 길이 평가 (set -u·bash3.2 안전).
 REV_NAMES=()
