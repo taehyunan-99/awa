@@ -24,19 +24,19 @@ trap cleanup EXIT
 cp -r "$ROOT/prompts" "$FIX_PROMPTS"
 
 # 워커용 test-role: {{HARNESS_ROOT}} 토큰 박기.
-cat > "$FIX_PROMPTS/roles/test-role.md" <<'EOF'
+mkdir -p "$FIX_PROMPTS/roles/02-development" && cat > "$FIX_PROMPTS/roles/02-development/test-role.md" <<'EOF'
 # Test Role
 도구는 {{HARNESS_ROOT}}/bin/dispatch.sh 절대경로로 호출.
 EOF
 
 # 리뷰어용 test-reviewer: {{HARNESS_ROOT}} 토큰 박기.
-cat > "$FIX_PROMPTS/roles/test-reviewer.md" <<'EOF'
+cat > "$FIX_PROMPTS/roles/03-quality/test-reviewer.md" <<'EOF'
 # Test Reviewer
 리뷰는 {{HARNESS_ROOT}}/bin/log-event.sh 를 기준으로 한다.
 EOF
 
 # lead boot 도 토큰 검증 — lead.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
-cat >> "$FIX_PROMPTS/roles/lead.md" <<'EOF'
+cat >> "$FIX_PROMPTS/roles/01-orchestration/lead.md" <<'EOF'
 
 ## (fixture) 토큰 검증
 dispatch: {{HARNESS_ROOT}}/bin/dispatch.sh

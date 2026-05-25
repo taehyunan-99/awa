@@ -4,7 +4,8 @@ set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
-content="$(cat "$ROOT/prompts/roles/lead.md")"
+source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
+content="$(cat "$(resolve_role_file "$ROOT/prompts" lead)")"
 
 # 6차 게이트 3단계 (보존·핵심)
 assert_contains "$content" "pending-asks" "1단계 pending-asks"

@@ -19,8 +19,10 @@ assert_contains "${WORKERS[*]}" "security" "code-review 에 security 포함"
 source "$ROOT/profiles/research.sh"
 assert_eq "3" "${#WORKERS[@]}" "research 워커 3개"
 
-for f in _common roles/dev roles/tester roles/security roles/researcher roles/lead roles/reviewer-spec roles/reviewer-quality roles/reviewer-arch; do
-  [ -f "$ROOT/prompts/$f.md" ]; assert_success "$?" "prompts/$f.md 존재"
+source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
+[ -f "$ROOT/prompts/_common.md" ]; assert_success "$?" "prompts/_common.md 존재"
+for r in dev tester security researcher lead reviewer-spec reviewer-quality reviewer-arch; do
+  resolve_role_file "$ROOT/prompts" "$r" >/dev/null 2>&1; assert_success "$?" "역할 $r 글롭 해석"
 done
 
 COMMON="$(cat "$ROOT/prompts/_common.md")"

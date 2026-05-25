@@ -407,7 +407,8 @@ for entry in "${WORKERS[@]}"; do
   bf="$(boot_file "$ENTRY_NAME")"
   # sed 구분자 `#`: {{HARNESS_ROOT}} 치환 시 절대경로의 `/` 충돌 회피.
   # HARNESS_ROOT_VALID 게이트가 `#` 포함을 사전 차단함.
-  cat "$PROMPTS_DIR/_common.md" "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" \
+  _role_file="$(resolve_role_file "$PROMPTS_DIR" "$ENTRY_ROLE")" || { echo "오류: 워커 '$ENTRY_NAME' 역할파일 해석 실패" >&2; exit 1; }
+  cat "$PROMPTS_DIR/_common.md" "$_role_file" \
     | sed -e "s#{{WORKER_NAME}}#$ENTRY_NAME#g" \
           -e "s#{{SESSION}}#$SESSION#g" \
           -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" > "$bf"
@@ -443,11 +444,11 @@ done
 catalog=""
 for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
-  desc="$(head -1 "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" 2>/dev/null || true)"
+  desc="$(head -1 "$(resolve_role_file "$PROMPTS_DIR" "$ENTRY_ROLE")" 2>/dev/null || true)"
   catalog+="- $ENTRY_NAME (역할 $ENTRY_ROLE): $desc"$'\n'
 done
 obf="$(boot_file LEAD)"
-{ cat "$PROMPTS_DIR/roles/lead.md" 2>/dev/null || true
+{ cat "$(resolve_role_file "$PROMPTS_DIR" lead)" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
 # lead boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
@@ -495,7 +496,7 @@ send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준�
 
 # pm 부트: roles/pm.md 합본 + pm 템플릿 settings. 사용자 창구.
 pbf="$(boot_file PM)"
-{ cat "$PROMPTS_DIR/roles/pm.md" 2>/dev/null || true
+{ cat "$(resolve_role_file "$PROMPTS_DIR" pm)" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"
   printf '\n## lead pane 전달 채널\n- lead pane_id: %s — pm→lead 지시는 `tmux send-keys -t %s -l "@pm: <지시>"` 후 Enter.\n' "$LEAD_PID" "$LEAD_PID"; } > "$pbf"
 _tmp_pbf="$pbf.tmp"
@@ -527,7 +528,9 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     rbf="$(boot_file "$ENTRY_NAME")"
     # 리뷰어 부트: roles/<리뷰어역할>.md + reviewer-common.md 합본 (정체성+공통절차).
     # sed `#` 구분자 (HARNESS_ROOT 절대경로의 `/` 충돌 회피).
-    cat "$PROMPTS_DIR/roles/$ENTRY_ROLE.md" "$PROMPTS_DIR/roles/reviewer-common.md" \
+    _rev_file="$(resolve_role_file "$PROMPTS_DIR" "$ENTRY_ROLE")" || { echo "오류: 리뷰어 '$ENTRY_NAME' 역할파일 해석 실패" >&2; j=$((j+1)); continue; }
+    _revc_file="$(resolve_role_file "$PROMPTS_DIR" reviewer-common)"
+    cat "$_rev_file" "$_revc_file" \
       | sed -e "s#{{SESSION}}#$SESSION#g" \
             -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" > "$rbf" 2>/dev/null || : > "$rbf"
     # `[ -s "$rbf" ]` 가드: 리뷰어 역할 파일이 없거나 비어있으면 빈 boot 허용 (의도된 묵살).

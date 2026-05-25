@@ -5,7 +5,8 @@ cd "$(dirname "$0")"
 source ./assert.sh
 
 ROOT="$(cd .. && pwd)"
-F="$ROOT/prompts/roles/reviewer-quality.md"
+source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
+F="$(resolve_role_file "$ROOT/prompts" reviewer-quality)"
 content="$(cat "$F")"
 
 assert_contains "$content" "도구 사용 제약" "제목 단락"
