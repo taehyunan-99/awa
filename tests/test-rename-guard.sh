@@ -8,7 +8,7 @@ ROOT="$(cd .. && pwd)"
 echo "[G1] 옛 이름 잔존 0건 (docs 제외, .claude/skills 포함 — P12)"
 # .claude/skills 도 범위에 (스킬 파일 오타로 옛 이름 유입 방지). 존재 안 하면 grep 이 무시.
 hits="$(grep -rln 'agents-\|team-up\|team-down\|tmux-agent-team' \
-  "$ROOT/bin" "$ROOT/prompts" "$ROOT/tests" "$ROOT/profiles" "$ROOT/config" "$ROOT/README.md" \
+  "$ROOT/bin" "$ROOT/prompts" "$ROOT/tests" "$ROOT/profiles" "$ROOT/config" "$ROOT/templates" "$ROOT/README.md" \
   "$ROOT/.claude/skills" \
   2>/dev/null | grep -v '/test-rename-guard.sh$' || true)"
 assert_eq "" "$hits" "G1 옛 이름 잔존 0건 (잔존: $hits)"
