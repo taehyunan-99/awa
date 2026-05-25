@@ -7,7 +7,8 @@ ROOT="$(cd .. && pwd)"
 src="$(cat "$ROOT/bin/agenphony-up.sh")"
 
 echo "[W1] --workers 파서 case 존재"
-assert_contains "$src" '--workers' "W1 --workers 파서"
+# 주석이 아닌 실제 case 토큰을 매칭 (약한 단언 보강)
+assert_contains "$src" '--workers)' "W1 --workers 파서 case"
 
 echo "[W2] --workers 와 profile 상호배타 (둘 다 오면 오류)"
 TMP="$(mktemp -d)"; ( cd "$TMP" && git init -q )
