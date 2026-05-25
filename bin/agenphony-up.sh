@@ -31,6 +31,7 @@ _normalize_plan_arg() {
   ( cd "$(dirname "$raw")" && printf '%s/%s\n' "$(pwd)" "$(basename "$raw")" )
 }
 PROFILE_ARG=""
+WORKERS_ARG=""
 # set -u 안전성을 위해 루프 앞에 선언 필수 (미선언 배열은 set -u 에서 unbound 오류).
 PLAN_FILES=()
 while [ $# -gt 0 ]; do
@@ -47,6 +48,11 @@ while [ $# -gt 0 ]; do
     --plan=*)
       _plan_norm="$(_normalize_plan_arg "${1#--plan=}")" || exit 1
       PLAN_FILES+=("$_plan_norm"); shift ;;
+    --workers)
+      WORKERS_ARG="${2:-}"; [ -n "$WORKERS_ARG" ] || { echo "오류: --workers 인자 누락" >&2; exit 1; }
+      shift 2 ;;
+    --workers=*)
+      WORKERS_ARG="${1#--workers=}"; shift ;;
     -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
     *)
       # 비옵션 인자는 프로파일명. 정상 사용은 1개 — 여분이 오면 무음 무시 대신 경고.
@@ -67,23 +73,38 @@ source "$_DIR/lib.sh"
 # prompts 디렉터리 — 기본 $HARNESS_ROOT/prompts, 테스트 fixture 용 PROMPTS_DIR env override.
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 
-PROFILE="${PROFILE_ARG:-default}"
-# PROFILE 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
-if [ -f "$PROFILE" ]; then
-  PROFILE_FILE="$PROFILE"
+# 12차 Task3: --workers 경로는 profile source 를 건너뛰고 WORKERS 를 직접 구성.
+# profile 과 상호배타. LAYOUT 은 select-layout "$LAYOUT" 직접참조(fallback 없음)라 필수 기본값.
+# REVIEWERS 미설정 — 기존 ${REVIEWERS+x} 가드가 빈/미정의를 안전 처리.
+if [ -n "${WORKERS_ARG:-}" ]; then
+  [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --workers 와 프로파일 동시 지정 불가" >&2; exit 1; }
+  PROFILE="(custom)"                    # 종료 메시지(팀 '$PROFILE' 가동 완료)용 라벨.
+  LAYOUT="tiled"                        # select-layout "$LAYOUT" 줄들이 fallback 없음 → 필수 기본값.
+  LEAD_MODEL="${LEAD_MODEL:-opus}"
+  PM_MODEL="${PM_MODEL:-sonnet}"
+  WORKERS=()
+  IFS=',' read -ra _wk <<< "$WORKERS_ARG"
+  for _w in "${_wk[@]}"; do WORKERS+=("$_w"); done
+  SESSION=""                            # profile SESSION 없음 — PROFILE_SESSION 빈값으로.
 else
-  PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.sh"
-fi
+  PROFILE="${PROFILE_ARG:-default}"
+  # PROFILE 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
+  if [ -f "$PROFILE" ]; then
+    PROFILE_FILE="$PROFILE"
+  else
+    PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.sh"
+  fi
 
-if [ ! -f "$PROFILE_FILE" ]; then
-  echo "오류: 프로파일 없음 → $PROFILE_FILE" >&2
-  echo "사용 가능: $(ls "$HARNESS_ROOT/profiles" 2>/dev/null | sed 's/\.sh$//' | tr '\n' ' ')" >&2
-  exit 1
-fi
+  if [ ! -f "$PROFILE_FILE" ]; then
+    echo "오류: 프로파일 없음 → $PROFILE_FILE" >&2
+    echo "사용 가능: $(ls "$HARNESS_ROOT/profiles" 2>/dev/null | sed 's/\.sh$//' | tr '\n' ' ')" >&2
+    exit 1
+  fi
 
-# 프로파일 로드 (SESSION, LAYOUT, WORKERS 정의)
-# shellcheck disable=SC1090
-source "$PROFILE_FILE"
+  # 프로파일 로드 (SESSION, LAYOUT, WORKERS 정의)
+  # shellcheck disable=SC1090
+  source "$PROFILE_FILE"
+fi
 
 # 프로파일이 정의한 SESSION 을 resolve_session 체인에 노출 (이슈 2, T2).
 export PROFILE_SESSION="${SESSION:-}"
