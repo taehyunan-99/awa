@@ -95,6 +95,17 @@ else
   else
     assert_eq "abs-path-present" "abs-path-missing" "lead boot: 절대경로 dispatch.sh 등장 — 첫 5줄: $(head -5 "$LEAD_BOOT")"
   fi
+  # T3.2b: partial(lead-gate) 내용이 lead boot 합본에 등장 (Task 2).
+  if grep -qF "pending-asks" "$LEAD_BOOT"; then
+    assert_eq "partial-present" "partial-present" "lead boot: 게이트 partial(pending-asks) 합본됨"
+  else
+    assert_eq "partial-present" "partial-missing" "lead boot: 게이트 partial 미합본 — 첫 5줄: $(head -5 "$LEAD_BOOT")"
+  fi
+  if grep -qF "removal-requests" "$LEAD_BOOT"; then
+    assert_eq "removal-present" "removal-present" "lead boot: removal-requests 절차 합본됨"
+  else
+    assert_eq "removal-present" "removal-missing" "lead boot: removal-requests 미합본"
+  fi
 fi
 
 # T3.3: 리뷰어 boot — 예약 토큰 잔존 0 + 절대경로 log-event 등장.

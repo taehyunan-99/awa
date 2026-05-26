@@ -449,6 +449,7 @@ for entry in "${WORKERS[@]}"; do
 done
 obf="$(boot_file LEAD)"
 { cat "$(resolve_role_file "$PROMPTS_DIR" lead)" 2>/dev/null || true
+  cat "$PROMPTS_DIR/_partials/lead-gate.md" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
 # lead boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
