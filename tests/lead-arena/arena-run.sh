@@ -5,7 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 ARENA="$(pwd)"; ROOT="$(cd ../.. && pwd)"
-cand="${1:?candidate A|B|C}"; stim="${2:?stimulus name}"
+cand="${1:?candidate A|B|C|D}"; stim="${2:?stimulus name}"
 candf="$ARENA/candidates/$cand.md"
 stimf="$ARENA/stimuli/$stim.md"
 [ -f "$candf" ] || { echo "없는 후보: $candf" >&2; exit 1; }
