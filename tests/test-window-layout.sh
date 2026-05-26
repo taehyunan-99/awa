@@ -9,6 +9,8 @@ ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
 echo "[W1] fix_session_titles 가 pane-border-status·format 세팅"
+# 각 fixture 는 trap (본문 중 사망 대비) + 끝에 명시 cleanup + `trap -` (다음
+# fixture 의 새 trap 으로 안전히 덮어쓰기) 의 3단 패턴. 이중 호출은 `|| true` 로 무해.
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; S="agenphony-$SAFE"
 trap 'tmux kill-session -t "$S" 2>/dev/null || true; rm -rf "$TMP"' EXIT INT TERM
 tmux new-session -d -s "$S" -c "$TMP"
