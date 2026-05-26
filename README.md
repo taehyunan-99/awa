@@ -77,9 +77,11 @@ SESSION_OVERRIDE="agenphony-auth2" ~/.../bin/agenphony-up.sh default
 ## 역할 추가 (파츠화 확장)
 
 새 역할 추가:
-1. `prompts/roles/NN-part/<역할>.md` 작성 (첫 줄 = 한 줄 desc. 5축 형식 — _common.md 참조).
+1. `prompts/roles/NN-part/<역할>.md` 작성 (첫 줄 = 한 줄 desc. 워커는 5축 형식 — _common.md 참조. **lead/pm 은 전용 축**(lead=신호→반응 6절 ⓐ~ⓕ / pm=대화·pull·전달 3절 ⓐ~ⓒ)이며 `_common` 미상속).
 2. 프로파일에 `WORKERS+=("이름:<역할>:모델")` 또는 `REVIEWERS+=(...)` 엔트리 추가.
 3. 끝 — up 이 `roles/*/<역할>.md` 글롭으로 자동 해석·카탈로그 등록. **프롬프트는 코드수정 0.**
+
+모든 역할 md 는 **100줄 캡**(가드레일: `tests/test-line-cap.sh`). **lead 권한 게이트 절차는 `prompts/_partials/lead-gate.md` 단일출처** — lead boot 시 sed 치환 *이전*에 합본 cat 으로 주입(`bin/agenphony-up.sh`), 본문 중복 금지.
 
 권한(settings)은 자동이 아니다:
 - 새 역할 권한이 기존 군(dev/test/reviewer/lead/pm)과 같으면 추가 작업 없음(default 또는 같은 case).
