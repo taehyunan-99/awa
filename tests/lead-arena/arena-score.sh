@@ -8,11 +8,15 @@ H="$proj/.agent-harness"
 key="$ARENA/answer-keys/$stim.md"
 
 score=0; notes=""
-# 지표1: 분해 task 수 (tasks/*.md 개수) vs 정답.
-ntask="$(ls "$H/tasks/"*.md 2>/dev/null | grep -c . || echo 0)"
+# 지표1: 분해 task 수 (tasks/*.md 개수) vs 정답. find+wc 가 빈 디렉터리도 단일 숫자 0 출력 (grep -c 의 exit 1 함정 회피).
+ntask="$(find "$H/tasks" -maxdepth 1 -name '*.md' -type f 2>/dev/null | wc -l | tr -d ' ')"
 notes+="task수=$ntask; "
-# 지표2: allowed_paths 명시율 (task 파일 중 allowed_paths 포함 비율).
-nallow="$(grep -l "allowed_paths" "$H/tasks/"*.md 2>/dev/null | grep -c . || echo 0)"
+# 지표2: allowed_paths 명시율 (task 파일 중 allowed_paths 포함 비율). ntask=0 일 땐 grep 호출 자체 회피.
+if [ "$ntask" -gt 0 ]; then
+  nallow="$(grep -l "allowed_paths" "$H/tasks/"*.md 2>/dev/null | wc -l | tr -d ' ')"
+else
+  nallow=0
+fi
 notes+="allowed명시=$nallow/$ntask; "
 # 지표3: .harness-state 존재·기록 여부.
 [ -s "$H/.harness-state" ] && { score=$((score+1)); notes+="state기록=O; "; } || notes+="state기록=X; "
