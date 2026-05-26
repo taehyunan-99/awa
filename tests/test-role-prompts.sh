@@ -36,12 +36,34 @@ fi
 resolve_role_file "$ROOT/prompts" reviewer-common >/dev/null 2>&1
 assert_success "$?" "reviewer-common.md 존재 (reviewer 부트 합본 의존)"
 
-# 9차: pm 역할 프롬프트 검증
-pm="$(rf pm)"
-assert_contains "$pm" "사용자" "pm 은 사용자 창구"
-assert_contains "$pm" "@pm:" "pm→lead 전달 prefix"
-assert_not_contains "$pm" "dispatch.sh" "pm 은 dispatch 안 함(lead 의 일)"
-assert_contains "$pm" "읽기 전용" "pm 은 읽기전용 규약 명시"
+# --- lead 구조 (승자=A 6절; 신호→반응) ---
+LEAD="$(rf lead)"
+assert_contains "$LEAD" "## ⓐ 동작 모델" "lead ⓐ 동작 모델"
+assert_contains "$LEAD" "## ⓑ @pm" "lead ⓑ 위임 계약"
+assert_contains "$LEAD" "## ⓒ @done" "lead ⓒ 종합"
+assert_contains "$LEAD" "## ⓓ @gate" "lead ⓓ 권한 게이트"
+assert_contains "$LEAD" "## ⓔ 개입" "lead ⓔ 개입·escalation"
+assert_contains "$LEAD" "## ⓕ 금지" "lead ⓕ 금지+근거"
+# 구조 무관 보존(본문 — partial 아님):
+assert_contains "$LEAD" "출력=토큰=신호" "lead 출력=신호 방향성"
+assert_contains "$LEAD" "stale" "lead stale tasks(#10)"
+assert_contains "$LEAD" "--project" "lead 호출 위치(#9, _common 미상속)"
+assert_contains "$LEAD" "입력경로" "lead 산출물 연결(#5)"
+assert_contains "$LEAD" "lead BLOCKED" "lead BLOCKED(ⓔ 변형 포함)"
+assert_contains "$LEAD" "@lead: rm" "lead rm 위임 신호(C-1)"
+assert_not_contains "$LEAD" "### 1단계. state/pending-asks/" "lead 본문엔 게이트 절차 본체 없음(partial)"
+
+# --- pm 3절 ---
+PM="$(rf pm)"
+assert_contains "$PM" "## ⓐ 정체성" "pm ⓐ 정체성"
+assert_contains "$PM" "## ⓑ pull-read" "pm ⓑ pull 관찰"
+assert_contains "$PM" "## ⓒ 전달" "pm ⓒ 전달+금지"
+assert_contains "$PM" "사실과 추측을 구분" "pm 사실/추측 구분"
+assert_contains "$PM" "@pm:" "pm 전달 prefix"
+assert_contains "$PM" "읽기 전용" "pm 읽기전용"
+# 안전망 (구 회귀 유지): pm 은 사용자 창구 + dispatch 직접 안 함.
+assert_contains "$PM" "사용자" "pm 은 사용자 창구"
+assert_not_contains "$PM" "dispatch.sh" "pm 은 dispatch 안 함(lead 의 일)"
 
 # --- 5축 공통 토대 (_common.md) ---
 COMMON="$(cat "$ROOT/prompts/_common.md")"

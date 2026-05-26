@@ -106,6 +106,15 @@ else
   else
     assert_eq "removal-present" "removal-missing" "lead boot: removal-requests 미합본"
   fi
+  # T3.2c: 기능 보존 — 핵심 기능 키워드가 boot 합본(lead+partial)에 전부 존재.
+  # 주의: '--project' 같은 dash 접두 토큰을 위해 `--` 인자 종결자 사용(BSD grep 옵션 오인 방지).
+  for kw in "allowed_paths" "--project" "stale" "harness-state" "review-cursor" "dispatch.sh"; do
+    if grep -qF -- "$kw" "$LEAD_BOOT"; then
+      assert_eq "kw-present" "kw-present" "lead boot 기능보존: '$kw' 등장"
+    else
+      assert_eq "kw-present" "kw-missing" "lead boot 기능보존: '$kw' 누락"
+    fi
+  done
 fi
 
 # T3.3: 리뷰어 boot — 예약 토큰 잔존 0 + 절대경로 log-event 등장.
