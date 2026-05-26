@@ -16,8 +16,18 @@ nallow="$(grep -l "allowed_paths" "$H/tasks/"*.md 2>/dev/null | grep -c . || ech
 notes+="allowed명시=$nallow/$ntask; "
 # 지표3: .harness-state 존재·기록 여부.
 [ -s "$H/.harness-state" ] && { score=$((score+1)); notes+="state기록=O; "; } || notes+="state기록=X; "
-# 지표4: 종합 header-first (results 가 status: 로 시작하는지 — 워커 더미라 lead 종합 출력은 state 에).
-grep -q "status:" "$H/.harness-state" 2>/dev/null && notes+="header종합=O; " || notes+="header종합=?; "
+# 지표4: 종합 header-first (results/*.md 가 status: 헤더로 시작 → lead 가 grep 종합 가능).
+nres=0; nhdr=0
+for r in "$H/results/"*.md; do
+  [ -f "$r" ] || continue
+  nres=$((nres+1))
+  case "$(head -1 "$r")" in status:*) nhdr=$((nhdr+1)) ;; esac
+done
+if [ "$nres" -gt 0 ] && [ "$nhdr" -eq "$nres" ]; then
+  score=$((score+1)); notes+="header종합=O($nhdr/$nres); "
+else
+  notes+="header종합=$nhdr/$nres; "
+fi
 # 자극별 특화 채점.
 case "$stim" in
   stress-overload) [ "$ntask" -ge 12 ] && { score=$((score+2)); notes+="과부하분해=완전; "; } || notes+="과부하분해=누락$((12-ntask)); " ;;
