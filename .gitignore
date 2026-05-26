@@ -5,11 +5,17 @@
 .claude/*
 !.claude/skills
 
+# 다른 에이전트(Codex/Antigravity 등) 로컬 미러 — 정의는 .claude/skills 가 단일출처
+.agents/
+
 # 설계/계획 문서 — git 추적 안 함
 docs/
 
 # superpowers brainstorming/visual-companion 로컬 세션 산출물
 .superpowers/
+
+# arena 실험 마지막 실행 메타 — 매 가동마다 덮어쓰는 임시
+tests/lead-arena/.last-run
 
 # 캐시 / OS / 에디터
 *.log
