@@ -28,25 +28,28 @@ assert_eq "0" "$rc" "agenphony-up default 성공 종료"
 tmux has-session -t "$SESSION_OVERRIDE" 2>/dev/null
 assert_eq "0" "$?" "세션 생성됨"
 
-# 9차: 페인 5개 (lead1 + pm + watcher + 워커2 — pm/watcher pane 추가)
-N="$(tmux list-panes -t "$SESSION_OVERRIDE:0" | wc -l | tr -d ' ')"
-assert_eq "5" "$N" "페인 5개 (lead+pm+watcher+워커2)"
+# 14차 UX: 윈도우 분리 후 구조 검증.
+# team 윈도우(0): LEAD + PM (2 pane), workers 윈도우(1): 워커2 + watcher (3 pane).
+N_TEAM="$(tmux list-panes -t "$SESSION_OVERRIDE:team" | wc -l | tr -d ' ')"
+assert_eq "2" "$N_TEAM" "team 윈도우 pane 2개 (lead+pm)"
+N_WORKERS="$(tmux list-panes -t "$SESSION_OVERRIDE:workers" | wc -l | tr -d ' ')"
+assert_eq "3" "$N_WORKERS" "workers 윈도우 pane 3개 (워커2+watcher)"
 
-# 워커 title 결정적 검증: split-window -P 로 캡처한 pane_id 로 title 설정하므로
-# select-layout 의 index 재배열과 무관하게 dev/test 가 정확히 걸려야 하고,
-# 호스트명/기본값 title 이 섞이지 않아야 함 (layout 무관, pane_id 기반).
-TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:0" -F '#{pane_title}' | sort | tr '\n' ',')"
+# workers 윈도우의 title 결정적 검증.
+TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:workers" -F '#{pane_title}' | sort | tr '\n' ',')"
 assert_contains "$TITLES" "dev" "워커 title dev 설정됨(layout 무관, pane_id 기반)"
 assert_contains "$TITLES" "test" "워커 title test 설정됨"
-# 9차: pm·watcher pane title
-assert_contains "$TITLES" "PM" "pm pane title 설정됨"
 assert_contains "$TITLES" "watcher" "watcher pane title 설정됨"
-assert_contains "$TITLES" "LEAD" "lead title 설정됨"
+# team 윈도우 title 검증.
+TEAM_TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:team" -F '#{pane_title}' | sort | tr '\n' ',')"
+assert_contains "$TEAM_TITLES" "PM" "pm pane title 설정됨"
+assert_contains "$TEAM_TITLES" "LEAD" "lead title 설정됨"
 
 # title 보존 결정적 검증: 워커 페인을 실제 셸로 띄워 OSC0 escape 를 흘려도
 # allow-set-title off 덕에 select-pane -T 로 준 title 이 유지돼야 함 (spec §6 전제).
 # 주의: respawn 이 pane 을 갈아끼우므로 위 title 집합 검증보다 반드시 뒤에 둔다.
-TGT="$SESSION_OVERRIDE:0.2"
+# 14차 UX: workers 윈도우 첫 pane (워커1=dev) 으로 타겟 변경.
+TGT="$SESSION_OVERRIDE:workers.1"
 tmux respawn-pane -k -t "$TGT" bash
 sleep 0.3
 tmux select-pane -t "$TGT" -T "dev"

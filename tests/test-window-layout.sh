@@ -26,4 +26,38 @@ assert_eq "$expected_format" "$got_format" "W1b pane-border-format 정확 일치
 tmux kill-session -t "$S" 2>/dev/null || true; rm -rf "$TMP"
 trap - EXIT INT TERM
 
+echo "[W2] agenphony-up 으로 띄운 세션의 윈도우 구조"
+# AGENT_CMD=cat 더미로 토큰 0, 실 layout 만 검증.
+TMP2="$(mktemp -d)"; ( cd "$TMP2" && git init -q )
+PROF="$TMP2/profile.sh"
+cat > "$PROF" <<'PROF_EOF'
+WORKERS=("dev1:dev" "tester:tester")
+REVIEWERS=("quality-rev:reviewer-quality:haiku")
+LEAD_MODEL=opus
+PM_MODEL=sonnet
+PROF_EOF
+SAFE2="$(basename "$TMP2" | sed 's/[^A-Za-z0-9_-]/_/g')"; S2="agenphony-$SAFE2"
+trap 'tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"' EXIT INT TERM
+SESSION_OVERRIDE="$S2" HARNESS_PROJECT="$TMP2" AGENT_CMD=cat \
+  bash "$ROOT/bin/agenphony-up.sh" "$PROF" >/dev/null 2>&1 || true
+
+# W2a: 윈도우 이름 = team, workers, review (REVIEWERS 있으니 3개)
+got_windows="$(tmux list-windows -t "$S2" -F '#{window_name}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
+assert_eq "team,workers,review" "$got_windows" "W2a 윈도우 3개(team,workers,review)"
+
+# W2b: window 0 (team) pane 2개, title 순서 LEAD/PM
+got_team="$(tmux list-panes -t "$S2:team" -F '#{pane_title}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
+assert_eq "LEAD,PM" "$got_team" "W2b team 윈도우 = LEAD,PM"
+
+# W2c: window 1 (workers) 마지막 pane title = watcher
+got_last_workers="$(tmux list-panes -t "$S2:workers" -F '#{pane_title}' 2>/dev/null | tail -1)"
+assert_eq "watcher" "$got_last_workers" "W2c workers 윈도우 마지막 pane = watcher"
+
+# W2d: @agenphony-project-name = basename
+got_pname="$(tmux show-options -v -t "$S2" @agenphony-project-name 2>/dev/null || echo MISS)"
+assert_eq "$(basename "$TMP2")" "$got_pname" "W2d @agenphony-project-name = basename"
+
+tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"
+trap - EXIT INT TERM
+
 test_summary

@@ -74,12 +74,11 @@ source "$_DIR/lib.sh"
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 
 # 12차 Task3: --workers 경로는 profile source 를 건너뛰고 WORKERS 를 직접 구성.
-# profile 과 상호배타. LAYOUT 은 select-layout "$LAYOUT" 직접참조(fallback 없음)라 필수 기본값.
+# profile 과 상호배타.
 # REVIEWERS 미설정 — 기존 ${REVIEWERS+x} 가드가 빈/미정의를 안전 처리.
 if [ -n "${WORKERS_ARG:-}" ]; then
   [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --workers 와 프로파일 동시 지정 불가" >&2; exit 1; }
   PROFILE="(custom)"                    # 종료 메시지(팀 '$PROFILE' 가동 완료)용 라벨.
-  LAYOUT="tiled"                        # select-layout "$LAYOUT" 줄들이 fallback 없음 → 필수 기본값.
   LEAD_MODEL="${LEAD_MODEL:-opus}"
   PM_MODEL="${PM_MODEL:-sonnet}"
   WORKERS=()
@@ -101,7 +100,7 @@ else
     exit 1
   fi
 
-  # 프로파일 로드 (SESSION, LAYOUT, WORKERS 정의)
+  # 프로파일 로드 (SESSION, WORKERS 정의)
   # shellcheck disable=SC1090
   source "$PROFILE_FILE"
 fi
@@ -259,57 +258,85 @@ fi
 fix_session_titles "$SESSION"
 
 # lead 페인의 영속 pane_id 캡처 후 id 로 title 설정.
-# (split 이전 시점이라 layout 영향 없으나, 워커와 동일하게 id 기준으로 통일.)
 LEAD_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
 tmux select-pane -t "$LEAD_PID" -T "LEAD"
 
-# pm pane: 윈도우0 에 lead 옆으로 split (사용자 창구). pane_id 캡처(layout 면역).
-PM_PID="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+# pm pane: window 0(team) 에 lead 옆으로 가로 split (사용자 창구). pane_id 캡처(layout 면역).
+# 14차 UX: -h 가로 명시. window 0 = LEAD+PM 만 (관제탑 join-pane 단위).
+PM_PID="$(tmux split-window -h -t "$SESSION:0" -d -P -F '#{pane_id}')"
 tmux select-pane -t "$PM_PID" -T "PM"
+tmux select-layout -t "$SESSION:0" even-horizontal
 
-# 워커 페인 분할.
-# split-window -P -F '#{pane_id}' 로 새 페인의 영속 pane_id(%N) 를 즉시 캡처.
-# pane_id 는 select-layout 의 pane index 재배열에도 불변이므로,
-# title 설정·부트스트랩 주입을 모두 이 id 로 수행해 index 재배열에 면역.
+# 14차 UX: 워커 페인은 별도 windows 윈도우(1)에 세로 스택.
+# 첫 워커는 new-window 의 auto-create pane 의 title 만 설정(pane_id 재캡처),
+# 둘째부터 -v split 누적. watcher 는 워커 다 split 한 뒤 마지막 -v split → 최하단.
+tmux new-window -t "$SESSION" -n workers
+# allow-set-title 은 window-level 옵션 → 새 윈도우는 global 상속.
+# workers 윈도우를 활성으로 두고 fix_session_titles 재적용.
+fix_session_titles "$SESSION"
+
+# workers 윈도우 생성 가드 (BSD grep -c 함정 회피 — wc -l 사용).
+_wcount="$(tmux list-windows -t "$SESSION" -F '#{window_name}' 2>/dev/null \
+  | grep '^workers$' | wc -l | tr -d ' ')"
+if [ "$_wcount" != "1" ]; then
+  echo "오류: workers 윈도우 생성 실패" >&2
+  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  exit 1
+fi
+
 # bash 3.2(macOS 기본) 는 연관배열 미지원 → 인덱스 정렬 일반 배열 2개 사용.
 WORKER_NAMES=()
 WORKER_PIDS=()
+_prev_worker_pid=""
+first_w=1
 for entry in "${WORKERS[@]}"; do
   parse_entry "$entry"
-  pid="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+  if [ "$first_w" = "1" ]; then
+    # workers 윈도우 auto-create pane 재사용.
+    pid="$(tmux display-message -p -t "$SESSION:workers" '#{pane_id}')"
+    first_w=0
+  else
+    # 이전 워커 pane_id 를 명시 타겟 → split 순서(상→하) 보장 (-d: focus 이동 없음).
+    pid="$(tmux split-window -v -t "$_prev_worker_pid" -d -P -F '#{pane_id}')"
+  fi
   tmux select-pane -t "$pid" -T "$ENTRY_NAME"
   WORKER_NAMES+=("$ENTRY_NAME")
   WORKER_PIDS+=("$pid")
+  _prev_worker_pid="$pid"
 done
-# 모든 split 완료 후 layout 한 번만 적용 (pane_id 방식이라 순서 무관·안전).
-tmux select-layout -t "$SESSION:0" "$LAYOUT"
 
-# continuum 오염 방지: 이 세션 자동저장 사실상 비활성화
+# continuum 오염 방지.
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 12차: PROJECT_ROOT 를 세션옵션으로 기록 — agenphony-list 가 읽는 안정적 출처.
+# 12차: PROJECT_ROOT (풀경로) — agenphony-list 가 읽음.
 tmux set-option -t "$SESSION" @agenphony-project "$PROJECT_ROOT" 2>/dev/null || true
+# 14차 UX: basename — pane-border-format 의 #{@agenphony-project-name} 으로 사용.
+tmux set-option -t "$SESSION" @agenphony-project-name "$(basename "$PROJECT_ROOT")" 2>/dev/null || true
 
-# review 윈도우(window 1) 생성 — REVIEWERS 정의·비어있지 않을 때만.
-# 가드 순서 중요: 존재 확인(+x) 먼저, 그 다음에만 길이 평가 (set -u·bash3.2 안전).
+# review 윈도우 생성 — REVIEWERS 정의·비어있지 않을 때만.
 REV_NAMES=()
 REV_PIDS=()
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   tmux new-window -t "$SESSION" -n review
+  # allow-set-title 은 window-level 옵션 → 새 윈도우는 global 상속.
+  fix_session_titles "$SESSION"
   first=1
+  _prev_rev_pid=""
   for entry in "${REVIEWERS[@]}"; do
     parse_entry "$entry"
     if [ "$first" = "1" ]; then
       pid="$(tmux display-message -p -t "$SESSION:review" '#{pane_id}')"
       first=0
     else
-      pid="$(tmux split-window -t "$SESSION:review" -d -P -F '#{pane_id}')"
+      # 이전 리뷰어 pane_id 명시 타겟 → split 순서(상→하) 보장.
+      pid="$(tmux split-window -v -t "$_prev_rev_pid" -d -P -F '#{pane_id}')"
     fi
     tmux select-pane -t "$pid" -T "$ENTRY_NAME"
     REV_NAMES+=("$ENTRY_NAME")
     REV_PIDS+=("$pid")
+    _prev_rev_pid="$pid"
   done
-  tmux select-layout -t "$SESSION:review" "${LAYOUT:-tiled}"
+  tmux select-layout -t "$SESSION:review" even-vertical
 fi
 
 # claude REPL 준비 대기: probe-loop.sh 검증 패턴 이식.
@@ -570,15 +597,24 @@ fi
 # watcher 데몬 기동 (9차). 윈도우0 에 셸 pane 으로 split — 세션 kill 시 자동 사망.
 # lead/reviewer pane_id + state 경로를 env 로 주입(index 재배열 면역).
 # AGENT_CMD=cat 더미 모드에서도 watcher 는 실셸로 기동 (감시 로직 검증 가능).
-WATCHER_PANE="$(tmux split-window -t "$SESSION:0" -d -P -F '#{pane_id}')"
+# 14차 UX: watcher 도 workers 윈도우 마지막에 -v split (최하단 보장).
+# _prev_worker_pid = 마지막 워커 pane_id 명시 타겟 → split 순서(상→하) 보장.
+WATCHER_PANE="$(tmux split-window -v -t "$_prev_worker_pid" -d -P -F '#{pane_id}')"
 tmux select-pane -t "$WATCHER_PANE" -T "watcher"
 # reviewer pane_id 목록 (공백구분). 리뷰어 없으면 빈 문자열(set -u 안전 — watcher 가드).
 _rev_panes=""
 if [ "${#REV_PIDS[@]}" -gt 0 ]; then
   _rev_panes="${REV_PIDS[*]}"
 fi
-# 윈도우0 레이아웃 재적용 (watcher pane 추가분 반영).
-tmux select-layout -t "$SESSION:0" "$LAYOUT"
+# workers 윈도우 layout 적용 — split 순서대로 상→하 (워커1→…→워커N→watcher).
+tmux select-layout -t "$SESSION:workers" even-vertical
+# watcher 가 list-panes 순서상 마지막인지 검증 — 깨지면 즉시 fail.
+_last="$(tmux list-panes -t "$SESSION:workers" -F '#{pane_title}' 2>/dev/null | tail -1)"
+if [ "$_last" != "watcher" ]; then
+  echo "오류: workers 윈도우 마지막 pane=$_last (기대=watcher)" >&2
+  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  exit 1
+fi
 # watcher 기동: pane 에 env 세팅 후 watcher.sh 실행 명령 주입.
 tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
 tmux send-keys -t "$WATCHER_PANE" Enter
