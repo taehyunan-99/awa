@@ -8,9 +8,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
 
-# grep -r: prompts/ 트리 전체.
+# 검사 대상: boot 합본에 실제 들어가는 파일만 — _common.md, _partials/*.md,
+# roles/**/*.md. AGENTS.md / CLAUDE.md / LEARNED_CAUTIONS.md 같은 영역 가이드
+# 문서는 워커 부트에 안 들어가니 false-positive 회피(13차 추가).
 # 패턴: 백틱(`) 직후 'bin/' 시작. {{HARNESS_ROOT}}/bin/ 는 'bin/' 앞에 /이 있어 미검출.
-bad_lines="$(grep -rn '`bin/' "$HARNESS_ROOT/prompts/" 2>/dev/null || true)"
+boot_files="$(find "$HARNESS_ROOT/prompts" \
+  \( -path "$HARNESS_ROOT/prompts/_common.md" \
+     -o -path "$HARNESS_ROOT/prompts/_partials/*.md" \
+     -o -path "$HARNESS_ROOT/prompts/roles/*/*.md" \) \
+  -type f 2>/dev/null)"
+if [ -z "$boot_files" ]; then
+  bad_lines=""
+else
+  bad_lines="$(printf '%s\n' "$boot_files" | xargs grep -n '`bin/' 2>/dev/null || true)"
+fi
 
 if [ -n "$bad_lines" ]; then
   echo "발견된 상대경로 라인:" >&2
