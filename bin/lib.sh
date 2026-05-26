@@ -113,11 +113,15 @@ fix_session_indexing() {
 # 따라서 pane_title 보존의 결정타는 allow-set-title off 이다.
 # allow-rename/automatic-rename off 도 세션 로컬·무해하므로 함께 고정한다
 # (window-name 까지 호스트명으로 흔들리지 않도록 방어).
+# 14차 UX: pane-border-status/format 도 같은 함수에서 세팅 (title 관련 세션 로컬 단일 출처).
 fix_session_titles() {
   local s="$1"
   tmux set-option -t "$s" allow-set-title off 2>/dev/null || true
   tmux set-option -t "$s" allow-rename off 2>/dev/null || true
   tmux set-option -t "$s" automatic-rename off 2>/dev/null || true
+  # pane border 에 라벨 표시 — title 보존 옵션 옆 단일 출처 (UX 14차).
+  tmux set-option -t "$s" pane-border-status top                                      2>/dev/null || true
+  tmux set-option -t "$s" pane-border-format ' [ #{@agenphony-project-name} ] #{pane_title} ' 2>/dev/null || true
 }
 
 # 워커 이름 → 부트스트랩 합본 파일 경로
