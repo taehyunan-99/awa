@@ -85,4 +85,12 @@ fi
 assert_contains "$(cat "$BOOKMARKS_FILE")" "/tmp/proj-c-real" "B8b 실재 path 보존"
 
 rm -rf /tmp/proj-c-real
+
+echo "[B9] wrapper: bash agenphony-bookmarks.sh list"
+mkdir -p /tmp/proj-w
+bookmarks_upsert "/tmp/proj-w" "default" ""
+out="$(bash "$ROOT/bin/agenphony-bookmarks.sh" list 2>&1)"
+assert_contains "$out" "/tmp/proj-w" "B9 wrapper list"
+rm -rf /tmp/proj-w
+
 test_summary
