@@ -64,23 +64,21 @@ fi
 
 WORKSPACE="$PROJECT_ROOT/.agent-harness"
 
+# 인자 path 의 basename 을 sanitize 해서 'agenphony-<safe>' 세션명 반환.
+# 순수 함수(외부 전역 미참조). _session_autoname 이 이 함수에 위임 (sanitize 단일 출처).
 # basename sanitize: tmux 세션명 규칙([A-Za-z0-9_-]).
 # bash 3.2 ${var//pattern} 의 glob/정규식 모호성 회피 위해 sed (D3).
-_session_autoname() {
-  local b safe
-  b="$(basename "$PROJECT_ROOT")"
-  safe="$(printf '%s' "$b" | sed 's/[^A-Za-z0-9_-]/_/g')"
-  printf 'agenphony-%s' "$safe"
-}
-
-# 인자 path 의 basename 을 sanitize 해서 'agenphony-<safe>' 세션명 반환.
-# 순수 함수(외부 전역 미참조) — agenphony-main.sh cmd_launch 의 인라인 sed 단일화 목적.
-# _session_autoname 은 PROJECT_ROOT 전역 의존이라 그대로 두고, 인자형 헬퍼를 별도 제공.
 session_name_for() {  # $1=project path → echo "agenphony-<sanitized>"
   local b safe
   b="$(basename "$1")"
   safe="$(printf '%s' "$b" | sed 's/[^A-Za-z0-9_-]/_/g')"
   printf 'agenphony-%s' "$safe"
+}
+
+# PROJECT_ROOT 기반 자동명 — session_name_for 위임으로 sanitize 로직 단일화.
+# 호출부(resolve_session)는 인자 없이 쓰는 관습을 유지하기 위해 wrapper 함수로 남긴다.
+_session_autoname() {
+  session_name_for "$PROJECT_ROOT"
 }
 
 # SESSION 결정 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION env > 자동명.
