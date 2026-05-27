@@ -308,7 +308,7 @@ done
 # continuum 오염 방지.
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 12차: PROJECT_ROOT (풀경로) — agenphony-list 가 읽음.
+# 12차: PROJECT_ROOT (풀경로) — /agpn (Step 0 resume) 또는 /agpn bookmarks list 가 읽음.
 tmux set-option -t "$SESSION" @agenphony-project "$PROJECT_ROOT" 2>/dev/null || true
 # 14차 UX: basename — pane-border-format 의 #{@agenphony-project-name} 으로 사용.
 tmux set-option -t "$SESSION" @agenphony-project-name "$(basename "$PROJECT_ROOT")" 2>/dev/null || true

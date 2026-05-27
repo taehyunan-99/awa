@@ -12,7 +12,6 @@ agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 d
 
 - `agenphony-up.sh` — 프로파일 기반 tmux 세션 가동(워커 페인·부트 프롬프트 주입)
 - `agenphony-down.sh` — 런타임 정리(tasks/results는 보존)
-- `agenphony-list.sh` — 가동 중인 agenphony-* 세션 나열
 - `agenphony-main.sh` — `/agpn` 비대화 명령 백엔드 (resume/attach/launch/resolve-path)
 - `agenphony-down-menu.sh` — `/agpn down` 진입점 (N=0/1/multi 분기 + down.sh 위임)
 - `agenphony-symphony.sh` — _SYMPHONY 멀티뷰 (compose/add/detach/disband/kill)

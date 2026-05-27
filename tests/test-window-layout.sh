@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # 14차 UX: 윈도우 재배치 + border 라벨 통합 검증.
-# fixture 는 실 agenphony-up 띄우지 않고 tmux new-session + 직접 split 으로 구성
-# (기존 test-agenphony-list.sh L3·L4 동일 패턴).
+# fixture 는 실 agenphony-up 띄우지 않고 tmux new-session + 직접 split 으로 구성.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
