@@ -51,11 +51,6 @@ mkdir -p /tmp/agpn15-a /tmp/agpn15-b
 - [ ] "all" 입력 → 두 세션 모두 종료
 - [ ] tmux ls 에 agenphony-* 없음
 
-## 7. 잔존 마이그레이션
-- [ ] `/agpn plan` → deprecated 안내 + exit
-- [ ] `/agpn stage` → deprecated 안내
-- [ ] `/agpn list` → deprecated 안내
-
 ## 결과
 - 라이브 일시:
 - 사용자 확인:

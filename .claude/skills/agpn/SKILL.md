@@ -140,11 +140,6 @@ actions: `compose <s1> [s2...]` | `add <s>` | `detach <w...>` | `disband` | `kil
 Bash: `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" <action>` — auto.
 actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 
-### Deprecated (notice + exit)
-- `/agpn plan` → "write plan externally, then /agpn picks it up via --plan"
-- `/agpn stage` → "merged into /agpn"
-- `/agpn list` → "use /agpn (Step 0 resume) or /agpn bookmarks list"
-
 ## References
 
 - `references/review-prompt.md` — 4-axis review subagent prompt
