@@ -110,6 +110,13 @@ cmd_launch() {
   if [ -n "$preset" ] && [ -n "$workers_spec" ]; then
     echo "오류: --preset 와 --workers 동시 불가" >&2; return 1
   fi
+  # 15차 quality review: preset 가 unquoted 로 cmd 문자열에 들어감 → paste-to-shell 방어용
+  # 화이트리스트. [A-Za-z0-9_-] 만 허용 (실 preset 이름 패턴과 일치).
+  if [ -n "$preset" ]; then
+    case "$preset" in
+      *[!A-Za-z0-9_-]*) echo "오류: --preset 은 [A-Za-z0-9_-] 만 — '$preset'" >&2; return 1 ;;
+    esac
+  fi
 
   local session_name
   session_name="agenphony-$(basename "$project" | sed 's/[^A-Za-z0-9_-]/_/g')"

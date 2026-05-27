@@ -99,4 +99,13 @@ else
 fi
 rm -rf /tmp/agpn-m8-real
 
+echo "[M9] preset injection 거부 (특수문자 거부)"
+TMP9="$(mktemp -d)"; ( cd "$TMP9" && git init -q )
+if bash "$ROOT/bin/agenphony-main.sh" launch --project "$TMP9" --mode-launch single --preset 'foo; rm -rf' 2>/dev/null; then
+  echo "  FAIL: M9 preset injection 허용됨"; _TESTS_RUN=$((_TESTS_RUN+1)); _TESTS_FAIL=$((_TESTS_FAIL+1))
+else
+  echo "  ok: M9 preset 특수문자 거부"; _TESTS_RUN=$((_TESTS_RUN+1))
+fi
+rm -rf "$TMP9"
+
 test_summary
