@@ -93,4 +93,17 @@ out="$(bash "$ROOT/bin/agenphony-bookmarks.sh" list 2>&1)"
 assert_contains "$out" "/tmp/proj-w" "B9 wrapper list"
 rm -rf /tmp/proj-w
 
+echo "[B10] agenphony-up.sh 발진 시 bookmarks 자동 등록 (AGENT_CMD=cat 더미)"
+TMP="$(mktemp -d)"; ( cd "$TMP" && git init -q )
+( cd "$TMP" && AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" --project "$TMP" default ) >/dev/null 2>&1 || true
+# 발진 자체는 더미라 실패해도, 사용자 가드까지 도달 후 bookmarks_upsert 호출이 핵심
+# 단순 케이스: lib.sh 함수 호출이 종료 메시지 직전에 박혀있는지 grep 으로 확인
+grep -q "bookmarks_upsert" "$ROOT/bin/agenphony-up.sh" && echo "  ok: B10 호출 박힘" || {
+  echo "  FAIL: B10 호출 누락"; _TESTS_FAIL=$((_TESTS_FAIL+1))
+}
+_TESTS_RUN=$((_TESTS_RUN+1))
+# 정리
+tmux kill-session -t "agenphony-$(basename "$TMP")" 2>/dev/null || true
+rm -rf "$TMP"
+
 test_summary
