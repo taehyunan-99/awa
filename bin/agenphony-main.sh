@@ -119,7 +119,7 @@ cmd_launch() {
   fi
 
   local session_name
-  session_name="agenphony-$(basename "$project" | sed 's/[^A-Za-z0-9_-]/_/g')"
+  session_name="$(session_name_for "$project")"
 
   # 발진 명령 조립 — HARNESS_ROOT 절대경로 (검증 완료) + paste-safe 따옴표.
   # lib.sh _validate_path_chars 가 공백/특수문자 거부했으니 paste 시에도 안전,

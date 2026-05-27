@@ -1,6 +1,6 @@
 ---
 name: agpn
-description: agenphony harness entry point. /agpn (no args) = launch flow (plan 4-axis review + preset + mode + project). Subcommands: down/symphony/bookmarks. User `!` required only for launch and attach.
+description: agenphony harness entry point. /agpn (no args) launches with 4-axis plan review + preset + mode. Subcommands: down/symphony/bookmarks. User `!` required for launch/attach.
 ---
 
 # agpn — agenphony harness entry point (15th cycle)

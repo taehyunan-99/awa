@@ -93,17 +93,15 @@ out="$(bash "$ROOT/bin/agenphony-bookmarks.sh" list 2>&1)"
 assert_contains "$out" "/tmp/proj-w" "B9 wrapper list"
 rm -rf /tmp/proj-w
 
-echo "[B10] agenphony-up.sh 발진 시 bookmarks 자동 등록 (AGENT_CMD=cat 더미)"
-TMP="$(mktemp -d)"; ( cd "$TMP" && git init -q )
-( cd "$TMP" && AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" --project "$TMP" default ) >/dev/null 2>&1 || true
-# 발진 자체는 더미라 실패해도, 사용자 가드까지 도달 후 bookmarks_upsert 호출이 핵심
-# 단순 케이스: lib.sh 함수 호출이 종료 메시지 직전에 박혀있는지 grep 으로 확인
+echo "[B10] agenphony-up.sh 발진 시 bookmarks 자동 등록 (정적 검증)"
+# 주의: bookmarks_upsert 호출(agenphony-up.sh L631)은 발진 '완전 성공 후' 라인.
+# AGENT_CMD=cat 같은 더미로는 발진 중간(tmux 세션 생성·워커 부트)에서 실패해 도달 불가.
+# 따라서 실제 BOOKMARKS_FILE 갱신을 단위테스트로 직접 검증할 수는 없고,
+# 호출 코드가 정상 위치(성공 echo 직후)에 박혀있는지 정적으로 확인한다.
+# 실 발진의 자동 등록은 라이브 e2e 에서 별도 검증(README/도커 시나리오 참고).
 grep -q "bookmarks_upsert" "$ROOT/bin/agenphony-up.sh" && echo "  ok: B10 호출 박힘" || {
   echo "  FAIL: B10 호출 누락"; _TESTS_FAIL=$((_TESTS_FAIL+1))
 }
 _TESTS_RUN=$((_TESTS_RUN+1))
-# 정리
-tmux kill-session -t "agenphony-$(basename "$TMP")" 2>/dev/null || true
-rm -rf "$TMP"
 
 test_summary

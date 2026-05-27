@@ -73,6 +73,16 @@ _session_autoname() {
   printf 'agenphony-%s' "$safe"
 }
 
+# 인자 path 의 basename 을 sanitize 해서 'agenphony-<safe>' 세션명 반환.
+# 순수 함수(외부 전역 미참조) — agenphony-main.sh cmd_launch 의 인라인 sed 단일화 목적.
+# _session_autoname 은 PROJECT_ROOT 전역 의존이라 그대로 두고, 인자형 헬퍼를 별도 제공.
+session_name_for() {  # $1=project path → echo "agenphony-<sanitized>"
+  local b safe
+  b="$(basename "$1")"
+  safe="$(printf '%s' "$b" | sed 's/[^A-Za-z0-9_-]/_/g')"
+  printf 'agenphony-%s' "$safe"
+}
+
 # SESSION 결정 우선순위: SESSION_OVERRIDE > PROFILE_SESSION > SESSION env > 자동명.
 # 자동명은 PROJECT_ROOT basename 기반이라 멀티 프로젝트 동시 가동 시 자연 격리.
 # SESSION_DEFAULT 와 session_exists() 는 호환 위해 유지 (Q9, 후속 cleanup).
