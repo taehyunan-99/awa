@@ -6,10 +6,17 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP1="/tmp/probe_mp_$$/projectA"; mkdir -p "$TMP1" && ( cd "$TMP1" && git init -q )
 TMP2="/tmp/probe_mp_$$/projectB"; mkdir -p "$TMP2" && ( cd "$TMP2" && git init -q )
+
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# probe fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
 cleanup() {
   tmux kill-session -t "agenphony-projectA" 2>/dev/null
   tmux kill-session -t "agenphony-projectB" 2>/dev/null
   rm -rf "/tmp/probe_mp_$$"
+  [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"
 }
 trap cleanup EXIT
 

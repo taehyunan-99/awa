@@ -12,9 +12,15 @@ export AGENT_CMD="bash $ROOT/tests/dummy-worker.sh dev $SESSION_OVERRIDE"
 TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
 export HARNESS_PROJECT="$TMP_PROJ"
 
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
 cleanup() {
   tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
   [ -n "${TMP_PROJ:-}" ] && rm -rf "$TMP_PROJ"
+  [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"
 }
 trap cleanup EXIT
 

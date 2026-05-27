@@ -6,6 +6,12 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 src="$(cat "$ROOT/bin/agenphony-up.sh")"
 
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+trap 'rm -rf "$_AGPN15_XDG"' EXIT
+
 echo "[W1] --workers 파서 case 존재"
 # 주석이 아닌 실제 case 토큰을 매칭 (약한 단언 보강)
 assert_contains "$src" '--workers)' "W1 --workers 파서 case"

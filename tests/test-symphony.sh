@@ -9,9 +9,15 @@ ROOT="$(cd .. && pwd)"
 export AGPN_SYM_NAME="_SYMPHONY_TEST_$$"
 SYM="$AGPN_SYM_NAME"
 
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
 trap '
   tmux kill-session -t "$SYM" 2>/dev/null
   for s in _S_A_$$ _S_B_$$ _S_C_$$ _ALONE_$$ _S_KA_$$; do tmux kill-session -t "$s" 2>/dev/null; done
+  rm -rf "$_AGPN15_XDG"
 ' EXIT
 
 # 헬퍼: 14차 윈도우 구조 흉내 (team + workers window).

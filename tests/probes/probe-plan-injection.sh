@@ -11,6 +11,12 @@ printf '# PRD\nproduct 요구사항\n' > "$PROJ/PRD.md"
 printf '# ARCH\n아키텍처 결정\n' > "$PROJ/ARCH.md"
 SES="$(HARNESS_PROJECT="$PROJ" bash -c "source $ROOT/bin/lib.sh; resolve_session")"
 
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# probe fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+trap 'rm -rf "$_AGPN15_XDG"' EXIT
+
 echo "=== agenphony-up --plan PRD.md --plan ARCH.md (cat 더미) ==="
 bash "$ROOT/bin/agenphony-up.sh" --project "$PROJ" --plan "$PROJ/PRD.md" --plan "$PROJ/ARCH.md" default >/dev/null 2>&1
 sleep 0.8

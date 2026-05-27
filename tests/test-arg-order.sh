@@ -10,6 +10,12 @@ export AGENT_CMD="cat"
 # 두 개의 격리 PROJECT_ROOT — 각각 다른 위치로 --project 전달.
 PROJ_A="$(mktemp -d)"; ( cd "$PROJ_A" && git init -q )
 PROJ_B="$(mktemp -d)"; ( cd "$PROJ_B" && git init -q )
+
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
 cleanup() {
   # 두 세션 모두 정리 시도 (resolve_session 은 PROJECT_ROOT basename 기반).
   for p in "$PROJ_A" "$PROJ_B"; do
@@ -17,6 +23,7 @@ cleanup() {
     [ -n "$s" ] && tmux kill-session -t "$s" 2>/dev/null || true
   done
   rm -rf "$PROJ_A" "$PROJ_B"
+  [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"
 }
 trap cleanup EXIT
 
