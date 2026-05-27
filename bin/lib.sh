@@ -528,3 +528,117 @@ run_with_timeout() {
     [ "$crc" -eq 0 ] && return 0 || return 124
   fi
 }
+
+# === bookmarks (15차) ===========================================================
+# 단일 출처 — wrapper 스크립트는 이 7개 함수만 호출.
+# 저장 형식: ~/.config/agenphony/bookmarks.tsv (TSV 5컬럼: path alias preset plan last_used).
+BOOKMARKS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/agenphony"
+BOOKMARKS_FILE="$BOOKMARKS_DIR/bookmarks.tsv"
+
+bookmarks_init() {
+  mkdir -p "$BOOKMARKS_DIR"
+  [ -f "$BOOKMARKS_FILE" ] || touch "$BOOKMARKS_FILE"
+}
+
+bookmarks_upsert() {
+  local path="$1" preset="$2" plan="${3:-}"
+  # 7차 리뷰 [MAJOR-9]: TSV 무결성 — path/preset/plan 에 tab/newline 들어가면 5컬럼 가정 깨짐
+  for _f in "$path" "$preset" "$plan"; do
+    case "$_f" in
+      *$'\t'*|*$'\n'*) echo "오류: bookmark 필드에 tab/newline 불가 — '$_f'" >&2; return 1 ;;
+    esac
+  done
+  local ts; ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  bookmarks_init
+  local existing_alias=""
+  existing_alias=$(awk -F'\t' -v p="$path" '$1==p{print $2; exit}' "$BOOKMARKS_FILE")
+  local tmp="$BOOKMARKS_FILE.$$.tmp"
+  awk -F'\t' -v p="$path" '$1!=p' "$BOOKMARKS_FILE" > "$tmp"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$path" "$existing_alias" "$preset" "$plan" "$ts" >> "$tmp"
+  mv "$tmp" "$BOOKMARKS_FILE"
+}
+
+bookmarks_resolve_alias() {
+  local input="$1"
+  [ -f "$BOOKMARKS_FILE" ] || { echo ""; return; }
+  awk -F'\t' -v a="$input" '$2==a{print $1; exit}' "$BOOKMARKS_FILE"
+}
+
+bookmarks_list() {
+  bookmarks_init
+  local i=0
+  echo "  #  path                                       alias       preset        last_used         stale?"
+  while IFS=$'\t' read -r path alias preset plan used; do
+    [ -n "$path" ] || continue
+    i=$((i+1))
+    local stale=""
+    [ -d "$path" ] || stale="[stale]"
+    printf '  %d  %-42s %-10s  %-12s  %-18s %s\n' \
+      "$i" "$path" "${alias:-}" "${preset:-}" "${used:-}" "$stale"
+  done < "$BOOKMARKS_FILE"
+  [ "$i" = 0 ] && echo "  (no bookmarks)"
+}
+
+bookmarks_set_alias() {
+  local num="$1" new_alias="${2:-}"
+  bookmarks_init
+  # 6차 리뷰 [CRIT-2]: list 가 빈 라인 skip 하므로 set_alias 도 동일 필터로 i 정렬
+  local target
+  target=$(awk -F'\t' -v n="$num" '$1!=""{i++; if(i==n){print $1; exit}}' "$BOOKMARKS_FILE")
+  [ -n "$target" ] || { echo "오류: bookmark $num 없음" >&2; return 1; }
+  # 6차 리뷰 [MINOR-5]: spec §5.6 L737 "기존 path 우선" — 충돌 시 set 거부
+  if [ -n "$new_alias" ]; then
+    local conflict
+    conflict=$(awk -F'\t' -v a="$new_alias" -v p="$target" '$2==a && $1!=p{print $1; exit}' "$BOOKMARKS_FILE")
+    if [ -n "$conflict" ]; then
+      echo "오류: alias '$new_alias' 이 이미 '$conflict' 에 부여됨 — 기존 path 우선 (set 거부)" >&2
+      return 1
+    fi
+  fi
+  local tmp="$BOOKMARKS_FILE.$$.tmp"
+  awk -F'\t' -v OFS='\t' -v p="$target" -v a="$new_alias" \
+    '$1==p { $2=a } { print }' "$BOOKMARKS_FILE" > "$tmp"
+  mv "$tmp" "$BOOKMARKS_FILE"
+}
+
+bookmarks_remove() {
+  local sel="$1"
+  bookmarks_init
+  # 6차 리뷰 [CRIT-2]: list 가 빈 라인 skip 하므로 i (논리 인덱스) 기준으로 통일
+  local n
+  n=$(awk -F'\t' '$1!=""{i++} END{print i+0}' "$BOOKMARKS_FILE")
+  local indices=""
+  if [ "$sel" = "all" ]; then
+    # 6차 리뷰 [CRIT-3]: BSD seq 1 0 = '1\n0' (descending) → n=0 가드 필수
+    [ "$n" -gt 0 ] && indices=$(seq 1 "$n")
+  else
+    indices=$(echo "$sel" | tr ',' '\n' | grep -E '^[0-9]+$' | sort -un)
+  fi
+  [ -n "$indices" ] || { echo "오류: 유효 선택 없음" >&2; return 1; }
+  local tmp="$BOOKMARKS_FILE.$$.tmp"
+  # i (논리 인덱스) 기준 삭제: 빈 라인이 있으면 NR 과 i 가 달라지므로 i 만 사용
+  awk -F'\t' -v OFS='\t' -v sel="$indices" '
+    BEGIN { n=split(sel, a, "\n"); for(k=1;k<=n;k++) d[a[k]]=1 }
+    $1=="" { print; next }   # 빈 라인은 보존 (제거 대상 아님)
+    { i++; if (!(i in d)) print }
+  ' "$BOOKMARKS_FILE" > "$tmp"
+  mv "$tmp" "$BOOKMARKS_FILE"
+}
+
+bookmarks_prune() {
+  bookmarks_init
+  local stale_count=0
+  while IFS=$'\t' read -r path _; do
+    [ -n "$path" ] || continue
+    [ -d "$path" ] || stale_count=$((stale_count+1))
+  done < "$BOOKMARKS_FILE"
+  [ "$stale_count" = 0 ] && { echo "No stale bookmarks."; return 0; }
+  read -r -p "Remove $stale_count stale bookmarks? (y/n): " ans
+  [ "$ans" = "y" ] || return 0
+  local tmp="$BOOKMARKS_FILE.$$.tmp"
+  awk -F'\t' -v OFS='\t' '{
+    cmd = "test -d \"" $1 "\""
+    if (system(cmd) == 0) print
+  }' "$BOOKMARKS_FILE" > "$tmp"
+  mv "$tmp" "$BOOKMARKS_FILE"
+}
