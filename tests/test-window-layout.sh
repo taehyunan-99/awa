@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 # 14차 UX: 윈도우 재배치 + border 라벨 통합 검증.
-# fixture 는 실 agenphony-up 띄우지 않고 tmux new-session + 직접 split 으로 구성
-# (기존 test-agenphony-list.sh L3·L4 동일 패턴).
+# fixture 는 실 agenphony-up 띄우지 않고 tmux new-session + 직접 split 으로 구성.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+# 본문은 fixture 별 trap 을 등록/해제하므로, 최종 trap 해제 후 살아남는 별도 EXIT trap 필요.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+_agpn15_xdg_cleanup() { [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"; }
+
 echo "[W1] fix_session_titles 가 pane-border-status·format 세팅"
 # 각 fixture 는 trap (본문 중 사망 대비) + 끝에 명시 cleanup + `trap -` (다음
 # fixture 의 새 trap 으로 안전히 덮어쓰기) 의 3단 패턴. 이중 호출은 `|| true` 로 무해.
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; S="agenphony-$SAFE"
-trap 'tmux kill-session -t "$S" 2>/dev/null || true; rm -rf "$TMP"' EXIT INT TERM
+trap 'tmux kill-session -t "$S" 2>/dev/null || true; rm -rf "$TMP"; _agpn15_xdg_cleanup' EXIT INT TERM
 tmux new-session -d -s "$S" -c "$TMP"
 fix_session_titles "$S"
 
@@ -37,7 +43,7 @@ LEAD_MODEL=opus
 PM_MODEL=sonnet
 PROF_EOF
 SAFE2="$(basename "$TMP2" | sed 's/[^A-Za-z0-9_-]/_/g')"; S2="agenphony-$SAFE2"
-trap 'tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"' EXIT INT TERM
+trap 'tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"; _agpn15_xdg_cleanup' EXIT INT TERM
 SESSION_OVERRIDE="$S2" HARNESS_PROJECT="$TMP2" AGENT_CMD=cat \
   bash "$ROOT/bin/agenphony-up.sh" "$PROF" >/dev/null 2>&1 || true
 
@@ -59,5 +65,8 @@ assert_eq "$(basename "$TMP2")" "$got_pname" "W2d @agenphony-project-name = base
 
 tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"
 trap - EXIT INT TERM
+
+# 15th: 모든 fixture 의 trap 이 해제된 후 XDG temp dir 정리 (살아남는 EXIT trap).
+trap '_agpn15_xdg_cleanup' EXIT
 
 test_summary

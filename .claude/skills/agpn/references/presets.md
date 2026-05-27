@@ -1,9 +1,9 @@
-# profile 추천 근거 (agpn stage 단계 3)
+# preset 추천 근거 (heuristics)
 
-plan task 분석 → 적정 profile 매핑. task 종류 라벨은 plan 에 없으므로 휴리스틱 추론.
+plan task 분석 → 적정 preset 매핑. task 종류 라벨은 plan 에 없으므로 휴리스틱 추론.
 
-## profile 인벤토리
-| profile | 구성 | 적합 작업 |
+## preset 인벤토리
+| preset | 구성 | 적합 작업 |
 |---|---|---|
 | default | dev1 test1 + quality-rev | 일반 기능, 소규모 |
 | feature-team | dev1 test1 arch1(researcher) + spec/quality/arch 리뷰어 | 설계 비중 큰 기능, 다관점 |
@@ -24,4 +24,4 @@ plan task 분석 → 적정 profile 매핑. task 종류 라벨은 plan 에 없�
 - 코드점검·보안 → code-review
 - 애매 → default + 커스텀 안내
 
-추천은 힌트 — 사용자가 채택/다른profile/커스텀으로 최종 결정.
+추천은 힌트 — 사용자가 채택/다른preset/커스텀으로 최종 결정.

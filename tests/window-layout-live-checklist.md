@@ -1,6 +1,6 @@
 # 14차 UX 라이브 체크리스트 — window layout + border 라벨
 
-자동 테스트(tests/test-window-layout.sh + test-agenphony-list.sh) 가 ALL PASS 인 상태에서, 실 claude 로 라이브 가동해 사용자 눈으로 확인. 사용자가 `!` 로 실행 (claude 토큰 규약).
+자동 테스트(tests/test-window-layout.sh) 가 ALL PASS 인 상태에서, 실 claude 로 라이브 가동해 사용자 눈으로 확인. 사용자가 `!` 로 실행 (claude 토큰 규약).
 
 ## 준비
 
@@ -33,7 +33,7 @@ tmux attach -t agenphony-agpn-uxlive
 - [ ] LEAD pane (window 0) 에서 "@pm: dev 에게 hello.py 만들고 'hi' 출력하도록 시켜" 같은 dispatch 트리거
 - [ ] dev pane (window 1) 으로 TASK 정상 도달
 - [ ] watcher (window 1 최하단) 가 events.log 갱신
-- [ ] agenphony-list 가 (dev test) 같이 워커명만 출력 (watcher·LEAD·PM·reviewer 안 섞임)
+- [ ] /agpn (Step 0 resume) 또는 /agpn bookmarks list 가 워커명만 출력 (watcher·LEAD·PM·reviewer 안 섞임)
 
 ### 정리
 - [ ] `bash /Users/taehyunan/Desktop/Repo/Practice/agenphony/bin/agenphony-down.sh agpn-uxlive` 로 세션 종료

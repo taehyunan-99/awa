@@ -13,10 +13,16 @@ TMP_PROJ="$(mktemp -d)"
 FIX_BASE="$(mktemp -d)"
 FIX_PROMPTS="$FIX_BASE/prompts"
 
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
 cleanup() {
   tmux kill-session -t "$SESSION" 2>/dev/null || true
   [ -n "${TMP_PROJ:-}" ] && rm -rf "$TMP_PROJ"
   [ -n "${FIX_BASE:-}" ] && rm -rf "$FIX_BASE"
+  [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"
 }
 trap cleanup EXIT
 

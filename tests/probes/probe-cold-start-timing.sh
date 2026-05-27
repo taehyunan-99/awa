@@ -8,7 +8,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HARNESS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 TMP_PROJ="$(mktemp -d -t p2-cold-start.XXXXXX)"
-trap "bash '$HARNESS_ROOT/bin/agenphony-down.sh' --project '$TMP_PROJ' 2>/dev/null || true; rm -rf '$TMP_PROJ'" EXIT
+
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# probe fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
+trap "bash '$HARNESS_ROOT/bin/agenphony-down.sh' --project '$TMP_PROJ' 2>/dev/null || true; rm -rf '$TMP_PROJ'; rm -rf '$_AGPN15_XDG'" EXIT
 
 cd "$TMP_PROJ"
 git init -q 2>/dev/null || true

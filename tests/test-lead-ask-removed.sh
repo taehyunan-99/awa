@@ -25,7 +25,13 @@ fi
 # 3) 산출된 LEAD boot 합본에 @lead-ask·pm pane_id 채널 0건 (실제 가동 산출물).
 PROJ="$(mktemp -d)"; ( cd "$PROJ" && git init -q )
 SES="$(HARNESS_PROJECT="$PROJ" bash -c "source $ROOT/bin/lib.sh; resolve_session")"
-cleanup() { tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$PROJ"; }
+
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
+cleanup() { tmux kill-session -t "$SES" 2>/dev/null || true; rm -rf "$PROJ"; [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"; }
 trap cleanup EXIT
 
 bash "$ROOT/bin/agenphony-up.sh" --project "$PROJ" default >/dev/null 2>&1

@@ -6,10 +6,17 @@ ROOT="$(cd .. && pwd)"
 
 TMP1="$(mktemp -d)/projectA"; mkdir -p "$TMP1" && ( cd "$TMP1" && git init -q )
 TMP2="$(mktemp -d)/projectB"; mkdir -p "$TMP2" && ( cd "$TMP2" && git init -q )
+
+# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
+_AGPN15_XDG="$(mktemp -d)"
+export XDG_CONFIG_HOME="$_AGPN15_XDG"
+
 trap '
   tmux kill-session -t "agenphony-projectA" 2>/dev/null
   tmux kill-session -t "agenphony-projectB" 2>/dev/null
   rm -rf "$(dirname "$TMP1")" "$(dirname "$TMP2")"
+  rm -rf "$_AGPN15_XDG"
 ' EXIT
 
 # A·B 동시 가동

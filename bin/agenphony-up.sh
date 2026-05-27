@@ -308,7 +308,7 @@ done
 # continuum 오염 방지.
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 12차: PROJECT_ROOT (풀경로) — agenphony-list 가 읽음.
+# 12차: PROJECT_ROOT (풀경로) — /agpn (Step 0 resume) 또는 /agpn bookmarks list 가 읽음.
 tmux set-option -t "$SESSION" @agenphony-project "$PROJECT_ROOT" 2>/dev/null || true
 # 14차 UX: basename — pane-border-format 의 #{@agenphony-project-name} 으로 사용.
 tmux set-option -t "$SESSION" @agenphony-project-name "$(basename "$PROJECT_ROOT")" 2>/dev/null || true
@@ -621,6 +621,14 @@ tmux send-keys -t "$WATCHER_PANE" Enter
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
 echo "attach: tmux attach -t $SESSION"
+
+# 15차: bookmarks 자동 등록 (현재 발진의 path/preset/plan 기록).
+# 7차 리뷰 [CRIT-8]: spec §5.5 의 ${PROFILE:-custom} 정합 — '(custom)' 괄호 라벨 정제.
+_PLAN_FIRST=""
+[ "${#PLAN_FILES[@]}" -gt 0 ] && _PLAN_FIRST="${PLAN_FILES[0]}"
+_PRESET_LABEL="${PROFILE:-custom}"
+[ "$_PRESET_LABEL" = "(custom)" ] && _PRESET_LABEL="custom"
+bookmarks_upsert "$PROJECT_ROOT" "$_PRESET_LABEL" "$_PLAN_FIRST" 2>/dev/null || true
 
 # P2 §2.3: SKIPPED_PANES 가시화. bootstrap_pane 에서 skip 시 누적된 변수.
 # 성공 메시지 직후에 출력해 사용자가 success/주의를 함께 인지.
