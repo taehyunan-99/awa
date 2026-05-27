@@ -87,7 +87,7 @@ SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatch
    launch_session=$(printf '%s' "$meta" | sed -n 's/.*session=\([^ ]*\).*/\1/p')
    launch_mode=$(printf '%s' "$meta" | sed -n 's/.*mode=\([^ ]*\).*/\1/p')
    ```
-   SKILL remembers `launch_session` and `launch_mode` for Step 7.
+   SKILL remembers `launch_session` and `launch_mode` for Step 5 (Auto-follow).
 
 6. **User executes the printed command with `!`** (10th review [CRIT-28]):
    - SKILL outputs the launch command to user with explicit guidance: "Please run this with `!` and tell me when it completes (or paste the result)."

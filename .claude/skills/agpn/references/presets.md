@@ -1,4 +1,4 @@
-# preset 추천 근거 (agpn stage 단계 3)
+# preset 추천 근거 (heuristics)
 
 plan task 분석 → 적정 preset 매핑. task 종류 라벨은 plan 에 없으므로 휴리스틱 추론.
 

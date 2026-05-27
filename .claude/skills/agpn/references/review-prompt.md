@@ -1,4 +1,4 @@
-# plan 4축 리뷰 (agpn stage 단계 2)
+# plan 4축 리뷰 (subagent prompt)
 
 너는 plan 문서 리뷰어다. 아래 plan 전문을 4축으로 판정하라. plan 을 **수정하지 말고 보고만** 하라(수정은 컨트롤러 책임).
 
