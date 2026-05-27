@@ -10,16 +10,16 @@ Redefined as a single responsibility — *team execution and management*. Plan w
 ## Execution Model (§1.1)
 
 **(A) User `!` required** — claude child process / stdin/stdout hijack risk
-- `bash bin/agenphony-up.sh ...` (launch = spawns claude REPL per worker)
+- `bash "$HARNESS_ROOT/bin/agenphony-up.sh" ...` (launch = spawns claude REPL per worker)
 - `tmux attach -t <session>`
 
 **(B) claude code auto-execute OK** — no risk above
 - All tmux ops (move-window / kill-session / set-option / ...)
-- `bash bin/agenphony-down.sh --project ...` (runtime cleanup only)
-- `bash bin/agenphony-down-menu.sh`
-- `bash bin/agenphony-symphony.sh <action>`
-- `bash bin/agenphony-bookmarks.sh <action>`
-- `bash bin/agenphony-main.sh ...` (non-interactive arg mode)
+- `bash "$HARNESS_ROOT/bin/agenphony-down.sh" --project ...` (runtime cleanup only)
+- `bash "$HARNESS_ROOT/bin/agenphony-down-menu.sh"`
+- `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" <action>`
+- `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" <action>`
+- `bash "$HARNESS_ROOT/bin/agenphony-main.sh" ...` (non-interactive arg mode)
 
 ## Routing
 
@@ -27,15 +27,32 @@ Redefined as a single responsibility — *team execution and management*. Plan w
 
 SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatches main.sh non-interactively.
 
-**All Bash calls in this routing run with `cwd=$HARNESS_ROOT`** (claude code Bash tool default). lib.sh's "not a git repo" warning is therefore not triggered. Do not change cwd in bash calls. (10th review [MAJOR-29])
+**HARNESS_ROOT discovery (MUST run before first Bash call)** — claude code Bash tool cwd is the user's *terminal cwd*, not the harness. Relative `bin/...` paths break when claude is started from outside the repo. (15th live finding [L-1])
 
-1. **Step 0 — Resume check (Bash):** `bash bin/agenphony-main.sh resume`
+```bash
+if [ -n "${AGPN_HARNESS_ROOT:-}" ]; then
+  HARNESS_ROOT="$AGPN_HARNESS_ROOT"
+elif [ -L ~/.claude/skills/agpn ]; then
+  # global install via symlink: ~/.claude/skills/agpn → <repo>/.claude/skills/agpn
+  _link="$(readlink ~/.claude/skills/agpn)"
+  HARNESS_ROOT="$(cd "$(dirname "$_link")/../.." && pwd)"
+elif [ -d ~/.claude/skills/agpn ] && [ -f ~/.claude/skills/agpn/SKILL.md ]; then
+  # global install via copy: search up for repo root marker (bin/agenphony-main.sh)
+  HARNESS_ROOT=""  # fallback to user prompt
+else
+  HARNESS_ROOT=""  # last resort — ask user for harness path
+fi
+```
+
+**All Bash invocations MUST use `bash "$HARNESS_ROOT/bin/<script>.sh" ...` (absolute path).** Never use relative `bin/...` — cwd is unreliable across new terminal sessions. lib.sh's "not a git repo" warning is suppressed because `$HARNESS_ROOT` is always the repo root.
+
+1. **Step 0 — Resume check (Bash):** `bash "$HARNESS_ROOT/bin/agenphony-main.sh" resume`
    - Parses TSV output (header line + 0+ rows). If rows exist, present them to user via chat. `_SYMPHONY` row is labeled `multi-view`.
-   - User picks one → `bash bin/agenphony-main.sh attach --session <name>` → print attach cmd → END.
+   - User picks one → `bash "$HARNESS_ROOT/bin/agenphony-main.sh" attach --session <name>` → print attach cmd → END.
    - User picks none / no rows → continue to Step 1.
 
 2. **Step 1 — Plan (SKILL chat):**
-   - **Auto-discover** (9th review [CRIT-22]): `bash -c "ls -t docs/superpowers/plans/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip.
+   - **Auto-discover** (9th review [CRIT-22]): `bash -c "ls -t \"$HARNESS_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip.
    - If user provides plan → Agent tool 4-axis review:
      - prompt: `references/review-prompt.md` + plan body
      - subagent_type: `general-purpose`
@@ -50,10 +67,13 @@ SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatch
        - keyword/path scan (Test:, tests/, "research", "security", Create:-count).
        - returns one recommended preset + reasoning.
    - If user skips plan → directly proceed to preset choice.
-   - **Preset choice** (5 options): default / feature-team / research / code-review / custom.
+   - **Preset choice — 2-stage branch** (15th live finding [L-2], AskUserQuestion 4-option cap):
+     - **Stage A — preset or custom?** AskUserQuestion: `preset (recommended) | custom (manual roles)`.
+     - **Stage B-preset** (if user chose preset): AskUserQuestion with 4 options — `default | feature-team | research | code-review`. Recommended option is highlighted from heuristic output above.
+     - **Stage B-custom** (if user chose custom): proceed to *Custom branch* below.
    - **Custom branch** (9th review [MAJOR-23]):
-     - Worker roles inventory: `prompts/roles/02-development/*.md` (dev, researcher) and `prompts/roles/04-security/*.md` (security), plus `prompts/roles/03-quality/tester.md`.
-     - Reviewer roles inventory: `prompts/roles/03-quality/reviewer-{spec,arch,quality}.md` (excluding `reviewer-common.md`).
+     - Worker roles inventory: `$HARNESS_ROOT/prompts/roles/02-development/*.md` (dev, researcher) and `$HARNESS_ROOT/prompts/roles/04-security/*.md` (security), plus `$HARNESS_ROOT/prompts/roles/03-quality/tester.md`.
+     - Reviewer roles inventory: `$HARNESS_ROOT/prompts/roles/03-quality/reviewer-{spec,arch,quality}.md` (excluding `reviewer-common.md`).
      - AskUserQuestion: which worker roles (multi-select). For each chosen role ask count (1-3) and model (`opus|sonnet|haiku`, recommended default sonnet).
      - AskUserQuestion: which reviewer roles (multi-select, optional).
      - Assemble `--workers "name1:role1:model1,name2:role2:model2,..."` (matches agenphony-up.sh `WORKERS_ARG` format).
@@ -64,16 +84,20 @@ SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatch
    - count ≥ 1 → ask user: Single vs Multi-view
    - count = 0 → mode=single auto, inform user
 
-4. **Step 3 — Project (SKILL chat):**
-   - Options: Current(cwd) / Bookmarks / Custom
-   - For Current: ask user their project root (SKILL cannot trust its own cwd — claude code Bash tool cwd is fixed to harness root). User pastes path or types alias.
-   - For Bookmarks: `bash bin/agenphony-bookmarks.sh list` → present rows to user → user picks number or alias
-   - For Custom: ask path/alias from user
-   - **Resolve to absolute path:** `bash bin/agenphony-main.sh resolve-path --input <user-input>` → returns resolved path or exit 1.
+4. **Step 3 — Project (SKILL chat)** (15th live finding [L-3]):
+   - Note: claude code Bash tool cwd cannot be trusted as the user's project root across new terminal sessions — therefore there is no separate "Current(cwd)" option. The user pastes their cwd via the *Custom path* option below.
+   - Options (3, with clear labels):
+     1. **Bookmarks** — pick from saved list
+     2. **Custom path** — paste absolute path or alias (this is also the channel for "my current cwd": just paste it)
+     3. **Harness root** — developer-only, runs against the harness repo itself
+   - For Bookmarks: `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" list` → present rows to user → user picks number or alias
+   - For Custom path: ask path/alias from user (label hints "absolute path or alias; if your terminal cwd, paste it here")
+   - For Harness root: use `$HARNESS_ROOT` directly
+   - **Resolve to absolute path:** `bash "$HARNESS_ROOT/bin/agenphony-main.sh" resolve-path --input <user-input>` → returns resolved path or exit 1.
 
 5. **Step 4 — Launch command output (Bash, non-interactive):**
    ```
-   bash bin/agenphony-main.sh launch \
+   bash "$HARNESS_ROOT/bin/agenphony-main.sh" launch \
      --project <resolved-path> \
      --mode-launch <single|multi> \
      [--preset <name>|--workers <spec>] \
@@ -99,21 +123,21 @@ SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatch
    - SKILL fetches current live agenphony-* sessions (Bash): `tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^agenphony-' || true`
    - **Excluding `launch_session`** from the result list, compute `existing[]`.
    - Branch:
-     - `tmux has-session -t _SYMPHONY` → exit 0 → `bash bin/agenphony-symphony.sh add <launch_session>`
-     - else → `bash bin/agenphony-symphony.sh compose <existing[]...> <launch_session>`
+     - `tmux has-session -t _SYMPHONY` → exit 0 → `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" add <launch_session>`
+     - else → `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" compose <existing[]...> <launch_session>`
    - symphony.sh dedupes defensively, but SKILL should send a clean list.
 
 8. **Step 6 — Attach guidance:** SKILL prints to user `tmux attach -t _SYMPHONY` (multi-view) or `tmux attach -t <launch_session>` (single) → user runs with `!`. SKILL turn ends.
 
 ### `/agpn down`
-Bash: `bash bin/agenphony-down-menu.sh` — auto, menu + multi-select.
+Bash: `bash "$HARNESS_ROOT/bin/agenphony-down-menu.sh"` — auto, menu + multi-select.
 
 ### `/agpn symphony [action]`
-Bash: `bash bin/agenphony-symphony.sh <action> [args]` — auto.
+Bash: `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" <action> [args]` — auto.
 actions: `compose <s1> [s2...]` | `add <s>` | `detach <w...>` | `disband` | `kill <w...>`
 
 ### `/agpn bookmarks [action]`
-Bash: `bash bin/agenphony-bookmarks.sh <action>` — auto.
+Bash: `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" <action>` — auto.
 actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 
 ### Deprecated (notice + exit)
