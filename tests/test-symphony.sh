@@ -86,4 +86,62 @@ out="$(bash "$ROOT/bin/agenphony-symphony.sh" add "_ALONE_$$" 2>&1)"
 assert_contains "$out" "team 외 window 가 없음" "S7 안전 검사 거부 메시지"
 tmux kill-session -t _ALONE_$$ 2>/dev/null
 
+echo "[S8] Detach: 선택 프로젝트 원세션 복원"
+tmux kill-session -t "$SYM" 2>/dev/null
+mk_src _S_A_$$
+mk_src _S_B_$$
+mk_src _S_C_$$
+bash "$ROOT/bin/agenphony-symphony.sh" compose "_S_A_$$" "_S_B_$$" "_S_C_$$" >/dev/null 2>&1
+bash "$ROOT/bin/agenphony-symphony.sh" detach "_S_A_$$-team" >/dev/null 2>&1
+# A 의 원세션에 team window 복원
+win="$(tmux list-windows -t "_S_A_$$" -F '#W' 2>/dev/null)"
+assert_contains "$win" "team" "S8a A 원세션 team 복원"
+# $SYM 에는 A 없음
+sym_win="$(tmux list-windows -t "$SYM" -F '#W' 2>/dev/null)"
+if ! printf '%s' "$sym_win" | grep -qx "_S_A_$$-team"; then
+  echo "  ok: S8b $SYM 에서 A 제거"
+  _TESTS_RUN=$((_TESTS_RUN+1))
+else
+  echo "  FAIL: S8b A 잔존"; _TESTS_RUN=$((_TESTS_RUN+1)); _TESTS_FAIL=$((_TESTS_FAIL+1))
+fi
+
+echo "[S9] Detach: 마지막 1개 → 자동 detach + \$SYM kill"
+# 현재 $SYM = {B-team, C-team}, detach B → 1개 남음 → 자동 처리
+bash "$ROOT/bin/agenphony-symphony.sh" detach "_S_B_$$-team" >/dev/null 2>&1
+# $SYM 죽었어야 함
+assert_eq "" "$(tmux has-session -t "$SYM" 2>/dev/null && echo alive)" "S9a \$SYM kill"
+# C 도 원세션 복원
+win="$(tmux list-windows -t "_S_C_$$" -F '#W' 2>/dev/null)"
+assert_contains "$win" "team" "S9b C auto-detach 복원"
+
+echo "[S10] Disband: 모두 복원 + \$SYM kill"
+tmux kill-session -t "$SYM" 2>/dev/null
+mk_src _S_A_$$ ; mk_src _S_B_$$
+bash "$ROOT/bin/agenphony-symphony.sh" compose "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
+bash "$ROOT/bin/agenphony-symphony.sh" disband >/dev/null 2>&1
+assert_eq "" "$(tmux has-session -t "$SYM" 2>/dev/null && echo alive)" "S10a \$SYM kill"
+win_a="$(tmux list-windows -t "_S_A_$$" -F '#W' 2>/dev/null)"
+win_b="$(tmux list-windows -t "_S_B_$$" -F '#W' 2>/dev/null)"
+assert_contains "$win_a" "team" "S10b A team 복원"
+assert_contains "$win_b" "team" "S10c B team 복원"
+
+echo "[S11] Kill: detach 선행 + down.sh 위임"
+tmux kill-session -t "$SYM" 2>/dev/null
+TMP_A="$(mktemp -d)"; ( cd "$TMP_A" && git init -q )
+tmux kill-session -t "_S_KA_$$" 2>/dev/null   # 멱등
+tmux new-session -d -s "_S_KA_$$" -n team
+tmux split-window -h -t "_S_KA_$$:team"
+tmux new-window -t "_S_KA_$$" -n workers
+tmux set-option -t "_S_KA_$$" @agenphony-project "$TMP_A"
+mk_src _S_B_$$
+bash "$ROOT/bin/agenphony-symphony.sh" compose "_S_KA_$$" "_S_B_$$" >/dev/null 2>&1
+# Kill 호출 (down.sh 가 marker 없으면 거부할 텐데, 그 자체로 detach 까지는 됨)
+bash "$ROOT/bin/agenphony-symphony.sh" kill "_S_KA_$$-team" >/dev/null 2>&1 || true
+# detach 자체는 됐는지 — _S_KA_$$ 가 살아있고 team window 복원
+if tmux has-session -t "_S_KA_$$" 2>/dev/null; then
+  win="$(tmux list-windows -t "_S_KA_$$" -F '#W' 2>/dev/null)"
+  assert_contains "$win" "team" "S11 detach 선행 후 down 호출"
+fi
+rm -rf "$TMP_A"
+
 test_summary

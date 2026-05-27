@@ -171,6 +171,115 @@ action_add() {
   echo "Added $session to $SYM"
 }
 
+sym_detach_one() {
+  # _SYMPHONY 의 한 *-team window 를 원세션으로 복원
+  local sym_win="$1"
+  # 8차 리뷰 [MAJOR-19]: window 이름이 '-team' 으로 안 끝나면 패턴 위반 — 거부
+  case "$sym_win" in
+    *-team) ;;
+    *) echo "오류: detach 대상 '$sym_win' 은 *-team 패턴 아님" >&2; return 1 ;;
+  esac
+  local orig_session="${sym_win%-team}"
+  # 8차 리뷰 [MAJOR-19]: orig 이 _SYMPHONY 자체면 자기 참조 — 거부
+  if [ "$orig_session" = "$SYM" ]; then
+    echo "오류: $SYM 자신은 detach 대상 아님" >&2
+    return 1
+  fi
+  if ! tmux has-session -t "$orig_session" 2>/dev/null; then
+    echo "경고: 원세션 $orig_session 부재." >&2
+    read -r -p "Create session $orig_session and restore? (y/n): " ans
+    [ "$ans" = "y" ] || return 1
+    tmux new-session -d -s "$orig_session" -n _placeholder
+    # 9차 리뷰 [CRIT-20]: 14차 fix (allow-set-title 윈도우 상속 부재) 적용 — lib.sh 단일 출처
+    fix_session_indexing "$orig_session"
+    fix_session_titles "$orig_session"
+  fi
+  if tmux list-windows -t "$orig_session" -F '#W' 2>/dev/null | grep -qx 'team'; then
+    echo "오류: $orig_session 에 이미 'team' window 존재. Detach 거부 (충돌 위험)." >&2
+    echo "  수동 해결: tmux rename-window -t $orig_session:team team-old" >&2
+    return 1
+  fi
+  tmux rename-window -t "$SYM:$sym_win" "team" 2>/dev/null || {
+    echo "오류: rename 실패 ($sym_win → team)" >&2
+    return 1
+  }
+  tmux move-window -s "$SYM:team" -t "$orig_session:" 2>/dev/null || {
+    echo "오류: move 실패 ($SYM:team → $orig_session)" >&2
+    return 1
+  }
+  tmux kill-window -t "$orig_session:_placeholder" 2>/dev/null || true
+  return 0
+}
+
+sym_post_check_last() {
+  # _SYMPHONY 에 *-team window 가 1개만 남으면 자동 detach + kill
+  if ! tmux has-session -t "$SYM" 2>/dev/null; then return 0; fi
+  local remaining
+  remaining=$(tmux list-windows -t "$SYM" -F '#W' 2>/dev/null | grep -E -- '-team$' || true)
+  # 6차 리뷰 [CRIT-1]: grep -c + || echo 0 은 빈 입력 시 '0\n0' 멀티라인 생성 → 분기 미진입
+  local count
+  if [ -z "$remaining" ]; then count=0; else count=$(printf '%s\n' "$remaining" | wc -l | tr -d ' '); fi
+  if [ "$count" = "1" ]; then
+    echo "Last project remaining — auto detach + kill $SYM."
+    sym_detach_one "$remaining" || return 1
+    tmux kill-session -t "$SYM" 2>/dev/null || true
+  elif [ "$count" = "0" ]; then
+    # 잔여 0 → _SYMPHONY 자체 kill
+    tmux kill-session -t "$SYM" 2>/dev/null || true
+  fi
+}
+
+action_detach() {
+  # arg: space-separated *-team window names
+  local -a wins=( "$@" )
+  [ "${#wins[@]}" -ge 1 ] || { echo "오류: detach 인자 필요" >&2; return 1; }
+  if ! tmux has-session -t "$SYM" 2>/dev/null; then
+    echo "오류: $SYM 부재." >&2
+    return 1
+  fi
+  local w
+  for w in "${wins[@]}"; do
+    sym_detach_one "$w" || return 1
+  done
+  sym_post_check_last
+}
+
+action_disband() {
+  if ! tmux has-session -t "$SYM" 2>/dev/null; then
+    echo "오류: $SYM 부재." >&2
+    return 1
+  fi
+  local wins
+  wins=$(tmux list-windows -t "$SYM" -F '#W' 2>/dev/null | grep -E -- '-team$' || true)
+  local w
+  while IFS= read -r w; do
+    [ -n "$w" ] || continue
+    sym_detach_one "$w" || true   # 일부 실패해도 진행 — 최대한 복원
+  done <<< "$wins"
+  tmux kill-session -t "$SYM" 2>/dev/null || true
+  echo "Disbanded $SYM."
+}
+
+action_kill() {
+  # arg: *-team window names
+  local -a wins=( "$@" )
+  [ "${#wins[@]}" -ge 1 ] || { echo "오류: kill 인자 필요" >&2; return 1; }
+  if ! tmux has-session -t "$SYM" 2>/dev/null; then
+    echo "오류: $SYM 부재." >&2
+    return 1
+  fi
+  local w orig proj
+  for w in "${wins[@]}"; do
+    orig="${w%-team}"
+    sym_detach_one "$w" || continue
+    proj=$(tmux show-options -t "$orig" -v @agenphony-project 2>/dev/null || echo "")
+    if [ -n "$proj" ]; then
+      bash "$_DIR/agenphony-down.sh" --project "$proj" || true
+    fi
+  done
+  sym_post_check_last
+}
+
 # === main ================================================================
 
 action="${1:-}"
@@ -178,6 +287,9 @@ shift || true
 case "$action" in
   compose) action_compose "$@" ;;
   add) action_add "$@" ;;
-  ""|menu) echo "Usage: $0 {compose <s1> [s2...] | add <s>}" ;;
+  detach) action_detach "$@" ;;
+  disband) action_disband ;;
+  kill) action_kill "$@" ;;
+  ""|menu) echo "Usage: $0 {compose <s1> [s2...] | add <s> | detach <w...> | disband | kill <w...>}" ;;
   *) echo "오류: 알 수 없는 action '$action'" >&2; exit 1 ;;
 esac
