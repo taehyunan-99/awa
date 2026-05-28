@@ -8,7 +8,7 @@ tmux 세션 생애주기(up/down)와 워커 dispatch·watcher·classify·permiss
 
 ## 1. WHAT
 
-agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들. 사용자 창구(pm) + 순수 오케스트레이터(lead) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등 아키텍처 (2차 하니스 설계).
+AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들. 사용자 창구(pm) + 순수 오케스트레이터(lead) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등 아키텍처 (2차 하니스 설계).
 
 ## 2. CONTENTS
 

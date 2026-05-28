@@ -8,7 +8,7 @@
 
 ## 1. WHAT
 
-agenphony 하니스의 회귀 방지층 — 단위 테스트(test-*.sh) 87개, 통합 probe(probes/) 25+개, 도메인 시나리오(lead-arena/m3/role5axis/stress).
+AWA 하니스의 회귀 방지층 — 단위 테스트(test-*.sh) 87개, 통합 probe(probes/) 25+개, 도메인 시나리오(lead-arena/m3/role5axis/stress).
 
 ## 2. CONTENTS
 

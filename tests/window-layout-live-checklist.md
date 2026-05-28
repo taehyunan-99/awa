@@ -6,8 +6,8 @@
 
 ```bash
 mkdir -p /tmp/agpn-uxlive && cd /tmp/agpn-uxlive && git init -q
-bash /Users/taehyunan/Desktop/Repo/Practice/agenphony/bin/awa-up.sh \
-  /Users/taehyunan/Desktop/Repo/Practice/agenphony/profiles/default.sh
+bash /Users/taehyunan/Desktop/Repo/Practice/AWA/bin/awa-up.sh \
+  /Users/taehyunan/Desktop/Repo/Practice/AWA/profiles/default.sh
 # attach 후 확인.
 tmux attach -t awa-agpn-uxlive
 ```
@@ -36,7 +36,7 @@ tmux attach -t awa-agpn-uxlive
 - [ ] /agpn (Step 0 resume) 또는 /agpn bookmarks list 가 워커명만 출력 (watcher·LEAD·PM·reviewer 안 섞임)
 
 ### 정리
-- [ ] `bash /Users/taehyunan/Desktop/Repo/Practice/agenphony/bin/awa-down.sh agpn-uxlive` 로 세션 종료
+- [ ] `bash /Users/taehyunan/Desktop/Repo/Practice/AWA/bin/awa-down.sh agpn-uxlive` 로 세션 종료
 - [ ] tmux ls 에 awa-agpn-uxlive 없음
 
 ## 결과 기록

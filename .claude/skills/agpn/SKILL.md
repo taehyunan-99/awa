@@ -1,9 +1,9 @@
 ---
 name: agpn
-description: agenphony harness entry point. /agpn (no args) launches with 4-axis plan review + preset + mode. Subcommands: down/symphony/bookmarks. User `!` required for launch/attach.
+description: AWA harness entry point. /agpn (no args) launches with 4-axis plan review + preset + mode. Subcommands: down/symphony/bookmarks. User `!` required for launch/attach.
 ---
 
-# agpn — agenphony harness entry point (15th cycle)
+# agpn — AWA harness entry point (15th cycle)
 
 Redefined as a single responsibility — *team execution and management*. Plan writing is external.
 
