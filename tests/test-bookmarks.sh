@@ -12,7 +12,7 @@ source "$ROOT/bin/lib.sh"
 
 echo "[B1] bookmarks_init: 디렉터리·파일 생성"
 bookmarks_init
-assert_eq "1" "$(test -d "$XDG_CONFIG_HOME/agenphony" && echo 1)" "B1a 디렉터리"
+assert_eq "1" "$(test -d "$XDG_CONFIG_HOME/awa" && echo 1)" "B1a 디렉터리"
 assert_eq "1" "$(test -f "$BOOKMARKS_FILE" && echo 1)" "B1b 파일"
 
 echo "[B2] bookmarks_upsert: 신규 추가"

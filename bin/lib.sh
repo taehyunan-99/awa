@@ -567,8 +567,8 @@ run_with_timeout() {
 
 # === bookmarks (15차) ===========================================================
 # 단일 출처 — wrapper 스크립트는 이 7개 함수만 호출.
-# 저장 형식: ~/.config/agenphony/bookmarks.tsv (TSV 5컬럼: path alias preset plan last_used).
-BOOKMARKS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/agenphony"
+# 저장 형식: ~/.config/awa/bookmarks.tsv (TSV 5컬럼: path alias preset plan last_used).
+BOOKMARKS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/awa"
 BOOKMARKS_FILE="$BOOKMARKS_DIR/bookmarks.tsv"
 
 bookmarks_init() {

@@ -15,7 +15,7 @@ printf '# PRD\nplan A 내용\n' > "$PLAN_A"
 printf '# ARCH\nplan B 내용\n' > "$PLAN_B"
 SES="$(HARNESS_PROJECT="$PROJ" bash -c "source $ROOT/bin/lib.sh; resolve_session")"
 
-# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"

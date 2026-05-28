@@ -7,7 +7,7 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
-# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 # 본문은 fixture 별 trap 을 등록/해제하므로, 최종 trap 해제 후 살아남는 별도 EXIT trap 필요.
 _AGPN15_XDG="$(mktemp -d)"
