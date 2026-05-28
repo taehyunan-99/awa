@@ -750,6 +750,7 @@ bump_stats_counter() {
     awk -v p="$pattern" -v f="$field" '
       BEGIN { found_pat=0; field_done=0; in_patterns=0 }
       /^patterns:/ { in_patterns=1; print; next }
+      in_patterns && /^[^ ]/ && !/^patterns:/ { in_patterns=0 }
       in_patterns && $0 ~ "  \""p"\":" { found_pat=1; print; next }
       found_pat && $0 ~ "    "f":" {
         # 기존 필드 — 값 +1
@@ -841,28 +842,27 @@ confirm_allow_yaml() {
       # 임시 yaml 사용 — HARNESS_ROOT/config 오염 차단. 거부 시 rejected 카운터 +1.
       # ★ 단위 테스트는 HARNESS_ROOT 를 격리 TMPDIR 로 override 하나 bin/ 은 복사 안 함 →
       #   bin/danger-check.sh 절대 경로는 *lib.sh 가 위치한 디렉터리* 기준으로 해석.
-      local _lib_dir
-      _lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+      #   _LIB_DIR 은 lib.sh source 시점에 계산되므로 동일 효과.
       local probe_yaml
       probe_yaml="$(mktemp)"
       printf 'probe:\n  - "%s"\n' "$pattern" > "$probe_yaml"
-      if ! bash "${_lib_dir}/danger-check.sh" --check-allow-yaml "$probe_yaml" 2>/dev/null; then
+      if ! bash "${_LIB_DIR}/danger-check.sh" --check-allow-yaml "$probe_yaml" 2>/dev/null; then
         rm -f "$probe_yaml"
         echo "[REJECT] confirm_allow_yaml: 패턴 '$pattern' 다중 probe danger 매치 → 학습 거부" >&2
-        bump_stats_counter "$pattern" "rejected"
+        bump_stats_counter "$pattern" "rejected" || echo "[WARN] bump_stats_counter rejected failed for: $pattern" >&2
         return 1
       fi
       rm -f "$probe_yaml"
       append_to_yaml "$allow_yaml" "$pattern" "learned"
-      bump_stats_counter "$pattern" "accepted"
+      bump_stats_counter "$pattern" "accepted" || echo "[WARN] bump_stats_counter accepted failed for: $pattern" >&2
       ;;
     rejected)
-      bump_stats_counter "$pattern" "rejected"
+      bump_stats_counter "$pattern" "rejected" || echo "[WARN] bump_stats_counter rejected failed for: $pattern" >&2
       ;;
     never)
       # 사용자 영구 거부 — blocklist 추가
       append_to_yaml "${HARNESS_ROOT}/config/lead-auto-allow-blocklist.yaml" "$pattern" "patterns"
-      bump_stats_counter "$pattern" "never"
+      bump_stats_counter "$pattern" "never" || echo "[WARN] bump_stats_counter never failed for: $pattern" >&2
       ;;
     *)
       return 1 ;;
