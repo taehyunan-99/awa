@@ -59,9 +59,13 @@ fi
      - returns 4 axis verdicts + `## 종합: APPROVED | CHANGES_NEEDED`
    - **CHANGES_NEEDED handling** (9th review [CRIT-21]):
      - SKILL parses each FAIL with location/reason from subagent output.
-     - For each, SKILL drafts a fix proposal (diff or rewrite snippet) and presents to user via chat.
+     - **NEW (§6.2 awa-rollout)** — 검증가능성 축 FAIL 분류:
+       - 1차 리뷰에서 검증가능성 축 FAIL → **즉시 abort** (재리뷰 없이, 사용자 yes 불가)
+       - 1차 PASS 후 재리뷰에서 검증가능성 FAIL 전환 → **즉시 abort** (3차 재리뷰 없음)
+       - 다른 3축 (완결성·실행가능성·기술건전성) FAIL → 재리뷰 1회 종결 후 `proceed despite gaps?` 허용
+     - For each FAIL (검증가능성 외), SKILL drafts a fix proposal (diff or rewrite snippet) and presents to user via chat.
      - User approves each fix → SKILL writes back to plan file via Edit tool.
-     - After all fixes applied, re-run review *once* (one retry max — avoid infinite loop). If still CHANGES_NEEDED, SKILL summarizes remaining gaps and asks user: "proceed despite gaps?" (yes → continue, no → abort).
+     - After all fixes applied, re-run review *once* (one retry max — avoid infinite loop). If still CHANGES_NEEDED, SKILL summarizes remaining gaps and asks user: "proceed despite gaps?" (yes → continue, no → abort). 단, 재리뷰에서 검증가능성 FAIL 발생 시 위 분류대로 즉시 abort.
    - **Preset suggestion** (9th review [MINOR-24]):
      - After APPROVED, *SKILL itself* (no subagent) applies heuristics in `references/presets.md` to the plan body:
        - keyword/path scan (Test:, tests/, "research", "security", Create:-count).
