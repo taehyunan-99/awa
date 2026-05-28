@@ -50,7 +50,7 @@ if [ "${RUN_LIVE:-0}" = "1" ]; then
 fi
 
 echo "=== differentiation ==="
-rc=0; bash "$(dirname "$0")/check-differentiation-status.sh" || rc=$?
+rc=0; bash check-differentiation-status.sh || rc=$?
 [ "$rc" -ne 0 ] && total_fail=$((total_fail + 1))
 
 echo "===================="
