@@ -45,4 +45,59 @@ HARNESS_ROOT="$TMPDIR" bash -c '
 '
 assert_success "$?" "confirm_allow_yaml accepted → learned 카테고리 누적"
 
+# 5. C-2 검증 — accepted 사후 검증으로 위험 패턴 학습 거부
+# 'Bash(git push:*)' 는 다중 probe ('--force') 에서 danger 매치 → learned 누적 안 됨.
+mkdir -p "$TMPDIR/c2/config"
+cp "$ROOT/config/lead-auto-allow.yaml" "$TMPDIR/c2/config/lead-auto-allow.yaml"
+cp "$ROOT/config/lead-auto-allow-stats.yaml" "$TMPDIR/c2/config/lead-auto-allow-stats.yaml"
+cp "$ROOT/config/lead-auto-allow-blocklist.yaml" "$TMPDIR/c2/config/lead-auto-allow-blocklist.yaml"
+
+HARNESS_ROOT="$TMPDIR/c2" bash -c '
+  source "'"$ROOT"'/bin/lib.sh"
+  HARNESS_ROOT="'"$TMPDIR"'/c2" confirm_allow_yaml "Bash(git push:*)" "accepted" 2>/dev/null
+  # 위험 패턴 → rejected 로 전환 → learned 에 누적 안 됨
+  if grep -q "Bash(git push:\*)" "'"$TMPDIR"'/c2/config/lead-auto-allow.yaml"; then exit 1; else exit 0; fi
+'
+assert_success "$?" "C-2: 위험 패턴 accepted → 사후 검증 거부 (learned 누적 안 됨)"
+
+# 6. I-7 검증 — Edit/Write 위험 패턴 검출
+cp "$ROOT/config/lead-auto-allow.yaml" "$TMPDIR/i7-conflict.yaml"
+cat >> "$TMPDIR/i7-conflict.yaml" <<'EOF'
+
+malicious-edit:
+  - "Edit(/etc/sudoers)"
+  - "Write(/etc/passwd)"
+EOF
+bash "$ROOT/bin/danger-check.sh" --check-allow-yaml "$TMPDIR/i7-conflict.yaml" 2>/dev/null
+rc=$?
+assert_eq "1" "$rc" "I-7: Edit/Write 위험 패턴 yaml → 충돌 발견"
+
+# 7. I-8 검증 — 카테고리 분리 멱등성
+# Bash(ls:*) 는 운영 yaml 의 read-only 에 이미 있음. learned 에 추가 시도 → I-8 정정 후 추가 성공.
+mkdir -p "$TMPDIR/i8/config"
+cp "$ROOT/config/lead-auto-allow.yaml" "$TMPDIR/i8/config/lead-auto-allow.yaml"
+cp "$ROOT/config/lead-auto-allow-stats.yaml" "$TMPDIR/i8/config/lead-auto-allow-stats.yaml"
+cp "$ROOT/config/lead-auto-allow-blocklist.yaml" "$TMPDIR/i8/config/lead-auto-allow-blocklist.yaml"
+
+HARNESS_ROOT="$TMPDIR/i8" bash -c '
+  source "'"$ROOT"'/bin/lib.sh"
+  HARNESS_ROOT="'"$TMPDIR"'/i8" append_to_yaml "'"$TMPDIR"'/i8/config/lead-auto-allow.yaml" "Bash(ls:*)" "learned"
+  # learned 카테고리 안에 Bash(ls:*) 있는지 확인
+  awk -v c="learned" -v p="  - \"Bash(ls:*)\"" "
+    \$0 ~ \"^\" c \":\" { in_cat=1; next }
+    in_cat && /^[a-z][a-z_-]*:/ { in_cat=0 }
+    in_cat && \$0 == p { print \"found\"; exit }
+  " "'"$TMPDIR"'/i8/config/lead-auto-allow.yaml" | grep -q "found"
+'
+assert_success "$?" "I-8: 다른 카테고리에 있어도 대상 카테고리에 추가 (멱등성 카테고리 분리)"
+
+# 8. I-9 검증 — bump_stats_counter 락 동시성 (락 디렉토리 정리 + 카운터 증가 확인)
+HARNESS_ROOT="$TMPDIR/i8" bash -c '
+  source "'"$ROOT"'/bin/lib.sh"
+  HARNESS_ROOT="'"$TMPDIR"'/i8" bump_stats_counter "Bash(test:*)" "confirm"
+  # 락 정리 확인
+  test ! -d "'"$TMPDIR"'/i8/config/lead-auto-allow-stats.yaml.lock"
+'
+assert_success "$?" "I-9: bump_stats_counter 락 획득·정리 정상"
+
 test_summary

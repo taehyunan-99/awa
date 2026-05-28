@@ -91,18 +91,49 @@ if [ "${1:-}" = "--check-allow-yaml" ]; then
   # yaml 안의 모든 패턴 추출 (단순 awk — `  - "..."` 라인).
   patterns="$(awk '/^  - "/ { gsub(/^  - "|"$/, ""); print }' "$yaml")"
 
+  # C-2 정정 — 다중 fake input. 패턴 'Bash(git push:*)' 가 '--force' 등 위험 토큰을
+  # 만나면 danger 매치되는데, 단일 'arg1 arg2' probe 로는 검출 못 함. 다중 probe 로 보강.
+  DANGER_PROBES="arg1 arg2
+--force
+-rf /
+-f /
+--hard HEAD
+of=/dev/sda
+| sh"
+
   conflicts=0
   while IFS= read -r pat; do
     [ -n "$pat" ] || continue
-    # 패턴이 Bash(<command>:*) 형식이면 command 추출 후 danger_check 시도.
+    # 패턴이 Bash(<command>:*) / Edit(<path>) / Write(<path>) 형식이면 danger_check 시도.
     case "$pat" in
       'Bash('*)
         cmd_prefix="${pat#Bash(}"
         cmd_prefix="${cmd_prefix%:\*)}"
         cmd_prefix="${cmd_prefix%\)}"
-        # fake input json — danger_check 가 .command 만 읽음.
-        input_json="$(printf '{"command":"%s"}' "$cmd_prefix arg1 arg2")"
-        if cat="$(danger_check "Bash" "$input_json")"; then
+        matched=0
+        while IFS= read -r probe; do
+          [ -n "$probe" ] || continue
+          # fake input json — danger_check 가 .command 만 읽음.
+          input_json="$(printf '{"command":"%s"}' "$cmd_prefix $probe")"
+          if cat="$(danger_check "Bash" "$input_json")"; then
+            echo "[CONFLICT] allow 패턴 '$pat' (probe='$probe') → danger '$cat'" >&2
+            conflicts=$((conflicts + 1))
+            matched=1
+            break  # 패턴당 1회만 보고 — 다중 probe FAIL 폭주 방지
+          fi
+        done <<PROBES
+$DANGER_PROBES
+PROBES
+        ;;
+      'Edit('*|'Write('*)
+        # I-7 정정 — Edit/Write 패턴도 danger_check path 분기로 검사.
+        tool="${pat%%(*}"
+        path_arg="${pat#*(}"; path_arg="${path_arg%)}"
+        # glob 제거 — /etc/sudoers/* → /etc/sudoers
+        path_arg="${path_arg%/\*}"
+        path_arg="${path_arg%\*}"
+        input_json="$(printf '{"file_path":"%s"}' "$path_arg")"
+        if cat="$(danger_check "$tool" "$input_json")"; then
           echo "[CONFLICT] allow 패턴 '$pat' → danger '$cat'" >&2
           conflicts=$((conflicts + 1))
         fi

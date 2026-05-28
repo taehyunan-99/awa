@@ -720,12 +720,30 @@ fi
 
 # bump_stats_counter — Phase A 카운터 갱신
 # $1=pattern $2=field (confirm|accepted|rejected|never)
+# I-9 정정 — 멀티 워커 동시 호출 시 lost update 차단 (add_to_allow 락 패턴 복제).
 bump_stats_counter() {
   local pattern="$1" field="$2"
   local stats="${HARNESS_ROOT}/config/lead-auto-allow-stats.yaml"
   [ -f "$stats" ] || return 1
+
+  local lock="${stats}.lock"
+  local i=0 max=300   # 300 * 0.05s = 15s 상한
+  while ! mkdir "$lock" 2>/dev/null; do
+    # stale lock 회수 — add_to_allow 와 동일 정책 (mt>0 가드).
+    local mt; mt="$(_mtime_epoch "$lock")"
+    if [ "$mt" -gt 0 ]; then
+      local age=$(( $(date +%s) - mt ))
+      [ "$age" -ge 15 ] && rmdir "$lock" 2>/dev/null || true
+    fi
+    i=$((i + 1))
+    [ "$i" -ge "$max" ] && { echo "bump_stats_counter: lock 획득 실패 ($stats)" >&2; return 1; }
+    sleep 0.05
+  done
+
+  local rc=0
   if [ "$USE_YQ" = "1" ]; then
     yq eval ".patterns.\"$pattern\".$field |= ((. // 0) + 1)" -i "$stats"
+    rc=$?
   else
     # awk fallback — 단순 누적. patterns 노드 존재 가정.
     # 새 패턴이면 append, 기존 패턴이면 field 카운트 +1.
@@ -756,7 +774,10 @@ bump_stats_counter() {
         }
       }
     ' "$stats" > "$stats.tmp" && mv "$stats.tmp" "$stats"
+    rc=$?
   fi
+  rmdir "$lock" 2>/dev/null || true
+  return $rc
 }
 
 # append_to_yaml — yaml 카테고리에 패턴 append
@@ -764,8 +785,16 @@ bump_stats_counter() {
 append_to_yaml() {
   local yaml="$1" pattern="$2" category="${3:-learned}"
   [ -f "$yaml" ] || return 1
-  # 멱등성 — 이미 있으면 skip
-  grep -q "^  - \"$pattern\"$" "$yaml" 2>/dev/null && return 0
+  # I-8 정정 — 멱등성 검사를 *대상 카테고리* 컨텍스트로 좁힘. 다른 카테고리에 같은
+  # 패턴이 있어도 대상 카테고리에는 추가 가능. awk `index` 매치로 정규식 함정 회피
+  # (`Bash(ls:*)` 의 `*` 가 awk `~` 에서 "0회 이상" 으로 해석되는 문제 차단).
+  local in_category
+  in_category="$(awk -v c="$category" -v p="  - \"$pattern\"" '
+    $0 ~ "^"c":" { in_cat=1; next }
+    in_cat && /^[a-z][a-z_-]*:/ { in_cat=0 }
+    in_cat && $0 == p { print "found"; exit }
+  ' "$yaml")"
+  [ "$in_category" = "found" ] && return 0
   if [ "$USE_YQ" = "1" ]; then
     yq eval ".$category += [\"$pattern\"]" -i "$yaml"
   else
@@ -807,6 +836,23 @@ confirm_allow_yaml() {
 
   case "$decision" in
     accepted)
+      # C-2 정정 — append 전 사후 검증. learned 카테고리에 추가될 패턴이
+      # 다중 probe (--force/-rf/-f/--hard/of=/sh) 로 danger 매치되면 거부.
+      # 임시 yaml 사용 — HARNESS_ROOT/config 오염 차단. 거부 시 rejected 카운터 +1.
+      # ★ 단위 테스트는 HARNESS_ROOT 를 격리 TMPDIR 로 override 하나 bin/ 은 복사 안 함 →
+      #   bin/danger-check.sh 절대 경로는 *lib.sh 가 위치한 디렉터리* 기준으로 해석.
+      local _lib_dir
+      _lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+      local probe_yaml
+      probe_yaml="$(mktemp)"
+      printf 'probe:\n  - "%s"\n' "$pattern" > "$probe_yaml"
+      if ! bash "${_lib_dir}/danger-check.sh" --check-allow-yaml "$probe_yaml" 2>/dev/null; then
+        rm -f "$probe_yaml"
+        echo "[REJECT] confirm_allow_yaml: 패턴 '$pattern' 다중 probe danger 매치 → 학습 거부" >&2
+        bump_stats_counter "$pattern" "rejected"
+        return 1
+      fi
+      rm -f "$probe_yaml"
       append_to_yaml "$allow_yaml" "$pattern" "learned"
       bump_stats_counter "$pattern" "accepted"
       ;;

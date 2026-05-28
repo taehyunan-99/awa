@@ -55,4 +55,4 @@
 ## ⓘ @allow-confirm → 권한 학습 사용자 승인 push
 1) `events.log` 의 `pattern=...;role=...` payload 파싱 (필드5 key=value, precondition C-1 정합)
 2) 사용자 AskUserQuestion: "패턴 '<pattern>' 영구 카탈로그 추가? accepted/rejected/never"
-3) 사용자 결정 후 `bash bin/lib.sh::confirm_allow_yaml <pattern> <decision>` 호출 (yaml/stats 누적, never 시 blocklist 추가)
+3) 사용자 결정 후 호출: `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && confirm_allow_yaml <pattern> <decision>'` (yaml/stats 누적, never 시 blocklist 추가, 사후 검증 실패 시 rejected 카운터 +1)

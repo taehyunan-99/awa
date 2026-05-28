@@ -226,6 +226,10 @@ fi
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 # 6차: 게이트 state 디렉터리 (lead 가 매 사이클 ls — 데몬이 만들던 것을 이관). marker 게이트 통과 후라 leak 없음.
 mkdir -p "$WORKSPACE/state/pending-asks" "$WORKSPACE/state/incidents" "$WORKSPACE/state/removal-requests"
+# I-10 정정 — events.log 빈 파일 생성 보장. add_to_allow 가 `[ -f events.log ]` 가드로
+# 신호 발화 — boot 직후 events.log 미생성 시 첫 호출 신호 silent drop. touch 로 빈 파일
+# 생성하면 watcher 의 last_events 초기화(현재 줄 수=0) 와 정합 — 과거 done 폭주 없음.
+touch "$WORKSPACE/events.log"
 
 # 5차→8차: lead-auto-allow.yaml 설치 + marker 게이트 + 백업 갱신.
 # lead_auto_allow_lookup 은 ${PROJECT_ROOT}/config/lead-auto-allow.yaml 을 읽으므로,

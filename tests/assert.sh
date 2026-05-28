@@ -20,7 +20,7 @@ assert_eq() {
 assert_contains() {
   local haystack="$1" needle="$2" msg="${3:-}"
   _TESTS_RUN=$((_TESTS_RUN + 1))
-  if printf '%s' "$haystack" | grep -qF -- "$needle"; then
+  if case "$haystack" in *"$needle"*) true ;; *) false ;; esac; then
     echo "  ok: ${msg:-assert_contains}"
   else
     _TESTS_FAIL=$((_TESTS_FAIL + 1))
@@ -33,7 +33,7 @@ assert_contains() {
 assert_not_contains() {
   local haystack="$1" needle="$2" msg="${3:-}"
   _TESTS_RUN=$((_TESTS_RUN + 1))
-  if printf '%s' "$haystack" | grep -qF -- "$needle"; then
+  if case "$haystack" in *"$needle"*) true ;; *) false ;; esac; then
     _TESTS_FAIL=$((_TESTS_FAIL + 1))
     echo "  FAIL: ${msg:-assert_not_contains} (found unwanted [$needle])"
   else
