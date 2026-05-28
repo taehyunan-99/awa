@@ -461,6 +461,25 @@ add_to_allow() {
     "${settings}" > "${tmp}" && mv "${tmp}" "${settings}"
   local rc=$?
   rmdir "$lock" 2>/dev/null || true
+
+  # Task 7 NEW (§7) — Phase A 신호 발화 + 통계 카운터.
+  # blocklist 검사 — Phase C 우회 시 신호 발화 안 함 (events.log·stats 모두 skip).
+  # 기존 add_to_allow 동작 (settings.json 누적 + return rc) 보존 — 후크 append 만.
+  # events.log 존재 가드 — 워커 컨텍스트(awa-up 후) 에서만 발화. 단위 테스트(HARNESS_PROJECT 격리,
+  # events.log 없음) 에서는 stats/events 모두 skip → 운영 stats.yaml 오염 방지.
+  if [ $rc -eq 0 ] && ! blocklist_contains "$pattern"; then
+    local events_log="${EVENTS:-${PROJECT_ROOT}/.agent-harness/events.log}"
+    if [ -f "$events_log" ]; then
+      bump_stats_counter "$pattern" "confirm" 2>/dev/null || true
+      # events.log 5필드: ts/worker(-)/task(-)/action(allow-confirm)/payload(key=value).
+      # 필드5 = pattern=<...>;role=<...> (precondition fix C-1 정합 — key=value payload).
+      # worker(2)=- · task(3)=- (allow-confirm 은 worker/task 의존 없음).
+      printf '%s\t-\t-\tallow-confirm\tpattern=%s;role=%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$pattern" "$entry_role" \
+        >> "$events_log" 2>/dev/null || true
+    fi
+  fi
+
   return $rc
 }
 
@@ -685,4 +704,121 @@ worker_modify_count() {
   local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
   [ -f "$events_log" ] || { echo 0; return 0; }
   awk -F'\t' -v w="$worker" '$2==w && $4=="modify" { n++ } END { print n+0 }' "$events_log"
+}
+
+# ===== Task 7: 권한 학습 영구화 (§7) =====
+# 4 함수 — bump_stats_counter / append_to_yaml / blocklist_contains / confirm_allow_yaml.
+# yq 부재 → awk fallback (Phase B/C 정확도 ↓ 인정).
+# 결정은 외부 콜백 (lead pane 신호 경유) — interactive read 미사용.
+
+# yq 검사 (lib.sh source 시 1회 캐시).
+USE_YQ="${USE_YQ:-}"
+if [ -z "$USE_YQ" ]; then
+  if command -v yq >/dev/null 2>&1; then USE_YQ=1; else USE_YQ=0; fi
+  export USE_YQ
+fi
+
+# bump_stats_counter — Phase A 카운터 갱신
+# $1=pattern $2=field (confirm|accepted|rejected|never)
+bump_stats_counter() {
+  local pattern="$1" field="$2"
+  local stats="${HARNESS_ROOT}/config/lead-auto-allow-stats.yaml"
+  [ -f "$stats" ] || return 1
+  if [ "$USE_YQ" = "1" ]; then
+    yq eval ".patterns.\"$pattern\".$field |= ((. // 0) + 1)" -i "$stats"
+  else
+    # awk fallback — 단순 누적. patterns 노드 존재 가정.
+    # 새 패턴이면 append, 기존 패턴이면 field 카운트 +1.
+    awk -v p="$pattern" -v f="$field" '
+      BEGIN { found_pat=0; field_done=0; in_patterns=0 }
+      /^patterns:/ { in_patterns=1; print; next }
+      in_patterns && $0 ~ "  \""p"\":" { found_pat=1; print; next }
+      found_pat && $0 ~ "    "f":" {
+        # 기존 필드 — 값 +1
+        match($0, /[0-9]+$/)
+        if (RSTART > 0) {
+          n = substr($0, RSTART) + 1
+          print substr($0, 1, RSTART-1) n
+        } else { print }
+        field_done=1; next
+      }
+      found_pat && /^  [^ ]/ {
+        # 다음 패턴 진입 — 현 패턴 끝
+        if (!field_done) { print "    "f": 1" }
+        found_pat=0; field_done=0
+      }
+      { print }
+      END {
+        if (found_pat && !field_done) { print "    "f": 1" }
+        else if (!found_pat && in_patterns) {
+          print "  \""p"\":"
+          print "    "f": 1"
+        }
+      }
+    ' "$stats" > "$stats.tmp" && mv "$stats.tmp" "$stats"
+  fi
+}
+
+# append_to_yaml — yaml 카테고리에 패턴 append
+# $1=yaml_path $2=pattern $3=category (기본 learned)
+append_to_yaml() {
+  local yaml="$1" pattern="$2" category="${3:-learned}"
+  [ -f "$yaml" ] || return 1
+  # 멱등성 — 이미 있으면 skip
+  grep -q "^  - \"$pattern\"$" "$yaml" 2>/dev/null && return 0
+  if [ "$USE_YQ" = "1" ]; then
+    yq eval ".$category += [\"$pattern\"]" -i "$yaml"
+  else
+    # awk fallback — category 키 다음에 들여쓰기 2칸 + `- "패턴"` append
+    awk -v p="$pattern" -v c="$category" '
+      BEGIN { found=0 }
+      $0 ~ "^"c":" { found=1; print; next }
+      found && /^[a-z][a-z_-]*:/ {
+        # 다음 카테고리 진입 직전에 패턴 추가
+        print "  - \""p"\""
+        found=0
+      }
+      { print }
+      END { if (found) print "  - \""p"\"" }
+    ' "$yaml" > "$yaml.tmp" && mv "$yaml.tmp" "$yaml"
+  fi
+}
+
+# blocklist_contains — 사용자 unsubscribe 검사 (Phase C 우회)
+# $1=pattern, exit 0=block 매치, exit 1=매치 안 함
+blocklist_contains() {
+  local pattern="$1"
+  local blocklist="${HARNESS_ROOT}/config/lead-auto-allow-blocklist.yaml"
+  [ -f "$blocklist" ] || return 1
+  grep -q "^  - \"$pattern\"$" "$blocklist" 2>/dev/null
+}
+
+# confirm_allow_yaml — 사용자 결정 후 yaml 영구 추가 + stats 갱신
+# $1=pattern $2=decision (accepted|rejected|never)
+# blocklist 검사 + 사용자 결정에 따라 yaml/stats 분기.
+confirm_allow_yaml() {
+  local pattern="$1" decision="$2"
+  local allow_yaml="${HARNESS_ROOT}/config/lead-auto-allow.yaml"
+
+  # Phase C 우회 — blocklist 매치하면 즉시 종료 (어떤 결정이든)
+  if blocklist_contains "$pattern"; then
+    return 1
+  fi
+
+  case "$decision" in
+    accepted)
+      append_to_yaml "$allow_yaml" "$pattern" "learned"
+      bump_stats_counter "$pattern" "accepted"
+      ;;
+    rejected)
+      bump_stats_counter "$pattern" "rejected"
+      ;;
+    never)
+      # 사용자 영구 거부 — blocklist 추가
+      append_to_yaml "${HARNESS_ROOT}/config/lead-auto-allow-blocklist.yaml" "$pattern" "patterns"
+      bump_stats_counter "$pattern" "never"
+      ;;
+    *)
+      return 1 ;;
+  esac
 }

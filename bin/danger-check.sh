@@ -77,3 +77,40 @@ danger_check() {
 
   return 1
 }
+
+# Task 7 NEW — CLI mode: --check-allow-yaml <yaml_path>
+# allow ∩ deny 충돌 검증 (C5 PASS 조건). exit 0=PASS, 1=충돌 발견.
+# 기존 danger_check 함수는 그대로 — source 시 부수효과 없음 유지.
+if [ "${1:-}" = "--check-allow-yaml" ]; then
+  yaml="${2:-}"
+  if [ ! -f "$yaml" ]; then
+    echo "[ABORT] yaml 미존재: $yaml" >&2
+    exit 1
+  fi
+
+  # yaml 안의 모든 패턴 추출 (단순 awk — `  - "..."` 라인).
+  patterns="$(awk '/^  - "/ { gsub(/^  - "|"$/, ""); print }' "$yaml")"
+
+  conflicts=0
+  while IFS= read -r pat; do
+    [ -n "$pat" ] || continue
+    # 패턴이 Bash(<command>:*) 형식이면 command 추출 후 danger_check 시도.
+    case "$pat" in
+      'Bash('*)
+        cmd_prefix="${pat#Bash(}"
+        cmd_prefix="${cmd_prefix%:\*)}"
+        cmd_prefix="${cmd_prefix%\)}"
+        # fake input json — danger_check 가 .command 만 읽음.
+        input_json="$(printf '{"command":"%s"}' "$cmd_prefix arg1 arg2")"
+        if cat="$(danger_check "Bash" "$input_json")"; then
+          echo "[CONFLICT] allow 패턴 '$pat' → danger '$cat'" >&2
+          conflicts=$((conflicts + 1))
+        fi
+        ;;
+    esac
+  done <<EOF
+$patterns
+EOF
+
+  [ "$conflicts" -eq 0 ] && exit 0 || exit 1
+fi

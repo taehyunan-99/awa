@@ -10,11 +10,11 @@ ROOT="$(cd .. && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Layer 1: lead.md ⓖ 섹션 + 신호 6종 (I-2 정정 후 @drift: 추가)
+# Layer 1: lead.md ⓖ 섹션 + 신호 N종 (I-2 정정 후 @drift: 추가, Task 7 후 @allow-confirm: 추가 → 7종)
 grep -q '## ⓖ' "$ROOT/prompts/roles/01-orchestration/lead.md"
 assert_success "$?" "L1 lead.md ⓖ 섹션 존재"
-grep -q '신호 6종' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md 신호 6종 반영 (@drift 추가)"
+grep -qE '신호 [0-9]+종' "$ROOT/prompts/roles/01-orchestration/lead.md"
+assert_success "$?" "L1 lead.md 신호 N종 헤더 반영"
 
 # Layer 1: _common.md 한 줄 존재
 grep -q '@plan-defect' "$ROOT/prompts/_common.md"

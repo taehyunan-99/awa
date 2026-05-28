@@ -1,0 +1,4 @@
+# 사용자 unsubscribe — Phase C 자동 학습 차단 패턴.
+# 사용자가 명시적으로 "이 패턴은 절대 학습 마라" 등록.
+# add_to_allow 진입 시 검사 — 블록 패턴 매치하면 즉시 종료 (yaml/settings 누적 안 함).
+patterns:

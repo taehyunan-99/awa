@@ -32,6 +32,7 @@ _normalize_plan_arg() {
 }
 PROFILE_ARG=""
 WORKERS_ARG=""
+DRY_CHECK=0
 # set -u 안전성을 위해 루프 앞에 선언 필수 (미선언 배열은 set -u 에서 unbound 오류).
 PLAN_FILES=()
 while [ $# -gt 0 ]; do
@@ -53,6 +54,10 @@ while [ $# -gt 0 ]; do
       shift 2 ;;
     --workers=*)
       WORKERS_ARG="${1#--workers=}"; shift ;;
+    --dry-check)
+      # Task 7 (§7) — yaml 부정합 가드만 실행 후 종료 (boot 안 함).
+      DRY_CHECK=1
+      shift ;;
     -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
     *)
       # 비옵션 인자는 프로파일명. 정상 사용은 1개 — 여분이 오면 무음 무시 대신 경고.
@@ -69,6 +74,22 @@ source "$_DIR/lib.sh"
 # `#` 자체가 HARNESS_ROOT 안에 들어가면 깨지므로 사전 거부 (T1 _validate_path_chars).
 # lib.sh 가 이미 stderr 에 오류 사유를 발화함 — 여기선 단순 exit 만 (메시지 책임 일원화, Minor #4).
 [ "${HARNESS_ROOT_VALID:-0}" = "1" ] || exit 1
+
+# Task 7 (§7) — yaml 부정합 검사 (boot 직전 가드, C5 PASS 조건).
+# allow ∩ deny 충돌 시 ABORT — 사용자가 학습시킨 패턴이 위험 카탈로그와 겹치는 케이스 차단.
+ALLOW_YAML="${HARNESS_ROOT}/config/lead-auto-allow.yaml"
+if [ -f "$ALLOW_YAML" ]; then
+  if ! bash "$_DIR/danger-check.sh" --check-allow-yaml "$ALLOW_YAML"; then
+    echo "[ABORT] yaml 부정합 — allow ∩ deny 충돌 발견. boot 거부" >&2
+    exit 1
+  fi
+fi
+
+# --dry-check 모드: 가드만 실행 후 종료 (실제 boot 안 함).
+if [ "${DRY_CHECK:-0}" = "1" ]; then
+  echo "[dry-check] yaml 부정합 검사 PASS"
+  exit 0
+fi
 
 # prompts 디렉터리 — 기본 $HARNESS_ROOT/prompts, 테스트 fixture 용 PROMPTS_DIR env override.
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"

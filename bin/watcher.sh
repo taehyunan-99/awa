@@ -109,6 +109,15 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           tmux send-keys -t "$LEAD_PANE" -l "@plan-defect: $wt $desc" 2>/dev/null
           tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
         done
+    # @allow-confirm: 라인 payload(필드5 = pattern=...;role=...) 추출 → lead ⓘ 라우팅 (§7 Phase A).
+    sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
+      | awk -F'\t' '$4=="allow-confirm"{print $5}' \
+      | while IFS= read -r payload; do
+          [ -n "$payload" ] || continue
+          pane_alive "$LEAD_PANE" || continue
+          tmux send-keys -t "$LEAD_PANE" -l "@allow-confirm: $payload" 2>/dev/null
+          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+        done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
   fi
 

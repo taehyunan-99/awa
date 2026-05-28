@@ -5,7 +5,7 @@
 ## ⓐ 동작 모델 (이벤트 반응형)
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
-- 신호 6종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@review:`(reviewer 용 — 무시).
+- 신호 7종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@review:`(reviewer 용 — 무시).
 - 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
 - boot 직후 1회: `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 stale 판별 — 완료 task 새 배정 마라. 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
@@ -51,3 +51,8 @@
 1) `.harness-state` 의 drift 카운터 갱신 (조용한 기록 — 즉시 push 아님)
 2) 임계 누적 시 사용자 push: "워커 <name> 드리프트 turn=N. 검토 / 재개?"
 3) 사용자 결정: (a) 검토 → 워커 중단 + review-manager 산출물 요청 / (b) 재개 → 카운터 유지
+
+## ⓘ @allow-confirm → 권한 학습 사용자 승인 push
+1) `events.log` 의 `pattern=...;role=...` payload 파싱 (필드5 key=value, precondition C-1 정합)
+2) 사용자 AskUserQuestion: "패턴 '<pattern>' 영구 카탈로그 추가? accepted/rejected/never"
+3) 사용자 결정 후 `bash bin/lib.sh::confirm_allow_yaml <pattern> <decision>` 호출 (yaml/stats 누적, never 시 blocklist 추가)
