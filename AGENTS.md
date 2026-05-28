@@ -1,4 +1,13 @@
-# agenphony — AI 에이전트 작업 지침
+# AWA — Agents Watching Agents
+
+**5어휘 표준** (한국어):
+- `plan-anchored` → "plan 정박"
+- `multi-reviewed` → "다벤더 교차 리뷰" (외부 노출 보류 — §10.6 게이트)
+- `drift-tracked` → "드리프트 상시 추적"
+- `permission-gated` → "권한 학습 게이트"
+- `deny-bounded` → "안전 한계선 보장"
+
+(영어 5어휘 책임 위치 = `README.md` + `docs/identity-AWA.md` — Task 10 산출물)
 
 세션은 일회용이며 `profiles/` + `prompts/`로부터 매번 재생성된다 — 세션 상태를 저장/복원하지 않으니 가이드·프롬프트·프로파일 변경은 항상 git 추적되는 원본 파일에서 한다.
 

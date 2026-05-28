@@ -4,6 +4,8 @@
 
 **Tradeoff**: 역할군마다 별도 템플릿을 유지하는 비용 → 워커가 자기 역할에 필요한 최소 권한만 가져 위험 명령 차단력을 높임.
 
+**5어휘 매핑**: permission-gated ("권한 학습 게이트") — Claude settings.json 권한 템플릿 군
+
 ## 1. WHAT
 
 각 역할군(default/dev/test/pm/lead/reviewer)에 대응하는 Claude Code `settings.json` 권한 템플릿. 토큰 치환 후 워커 페인 cwd의 `.claude/settings.json`으로 배치된다.

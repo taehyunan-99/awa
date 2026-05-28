@@ -4,6 +4,8 @@ tmux 세션 생애주기(up/down)와 워커 dispatch·watcher·classify·permiss
 
 **Tradeoff**: bash + tmux 의존을 받아들이는 대신, 별도 런타임 없이 PROJECT_ROOT 분리·세션 재생성 가능성을 얻는다.
 
+**5어휘 매핑**: (실행 인프라 — 5어휘 직접 책임 없음 / 라이프사이클·permission-gate·danger-check 실행 담당)
+
 ## 1. WHAT
 
 agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들.
@@ -23,17 +25,27 @@ agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 d
 - `matrix-lookup.sh` — `config/lead-auto-allow.yaml`의 카테고리 패턴 매칭(awk 파서)
 - `permission-gate.sh` — PreToolUse hook 진입점, classify 결과로 allow/deny 결정
 - `log-event.sh` — events.log 포맷 라인 append 헬퍼
-- `lib.sh` — 공통 함수(`generate_worker_settings` 등), 다른 스크립트가 source
+- `lib.sh` — 공통 함수(`generate_worker_settings`·`worker_turn_count`·`confirm_allow_yaml`·`bump_stats_counter` 등), 다른 스크립트가 source
+
+`awa-up.sh` 주요 옵션:
+- `--profile <name>` — 프로파일 fragment 선택 (`profiles/<name>.sh`)
+- `--project <path>` — PROJECT_ROOT 명시 (cwd 자동 도출 우회)
+- `--dry-check` — yaml 가드 (`danger-check.sh --check-allow-yaml`) 만 실행 후 즉시 종료 (boot 안 함, Task 7)
 
 기술 스택: bash 4+/zsh, tmux 3.6+, awk, sed, claude CLI
 
 ## 3. HOW
 
-_(update 스킬에서 채워질 자리. 작업 중 패턴이 정립되면 `/update`로 인터뷰 진행)_
+- **watcher.sh awk 분기 패턴** — 새 신호 라우팅 추가 시 done 분기 (L74-81) 100% 모방: `sed -n "$((last_events+1)),${cur}p" "$EVENTS"` 구간 추출 → `awk -F'\t' '$4=="<action>"{...}'` 필터 → `while IFS= read` + `pane_alive` 가드 + `send-keys -l <text>` + `send-keys Enter` 분리. drift-check (L85-102) / plan-defect (L104-111) / allow-confirm (L113-120) 모두 동일 형태.
+- **`lib.sh` 는 source 전용** — 진입점 없음. 직접 실행 (`bash lib.sh`) 하면 함수 정의만 만들고 종료. lead LLM 이 함수 호출해야 할 때는 `bash -c "source $HARNESS_ROOT/bin/lib.sh && confirm_allow_yaml '<pattern>' '<decision>'"` 형식으로 명시.
+- **events.log 5필드 조작 시 `event_field` / `event_valid` 호출** — `lib.sh:280-287`. 하드코딩 `awk -F'\t' '{print $N}'` 재사용 금지 — 5필드 규약 변경 시 전 수정 필요.
 
 ## 4. ⛔ HOW NOT
 
-_(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은 비워둔다)_
+- **`lib.sh` 에 진입점 추가 금지** — source 전용 계약. main 분기 (`if [ "$0" = "${BASH_SOURCE[0]}" ]`) 추가 시 source 시 부수효과 발생 가능. CLI 도구는 별도 스크립트로 분리 (예: `danger-check.sh --check-allow-yaml` 처럼 *기존 함수의 source-then-call* 가 아니라 *전용 진입점 분기*).
+- **events.log 에 직접 `printf` 쓰기 금지 (운영 코드)** — 항상 `add_to_allow` / `log_safe` 같은 보호 함수 경유. 직접 쓰기 시 mkdir 락 우회·blocklist 검사 우회·SIGPIPE 가드 우회 발생. (예외: watcher.sh 의 `drift-check` payload — 워커 손이 안 닿는 위치만 허용).
+- **yaml 쓰기 함수에 mkdir 락 누락 금지** — `add_to_allow` (lib.sh:435-449) 가 표준 패턴. 새 yaml 쓰기 함수 (예: `bump_stats_counter`) 도 *반드시* 동일 mkdir 락 + stale lock 15s 회수 패턴 복제. 락 없으면 멀티 워커 lost update.
+- **`tmux send-keys` 에 `-l` 없이 텍스트+Enter 체이닝 금지** — `send-keys -l "text" Enter` 형태는 텍스트 안의 메타키 해석 위험. 항상 두 호출로 분리 (`send-keys -t pane -l "text"` + `send-keys -t pane Enter`). `&&` 체이닝도 금지 — `-l` 성공·Enter 실패 시 half-sent 발생 (watcher.sh L52 주석 참조).
 
 ## 5. WHERE
 
@@ -53,7 +65,10 @@ _(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은
 
 ## 6. WHY
 
-_(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은 비워둔다)_
+- **watcher.sh `set -u` (set -e 미적용)** — 데몬은 *일시 실패로 죽으면 안 된다*. 서브셸 awk 파이프라인이 한 폴링 사이클에서 실패해도 다음 사이클이 정상 처리 가능하도록 `-e` 미적용. `-u` 만 두어 미설정 변수 사용은 즉시 잡되, 명령 실패는 무시 → 데몬 생존성 우선.
+- **mkdir 락 선택 이유 = macOS flock 부재** — POSIX `mkdir` 의 원자성 보장 (이미 존재하면 실패) 을 이식성 락으로 활용. flock 은 macOS 기본 부재 → 별도 brew 의존 회피.
+- **stale lock 15초 + mtime>0 가드 이유 = 5차 실측 결함 수정** — `mt=0` (stat 실패, lock 이 막 사라짐) 일 때 `age=now-0` = 거대값으로 *방금 다른 워커가 만든 정상 lock* 을 stale 로 오판 → 강제 삭제 → 임계구역 동시 진입 → lost update 재발. mt>0 가드로 차단 (lib.sh:438-444 주석).
+- **`add_to_allow` 의 events.log 가드 = 단위 테스트 격리** — 테스트 환경 (events.log 없음) 에서 `add_to_allow` 호출 시 운영 stats.yaml 오염 차단. 운영 환경 (boot 후 events.log 존재) 에서만 신호·통계 발화.
 
 ## 7. COMMANDS
 

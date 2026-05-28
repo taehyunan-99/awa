@@ -4,6 +4,8 @@
 
 **Tradeoff**: 동적 팀 빌더가 아닌 정적 fragment를 받아들이는 대신, git diff로 팀 구성 변경 이력을 추적하고 매번 동일 팀을 재생성한다.
 
+**5어휘 매핑**: multi-reviewed ("다벤더 교차 리뷰") — REVIEWERS 배열 정의 (외부 노출 보류 §10.6)
+
 ## 1. WHAT
 
 프로파일은 한 팀의 청사진이다. `bin/awa-up.sh <name>`가 `profiles/<name>.sh`를 source하면 필요한 변수가 환경에 노출되어 페인 분할·부트 프롬프트 선택이 결정된다.
@@ -26,11 +28,11 @@
 
 ## 3. HOW
 
-_(update 스킬에서 채워질 자리. 작업 중 패턴이 정립되면 `/update`로 인터뷰 진행)_
+- **REVIEWERS 이름 컨벤션** — `<역할>-rev` 접미사 (예: `spec-rev:reviewer-spec`, `quality-rev:reviewer-quality`, `arch-rev:reviewer-arch`) 또는 review-<필드>. `review-manager` 는 pane 이름 `review-mgr` 로 *고정* (`bin/awa-up.sh` 의 `REVIEW_MANAGER_PANE` 결정 로직이 이 이름으로 pane 조회).
 
 ## 4. ⛔ HOW NOT
 
-_(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은 비워둔다)_
+- **`review-mgr` pane 이름 임의 변경 금지** — `bin/awa-up.sh` 의 `REVIEW_MANAGER_PANE` 환경변수 주입 로직이 정확히 `review-mgr` 토큰으로 pane 식별. 변경 시 `watcher.sh` 의 drift-check 깨움 (line 97-100) 이 빈 PANE 으로 silent skip → review-manager 가 영원히 안 깨워짐.
 
 ## 5. WHERE
 
