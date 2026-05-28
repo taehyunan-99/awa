@@ -27,5 +27,5 @@ grep -q 'acceptance criteria\|acceptance_criteria' \
 # acceptance_criteria 구조화 필드 없는 plan 도 검증가능성 정성 표현 PASS
 echo "[STUB] (d) 역방향 호환 — 정성 표현 검증가능성 시나리오는 수동 검증 (Task 11 sanity check)"
 
-echo "[PASS] /agpn plan review 시나리오 카탈로그 — (a)·(b)·(c)·(d)"
+echo "[PASS] agpn 플랜 리뷰 시나리오 카탈로그 — (a)·(b)·(c)·(d)"
 exit 0
