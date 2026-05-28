@@ -10,11 +10,11 @@ ROOT="$(cd .. && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Layer 1: lead.md ⓖ 섹션 + 신호 5종
+# Layer 1: lead.md ⓖ 섹션 + 신호 6종 (I-2 정정 후 @drift: 추가)
 grep -q '## ⓖ' "$ROOT/prompts/roles/01-orchestration/lead.md"
 assert_success "$?" "L1 lead.md ⓖ 섹션 존재"
-grep -q '신호 5종' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md 신호 5종 반영"
+grep -q '신호 6종' "$ROOT/prompts/roles/01-orchestration/lead.md"
+assert_success "$?" "L1 lead.md 신호 6종 반영 (@drift 추가)"
 
 # Layer 1: _common.md 한 줄 존재
 grep -q '@plan-defect' "$ROOT/prompts/_common.md"
@@ -34,14 +34,7 @@ extracted="$(awk -F'\t' '$4=="plan-defect"{print $2"/"$3"\t"$5}' "$EVENTS_LOG")"
 expected="dev/T3	acceptance criteria 모호"
 assert_eq "$expected" "$extracted" "L2 watcher awk plan-defect 추출 정확"
 
-# 분기 시뮬 — (a)/(b)/(c) 사용자 결정 mock (실 AskUserQuestion 도달은 D1 수동)
-mock_ok=1
-for decision in "수정" "재개" "취소"; do
-  case "$decision" in
-    "수정"|"재개"|"취소") : ;;
-    *) mock_ok=0 ;;
-  esac
-done
-assert_eq "1" "$mock_ok" "L2 사용자 결정 mock 3분기 (수정/재개/취소)"
+# (a)/(b)/(c) 분기 검증은 Task 11 sanity check 위임 (실측 lead AskUserQuestion 도달).
+# 자동 검증 가능 영역: Layer 1 grep + Layer 2 awk 추출 (위 5 assert 로 충분).
 
 test_summary

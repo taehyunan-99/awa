@@ -3,18 +3,20 @@
 # 의존성 0(순수 셸). control mode/fswatch 배제.
 #
 # env (awa-up 이 주입):
-#   SESSION         감시 대상 세션명 (has-session 가드)
-#   LEAD_PANE       lead pane_id (%N) — @gate:/@done: 대상
-#   REVIEWER_PANES  공백구분 reviewer pane_id 목록 (0~N, 빈 문자열 가능)
-#   STATE_DIR       .agent-harness/state (pending-asks/ 포함)
-#   EVENTS          .agent-harness/events.log
-#   SEEN            .watcher-seen (처리한 uuid 누적)
-#   REV_DEBOUNCE    reviewer 깨움 디바운스 초 (기본 3)
+#   SESSION              감시 대상 세션명 (has-session 가드)
+#   LEAD_PANE            lead pane_id (%N) — @gate:/@done: 대상
+#   REVIEWER_PANES       공백구분 reviewer pane_id 목록 (0~N, 빈 문자열 가능)
+#   REVIEW_MANAGER_PANE  review-manager pane_id (있으면) — drift-check 전용 깨움 (I-3 정정)
+#   STATE_DIR            .agent-harness/state (pending-asks/ 포함)
+#   EVENTS               .agent-harness/events.log
+#   SEEN                 .watcher-seen (처리한 uuid 누적)
+#   REV_DEBOUNCE         reviewer 깨움 디바운스 초 (기본 3)
 set -u
 
 SESSION="${SESSION:-}"
 LEAD_PANE="${LEAD_PANE:-}"
 REVIEWER_PANES="${REVIEWER_PANES:-}"
+REVIEW_MANAGER_PANE="${REVIEW_MANAGER_PANE:-}"
 STATE_DIR="${STATE_DIR:-}"
 EVENTS="${EVENTS:-}"
 SEEN="${SEEN:-$STATE_DIR/.watcher-seen}"
@@ -61,6 +63,8 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     if [ "$((now - debounced_rev))" -ge "$REV_DEBOUNCE" ]; then
       for rp in $REVIEWER_PANES; do
         pane_alive "$rp" || continue
+        # I-3 정정: review-manager 는 일반 @review: 깨움에서 제외 — drift-check 전용으로만 깨움.
+        [ "$rp" = "$REVIEW_MANAGER_PANE" ] && continue
         tmux send-keys -t "$rp" -l "@review: events.log 새 줄. 증분 검토." 2>/dev/null
         tmux send-keys -t "$rp" Enter 2>/dev/null
       done
@@ -88,6 +92,12 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           [ "$turn" -ge 10 ] && [ $((turn % 10)) -eq 0 ] && {
             printf '%s\t%s\t-\tdrift-check\tturn=%s\n' \
               "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$w" "$turn" >> "$EVENTS" 2>/dev/null
+            # I-3 정정: review-manager pane 전용 깨움 (drift 분석 책임 작동).
+            # REVIEW_MANAGER_PANE 미설정 시 무해 건너뜀 (review-manager 가 없는 프로파일도 호환).
+            if [ -n "$REVIEW_MANAGER_PANE" ] && pane_alive "$REVIEW_MANAGER_PANE"; then
+              tmux send-keys -t "$REVIEW_MANAGER_PANE" -l "@drift-check: $w turn=$turn. plan-diff 시계열 갱신." 2>/dev/null
+              tmux send-keys -t "$REVIEW_MANAGER_PANE" Enter 2>/dev/null
+            fi
           }
         done
     # @plan-defect: 라인 worker/task/설명 추출 → lead ⓖ 라우팅 (§4 임시 채널). done 분기와 동일 패턴.

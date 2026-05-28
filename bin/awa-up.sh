@@ -316,6 +316,7 @@ tmux set-option -t "$SESSION" @awa-project-name "$(basename "$PROJECT_ROOT")" 2>
 # review 윈도우 생성 — REVIEWERS 정의·비어있지 않을 때만.
 REV_NAMES=()
 REV_PIDS=()
+REVIEW_MANAGER_PANE=""   # I-3 정정: review-manager 역할 pane 별도 추출 (drift-check 전용 깨움)
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   tmux new-window -t "$SESSION" -n review
   # allow-set-title 은 window-level 옵션 → 새 윈도우는 global 상속.
@@ -334,6 +335,9 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     tmux select-pane -t "$pid" -T "$ENTRY_NAME"
     REV_NAMES+=("$ENTRY_NAME")
     REV_PIDS+=("$pid")
+    # I-3: review-manager 역할 pane_id 별도 보존 (watcher 가 drift-check 분기에서만 사용).
+    # REVIEWERS 배열에는 유지 (다른 reviewer 와 함께 부트되도록) — watcher 가 디바운스 분기에서 제외.
+    [ "$ENTRY_ROLE" = "review-manager" ] && REVIEW_MANAGER_PANE="$pid"
     _prev_rev_pid="$pid"
   done
   tmux select-layout -t "$SESSION:review" even-vertical
@@ -616,7 +620,7 @@ if [ "$_last" != "watcher" ]; then
   exit 1
 fi
 # watcher 기동: pane 에 env 세팅 후 watcher.sh 실행 명령 주입.
-tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
+tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" REVIEW_MANAGER_PANE=\"${REVIEW_MANAGER_PANE:-}\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
 tmux send-keys -t "$WATCHER_PANE" Enter
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."

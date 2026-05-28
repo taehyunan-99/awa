@@ -295,12 +295,21 @@ events_valid_count() {  # $1=file → valid 라인 수
 }
 
 # 디바운스 (spec §5.5): 처리 범위 내 유니크 (worker,path). valid 라인만.
-debounce_pairs() {  # $1=file → "worker\tpath" 유니크
-  local line w p
+# C-1 정정: action 별 필드5 의미 분기 — modify 만 path 디바운스.
+# - modify: ($worker, $path) 키 — 같은 워커가 같은 파일을 여러 번 수정 → 1회로 압축
+# - done/plan-defect/drift-check: ($worker, $action) 키 — payload 가 path 가 아니므로
+#   path 디바운스 무의미. action 자체를 키로 (워커별 동종 이벤트 1회 압축).
+debounce_pairs() {  # $1=file → "worker\tpath_or_action" 유니크
+  local line w a p key
   while IFS= read -r line; do
     event_valid "$line" || continue
-    w="$(event_field "$line" 2)"; p="$(event_field "$line" 5)"
-    printf '%s\t%s\n' "$w" "$p"
+    w="$(event_field "$line" 2)"; a="$(event_field "$line" 4)"; p="$(event_field "$line" 5)"
+    if [ "$a" = "modify" ]; then
+      key="$p"
+    else
+      key="$a"
+    fi
+    printf '%s\t%s\n' "$w" "$key"
   done < "$1" | awk '!seen[$0]++'
 }
 
@@ -659,4 +668,21 @@ worker_turn_count() {
   local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
   [ -f "$events_log" ] || { echo 0; return 0; }
   awk -F'\t' -v w="$worker" '$2==w && ($4=="modify" || $4=="done") { n++ } END { print n+0 }' "$events_log"
+}
+
+# I-5 정정: worker_turn_count 가 modify+done 합산 → "총 활동" 의미. 의미 모호 해소를 위해
+# action 별 분리 변형 2종 추가. drift-check 임계 (N=10) 는 기존 worker_turn_count 유지.
+#
+# worker_done_count — done 라인만 카운트 (완료 사이클 의미)
+worker_done_count() {
+  local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
+  [ -f "$events_log" ] || { echo 0; return 0; }
+  awk -F'\t' -v w="$worker" '$2==w && $4=="done" { n++ } END { print n+0 }' "$events_log"
+}
+
+# worker_modify_count — modify 라인만 카운트 (도구 호출 의미)
+worker_modify_count() {
+  local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
+  [ -f "$events_log" ] || { echo 0; return 0; }
+  awk -F'\t' -v w="$worker" '$2==w && $4=="modify" { n++ } END { print n+0 }' "$events_log"
 }
