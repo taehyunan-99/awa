@@ -19,6 +19,10 @@ STATE_DIR="${STATE_DIR:-}"
 EVENTS="${EVENTS:-}"
 SEEN="${SEEN:-$STATE_DIR/.watcher-seen}"
 REV_DEBOUNCE="${REV_DEBOUNCE:-3}"
+
+# §5.7 drift-check 용 worker_turn_count 함수 — lib.sh 에서 끌어온다 (없으면 무해 진행).
+# shellcheck source=lib.sh
+. "$(dirname "$0")/lib.sh" 2>/dev/null || true
 # REV_DEBOUNCE 가 비정수로 주입되면 산술 비교에서 데몬이 즉사 → 정수 아니면 기본값으로.
 case "$REV_DEBOUNCE" in ''|*[!0-9]*) REV_DEBOUNCE=3 ;; esac
 
@@ -70,6 +74,21 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           pane_alive "$LEAD_PANE" || continue
           tmux send-keys -t "$LEAD_PANE" -l "@done: $wt 완료. results/ 확인 후 종합." 2>/dev/null
           tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+        done
+    # @drift-check: worker_turn_count 임계 (N=10) 도달 → review-manager 깨움 트리거 (§5.7).
+    # done 라인 발생 시 worker 별 turn 누적 검사. sort -u 로 동일 worker 중복 트리거 방지.
+    # turn % 10 == 0 일 때만 발화 (drift-check 폭주 방지). events.log 5필드 컨벤션 유지.
+    sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
+      | awk -F'\t' '$4=="done"{print $2}' \
+      | sort -u \
+      | while IFS= read -r w; do
+          [ -n "$w" ] || continue
+          turn="$(worker_turn_count "$w" "$EVENTS" 2>/dev/null || echo 0)"
+          case "$turn" in ''|*[!0-9]*) turn=0 ;; esac
+          [ "$turn" -ge 10 ] && [ $((turn % 10)) -eq 0 ] && {
+            printf '%s\t%s\t-\tdrift-check\tturn=%s\n' \
+              "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$w" "$turn" >> "$EVENTS" 2>/dev/null
+          }
         done
     # @plan-defect: 라인 worker/task/설명 추출 → lead ⓖ 라우팅 (§4 임시 채널). done 분기와 동일 패턴.
     sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \

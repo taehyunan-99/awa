@@ -650,3 +650,13 @@ bookmarks_prune() {
   }' "$BOOKMARKS_FILE" > "$tmp"
   mv "$tmp" "$BOOKMARKS_FILE"
 }
+
+# worker_turn_count — events.log 의 worker 활동 (modify|done) 행 카운트
+# events.log 형식: ts<TAB>worker<TAB>task<TAB>action<TAB>path
+# 패턴: 필드 2 = worker, 필드 4 = action (modify|done|...)
+# bash 3.2 호환 (awk 만 사용, associative array 미사용)
+worker_turn_count() {
+  local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
+  [ -f "$events_log" ] || { echo 0; return 0; }
+  awk -F'\t' -v w="$worker" '$2==w && ($4=="modify" || $4=="done") { n++ } END { print n+0 }' "$events_log"
+}

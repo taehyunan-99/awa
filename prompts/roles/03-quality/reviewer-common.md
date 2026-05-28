@@ -13,3 +13,5 @@ watcher 가 `@review:` 로 깨우면 1회 실행한다(스스로 폴링하지 �
 - **Bash·Edit 호출 금지** — 리뷰어가 셸/수정을 하면 검사 대상을 오염시켜 verdict 자체가 신뢰를 잃는다. 읽기(Read/Grep/Glob/WebFetch)와 `review/` Write 만.
 - **`review/<worker>-<id>.<나>.md` 외 Write 금지** — 다른 경로에 쓰면 워커 산출물로 오인돼 events.log·종합을 오염시킨다. lead 가 매 사이클 위반 감지.
 - **워커 조종 금지** — 리뷰어는 보고만. 개입(중단/수정 주입)은 lead 만 한다. 리뷰어가 끼어들면 단일 개입원칙이 깨져 충돌.
+
+출력: `results/<id>.md` 헤더에 `plan_alignment: <0.0~1.0>` 필드 필수 (review-manager 가 시계열 집계)

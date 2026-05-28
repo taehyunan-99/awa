@@ -20,3 +20,5 @@ reviewer 는 다음 도구만 사용한다:
 위반 시 verdict 기록 자체가 신뢰성 잃음. lead 가 위반 감지:
 - Bash/Edit 호출은 permission-gate hook 이 즉시 게이트 (reviewer settings 에 Bash allow 없음 → 사용자 확인). reviewer 는 애초에 호출 말 것.
 - events.log 의 `worker=reviewer` + `review/` 외 Write 줄 → Write 위반 (lead 가 매 사이클 감지·보고).
+
+출력: `results/<id>.md` 헤더에 `plan_alignment: <0.0~1.0>` 필드 필수 (review-manager 가 시계열 집계)
