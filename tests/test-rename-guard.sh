@@ -21,43 +21,32 @@ assert_eq "0" "$([ -f "$ROOT/bin/team-up.sh" ] && echo 1 || echo 0)" "G2b team-u
 echo "[G3] resolve_session 이 awa- prefix"
 assert_contains "$(cat "$ROOT/bin/lib.sh")" "awa-%s" "G3 세션 prefix awa-"
 
-echo "[G4] agenphony 잔재 0건 (AWA 사이클 §13.3.2-a 보존 대상 + Task 9·10 위임 제외)"
-# 보존 대상 (시간 순 기록): .claude/memory/ (과거 사이클 메모리), docs/superpowers/specs/ (과거 spec 스냅샷),
-# docs/superpowers/plans/ (과거 plan 스냅샷 — specs 와 동일 범주), .git/, .agent-harness/ (런타임).
-# .claude 통째 제외 — .claude/skills/agpn/SKILL.md 는 본 사이클에서 별도 갱신됨.
-#
-# 패턴 강화 (G4-a): 'agenphony' + 비-하이픈 경계 문자 — 외부 리뷰의 허위 PASS 정정.
-# 'agenphony-' (옛 파일명) + 'agenphony ' (정체성 단어) + 'agenphony/' (경로) 모두 포착.
-#
-# 명시 exclusion (영구 + 후속 Task 위임) — spec §13.3.2-a 범위 표:
-#   - Practice/agenphony/   → spec §13.8 디렉토리 리네이밍 기각 (오케스트레이션 메타포 흔적 솔직 인정)
-#   - ~/.config/agenphony/  → 사용자 데이터 경로 보존 (런타임 영향 회피)
-#   - "# agenphony — "       → AGENTS.md L1 정체성 문구 (Task 9 영역)
-#   - "agenphony 하니스"     → 영역 AGENTS.md 본문 (Task 9 영역)
-#   - README.md L23 절대경로 → Task 10 README 전면 재작성 영역
-#   - tests/window-layout-live-checklist.md 절대경로 → 운영 checklist (Task 9·10 처리)
+echo "[G4] agenphony 잔재 0건 (엄격 모드 — exclusion 0)"
+# 이전 사이클 spec §13.8 의 '디렉토리 리네이밍 기각' 결정을 본 사이클(2026-05-28)이 명시적으로 뒤집음
+# (폴더 리네이밍 awa/ + 사용자 데이터 마이그레이션 + 식별자 일괄 정리 완료).
+# 보존 영역 = memory(=.claude/memory)·과거 spec/plan·.git·.agent-harness 만 (--exclude-dir 으로 처리).
+# --exclude-dir 은 basename 매칭이라 'memory'/'specs'/'plans' 는 어디 위치든 모두 제외됨 — 의도: .claude/memory, docs/superpowers/specs|plans/.
+# .claude/skills 등 활성 영역은 가드 대상에 포함.
+# settings.local.json 은 사용자 권한 학습 산출물(spec §2.2 예외, feedback_gitignore_no_touch 영역) → --exclude.
 agenphony_hits="$(grep -rnE 'agenphony[^-]|agenphony-' \
   --include='*.sh' --include='*.md' --include='*.yaml' --include='*.json' \
-  --exclude-dir='.claude' \
+  --exclude='settings.local.json' \
+  --exclude-dir='memory' \
   --exclude-dir='specs' \
   --exclude-dir='plans' \
   --exclude-dir='.git' \
   --exclude-dir='.agent-harness' \
   "$ROOT" 2>/dev/null \
   | grep -v '/test-rename-guard.sh:' \
-  | grep -v '\.config/agenphony' \
-  | grep -v 'config\}/agenphony' \
-  | grep -v 'XDG_CONFIG_HOME.*agenphony' \
-  | grep -v '/agenphony/bin/awa-' \
-  | grep -v '/agenphony/profiles/' \
-  | grep -v '^[^:]*AGENTS\.md:[0-9]*:.*agenphony' \
-  | grep -v '^[^:]*README\.md:[0-9]*:.*agenphony' \
-  | grep -v "test-session-resolve\.sh:.*repo basename.*agenphony" \
   || true)"
-assert_eq "" "$agenphony_hits" "G4 agenphony 잔재 0건 — 비위임 잔재 (잔존: $agenphony_hits)"
+assert_eq "" "$agenphony_hits" "G4 agenphony 잔재 0건 — 엄격 모드 (잔존: $agenphony_hits)"
 
 echo "[G5] bin/agenphony-*.sh 부재 (파일명 리네이밍 완료)"
 old_bin_files="$(ls "$ROOT"/bin/agenphony-*.sh 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "0" "$old_bin_files" "G5 bin/agenphony-*.sh 파일 부재"
+
+echo "[G6] 폴더명 일관성 — basename(PROJECT_ROOT) == 'AWA'"
+actual_basename="$(basename "$ROOT")"
+assert_eq "AWA" "$actual_basename" "G6 PROJECT_ROOT basename = AWA (잔존: $actual_basename)"
 
 test_summary
