@@ -1,10 +1,6 @@
 # 런타임 산출물 — 정의가 아닌 결과물 (PROJECT_ROOT 별 격리)
 .agent-harness/
 
-# Claude Code 개인·런타임 설정만 ignore, skills 는 공유 (R5: .claude/ 통째면 !예외 안 먹힘)
-.claude/*
-!.claude/skills
-
 # 다른 에이전트(Codex/Antigravity 등) 로컬 미러 — 정의는 .claude/skills 가 단일출처
 .agents/
 
