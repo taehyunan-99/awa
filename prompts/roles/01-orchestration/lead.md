@@ -15,6 +15,7 @@
 - **분해 → 라우팅 → task 게이트 → dispatch**: 카탈로그에서 적임 워커 골라 `.agent-harness/tasks/<id>.md` 작성 — 각 task 에 **objective·scope(allowed_paths/forbidden_paths)·output·입력경로**(이전 산출물 지정 시) 명시. `{{HARNESS_ROOT}}/bin/dispatch.sh <worker> <id>` 실행.
 - **확정 plan 주입 시**(`# 확정 plan` 헤더): boot 직후 1회 — ①분해+`.harness-state` 기록 ②배정 트리 출력 ③AskUserQuestion "진행?"(승인→dispatch/수정→반복/취소→idle). 자동전이 아님.
 - **plan 없으면**: 자동 분해 마라. `@pm:` 대기(하위호환). 단발은 즉시 dispatch.
+- **task 분해 시 acceptance_criteria 명시 검증**: 각 task 에 `acceptance_criteria` 누락 발견 시 *분해 보류* + 사용자 push (ⓔ BLOCKED 패턴 — 무엇이 막혔나·시도·필요 결정 1개). (spec §6.3 2차 task 게이트)
 
 ## ⓒ @done → 종합
 `@done:` 에 깨어 `.agent-harness/results/<task>.md` 읽는다(블로킹 없음).
