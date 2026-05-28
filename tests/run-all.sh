@@ -49,6 +49,10 @@ if [ "${RUN_LIVE:-0}" = "1" ]; then
   done
 fi
 
+echo "=== differentiation ==="
+rc=0; bash "$(dirname "$0")/check-differentiation-status.sh" || rc=$?
+[ "$rc" -ne 0 ] && total_fail=$((total_fail + 1))
+
 echo "===================="
 if [ "$total_fail" -eq 0 ]; then
   echo "ALL SUITES PASSED"
