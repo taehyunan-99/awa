@@ -2,3 +2,7 @@
 # add_to_allow → bump_stats_counter 가 갱신. 형식: patterns.<패턴>.<필드>: <수>
 # 사용처: 운영 데이터 누적 → Phase B/C 진입 시점 판단 (§7).
 patterns:
+  "Bash(cat:*)":
+    confirm: 1
+  "Bash(wc:*)":
+    confirm: 1
