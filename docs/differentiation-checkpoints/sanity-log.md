@@ -1,3 +1,4 @@
+# Sanity Check Log
 
 ## 2026-05-28
 - 선택 항목: A2 plan-defect 채널

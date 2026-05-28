@@ -80,7 +80,7 @@ check C 5 "allow ∩ deny 충돌 검증" \
 
 # D. 다벤더 (보류) — 명시적 SKIP (회귀 FAIL 와 구분)
 check_skip D 1 "Codex/Antigravity CLI 통합" "다벤더 사이클까지 보류"
-check_skip D 2 "리뷰어 풀 정책 문서" "다벤더 사이클 진입 후 docs/reviewer-pool-policy.md 신설 (spec §12.6)"
+check_skip D 2 "리뷰어 풀 정책 문서" "다벤더 사이클 진입 후 활성화"
 check_skip D 3 "M5 RDR 메트릭 정의" "다벤더 사이클 + 7일 운영 데이터 후 활성화"
 check_skip D 4 "Anthropic blind spot task fixture" "다벤더 사이클 진입 후"
 
