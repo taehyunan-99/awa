@@ -8,7 +8,7 @@ tmux 세션 생애주기(up/down)와 워커 dispatch·watcher·classify·permiss
 
 ## 1. WHAT
 
-agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들.
+agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들. 사용자 창구(pm) + 순수 오케스트레이터(lead) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등 아키텍처 (2차 하니스 설계).
 
 ## 2. CONTENTS
 
@@ -31,6 +31,7 @@ agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 d
 - `--profile <name>` — 프로파일 fragment 선택 (`profiles/<name>.sh`)
 - `--project <path>` — PROJECT_ROOT 명시 (cwd 자동 도출 우회)
 - `--dry-check` — yaml 가드 (`danger-check.sh --check-allow-yaml`) 만 실행 후 즉시 종료 (boot 안 함, Task 7)
+- `--plan <file>` — 확정 plan 자동주입 (반복 가능, 합본 후 `--append-system-prompt-file` 로 LEAD 주입, 11차)
 
 기술 스택: bash 4+/zsh, tmux 3.6+, awk, sed, claude CLI
 
@@ -69,6 +70,19 @@ agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 d
 - **mkdir 락 선택 이유 = macOS flock 부재** — POSIX `mkdir` 의 원자성 보장 (이미 존재하면 실패) 을 이식성 락으로 활용. flock 은 macOS 기본 부재 → 별도 brew 의존 회피.
 - **stale lock 15초 + mtime>0 가드 이유 = 5차 실측 결함 수정** — `mt=0` (stat 실패, lock 이 막 사라짐) 일 때 `age=now-0` = 거대값으로 *방금 다른 워커가 만든 정상 lock* 을 stale 로 오판 → 강제 삭제 → 임계구역 동시 진입 → lost update 재발. mt>0 가드로 차단 (lib.sh:438-444 주석).
 - **`add_to_allow` 의 events.log 가드 = 단위 테스트 격리** — 테스트 환경 (events.log 없음) 에서 `add_to_allow` 호출 시 운영 stats.yaml 오염 차단. 운영 환경 (boot 후 events.log 존재) 에서만 신호·통계 발화.
+
+## 환경변수
+
+| 이름 | 기본 | 의미 |
+|---|---|---|
+| `SHELL_READY_TIMEOUT` | 15 (초) | pane 셸 ready 폴링 timeout. conda init 등 느린 환경에서 늘림. |
+| `BOOT_REPL_CHECK_DELAY` | 5 (초) | claude 명령 송신 후 trust/REPL 검출 매치 윈도우. (timeout 아님 — 검사 대기.) |
+| `HARNESS_PROJECT` | (없음) | PROJECT_ROOT 강제 지정. 기본은 git toplevel 또는 PWD 폴백. |
+| `PROMPTS_DIR` | `$HARNESS_ROOT/prompts` | 부트 프롬프트 디렉터리 override (주로 테스트 fixture 용). |
+
+## 멀티 프로젝트 동시 가동
+
+basename 다를 시 `awa-<basename>` 세션 동시 가동 가능. basename 충돌 시 후행 가동 거부 — `SESSION_OVERRIDE="awa-auth2" bin/awa-up.sh default` 로 회피.
 
 ## 7. COMMANDS
 
