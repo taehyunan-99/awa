@@ -3,11 +3,11 @@
 # 7차 리뷰 [CRIT-7]: claude code Bash 도구는 stdin 닫혀있어 read 불가 — 모든 분기를 인자로 받음.
 #
 # Usage:
-#   agenphony-main.sh resume
-#       → live agenphony-* / _SYMPHONY 세션 TSV 출력
-#   agenphony-main.sh attach --session <name>
+#   awa-main.sh resume
+#       → live awa-* / _SYMPHONY 세션 TSV 출력
+#   awa-main.sh attach --session <name>
 #       → "tmux attach -t <name>" 한 줄 출력
-#   agenphony-main.sh launch --project <path> --mode-launch <single|multi>
+#   awa-main.sh launch --project <path> --mode-launch <single|multi>
 #                            [--preset <name>|--workers <spec>] [--plan <path>]
 #       → 발진 명령 + AGPN_META 출력
 set -uo pipefail
@@ -24,7 +24,7 @@ cmd_resume() {
   #   label 은 _SYMPHONY 만 'multi-view', 나머지는 빈 문자열. 사용자가 채팅에서 직접 선택.
   local live
   live=$(tmux list-sessions -F '#{session_name}' 2>/dev/null \
-         | grep -E '^(agenphony-|_SYMPHONY$)' || true)
+         | grep -E '^(awa-|_SYMPHONY$)' || true)
   printf 'session\tproject\tlabel\n'
   [ -z "$live" ] && return 0
   while IFS= read -r s; do
@@ -33,7 +33,7 @@ cmd_resume() {
     if [ "$s" = "_SYMPHONY" ]; then
       label="multi-view"
     else
-      proj=$(tmux show-options -t "$s" -v @agenphony-project 2>/dev/null || echo "")
+      proj=$(tmux show-options -t "$s" -v @awa-project 2>/dev/null || echo "")
     fi
     printf '%s\t%s\t%s\n' "$s" "${proj:-}" "$label"
   done <<< "$live"
@@ -124,7 +124,7 @@ cmd_launch() {
   # 발진 명령 조립 — HARNESS_ROOT 절대경로 (검증 완료) + paste-safe 따옴표.
   # lib.sh _validate_path_chars 가 공백/특수문자 거부했으니 paste 시에도 안전,
   # 단 가독성·일관성 위해 모든 경로 인자 따옴표.
-  local cmd="bash \"$HARNESS_ROOT/bin/agenphony-up.sh\""
+  local cmd="bash \"$HARNESS_ROOT/bin/awa-up.sh\""
   if [ -n "$workers_spec" ]; then
     cmd="$cmd --workers \"$workers_spec\""
   else

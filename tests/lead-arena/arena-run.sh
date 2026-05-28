@@ -27,10 +27,10 @@ LEAD_MODEL=opus
 EOF
 
 export SESSION_OVERRIDE="$SESSION" HARNESS_PROJECT="$PROJ" PROMPTS_DIR="$FIX/prompts"
-# 자극을 확정 plan 으로 주입 (--plan 인자 — agenphony-up plan 합본 경로).
+# 자극을 확정 plan 으로 주입 (--plan 인자 — awa-up plan 합본 경로).
 echo "=== arena run: 후보=$cand 자극=$stim 세션=$SESSION PROJ=$PROJ ==="
 echo "출력 디렉터리: $PROJ/.agent-harness/"
-bash "$ROOT/bin/agenphony-up.sh" "$PROF" --plan "$stimf"
+bash "$ROOT/bin/awa-up.sh" "$PROF" --plan "$stimf"
 echo "$cand $stim $SESSION $PROJ" > "$ARENA/.last-run"
 echo "lead 가 분해·배정·승인게이트를 처리하도록 두고, 안정되면 다음을 실행해 산출물 수집:"
 echo "  bash $ARENA/arena-score.sh"

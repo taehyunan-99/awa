@@ -5,13 +5,13 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
-# 기본: 인자 없고 env 없으면 자동명 (agenphony-<basename of PROJECT_ROOT>) — T3.
-# repo basename 이 'agenphony' 이므로 'agenphony-agenphony'.
+# 기본: 인자 없고 env 없으면 자동명 (awa-<basename of PROJECT_ROOT>) — T3.
+# repo basename 이 'agenphony' 이므로 'awa-agenphony'.
 unset SESSION_OVERRIDE PROFILE_SESSION SESSION 2>/dev/null || true
-expected_auto="agenphony-$(basename "$PROJECT_ROOT")"
+expected_auto="awa-$(basename "$PROJECT_ROOT")"
 assert_eq "$expected_auto" "$(resolve_session)" "기본 → 자동명 폴백"
 
-# PROFILE_SESSION 우선 (agenphony-up: 프로파일 SESSION)
+# PROFILE_SESSION 우선 (awa-up: 프로파일 SESSION)
 PROFILE_SESSION="featteam"
 assert_eq "featteam" "$(resolve_session)" "PROFILE_SESSION 반영"
 

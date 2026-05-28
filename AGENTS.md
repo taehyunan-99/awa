@@ -14,7 +14,7 @@ Claude Code 는 같은 폴더의 CLAUDE.md(= `@./AGENTS.md` 한 줄) 를 통해 
 
 작업 영역에 해당하는 AGENTS.md 를 먼저 읽고 진행한다.
 
-- **bin/** — 하니스 실행 스크립트 (agenphony-up/down, watcher, dispatch, classify, permission-gate) → [`bin/AGENTS.md`](bin/AGENTS.md)
+- **bin/** — 하니스 실행 스크립트 (awa-up/down, watcher, dispatch, classify, permission-gate) → [`bin/AGENTS.md`](bin/AGENTS.md)
 - **profiles/** — 팀 구성 정의 (default/feature-team/code-review/research) → [`profiles/AGENTS.md`](profiles/AGENTS.md)
 - **prompts/** — 워커 부트 프롬프트 (`_common.md` + `roles/NN-part/*.md`) → [`prompts/AGENTS.md`](prompts/AGENTS.md)
 - **templates/** — Claude `settings.json` 권한 템플릿 군 → [`templates/AGENTS.md`](templates/AGENTS.md)
@@ -43,8 +43,8 @@ HOW/HOW NOT/WHY 는 placeholder. 본격 작성은 베이스라인 완성 즈음 
 
 - 전체 테스트: `bash tests/run-all.sh`
 - 통합 probe 포함: `RUN_INTEGRATION=1 bash tests/run-all.sh` <!-- claude CLI 필요 -->
-- 팀 가동: `bin/agenphony-up.sh <profile>` (cwd=프로젝트 또는 `--project /path <profile>`)
-- 팀 정리: `bin/agenphony-down.sh`
+- 팀 가동: `bin/awa-up.sh <profile>` (cwd=프로젝트 또는 `--project /path <profile>`)
+- 팀 정리: `bin/awa-down.sh`
 - 세션 목록: `/agpn` (Step 0 resume) 또는 `/agpn bookmarks list`
 
 **공통 명령어 가드** (모든 영역에 적용):

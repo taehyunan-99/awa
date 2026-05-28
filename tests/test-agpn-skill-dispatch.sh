@@ -17,6 +17,6 @@ assert_contains "$src" "stage" "S2b stage"
 assert_contains "$src" "list" "S2c list"
 
 echo "[S3] 핵심 규약 — 라이브 tmux 는 사용자가 ! 로 (직접 실행 금지)"
-assert_contains "$src" "agenphony-up" "S3a 발진 명령은 agenphony-up"
+assert_contains "$src" "awa-up" "S3a 발진 명령은 awa-up"
 
 test_summary

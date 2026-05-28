@@ -20,7 +20,7 @@ _common.md 의 결과 출력 계약(header-first: status 헤더 + EVIDENCE/HYPOT
 EOF
 
 # dev pane = 실 claude. _common.md + dev.md 합본을 boot 로 주입해야 5축이 적용된다.
-# (정식 경로: agenphony-up 이 워커 boot 를 만든다. 여기선 관측이라 dev 1개만 직접 기동.)
+# (정식 경로: awa-up 이 워커 boot 를 만든다. 여기선 관측이라 dev 1개만 직접 기동.)
 DEV_BOOT="$WS/.boot-dev.md"
 # source 는 stdout/stderr 모두 막아 $() 오염 방지(lib.sh source-safe·stdout 빈 것 실측, 미래 방어).
 _dev_role="$(. "$ROOT/bin/lib.sh" >/dev/null 2>&1; resolve_role_file "$ROOT/prompts" dev)"

@@ -1,36 +1,36 @@
 #!/usr/bin/env bash
 # 멀티 프로젝트 동시 가동 실측. run-all 비포함, 수동 실행.
-# 두 임시 git repo 에서 동시에 agenphony-up → hook 각자 events.log 에만 기록되는지.
+# 두 임시 git repo 에서 동시에 awa-up → hook 각자 events.log 에만 기록되는지.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 TMP1="/tmp/probe_mp_$$/projectA"; mkdir -p "$TMP1" && ( cd "$TMP1" && git init -q )
 TMP2="/tmp/probe_mp_$$/projectB"; mkdir -p "$TMP2" && ( cd "$TMP2" && git init -q )
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # probe fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
 
 cleanup() {
-  tmux kill-session -t "agenphony-projectA" 2>/dev/null
-  tmux kill-session -t "agenphony-projectB" 2>/dev/null
+  tmux kill-session -t "awa-projectA" 2>/dev/null
+  tmux kill-session -t "awa-projectB" 2>/dev/null
   rm -rf "/tmp/probe_mp_$$"
   [ -n "${_AGPN15_XDG:-}" ] && rm -rf "$_AGPN15_XDG"
 }
 trap cleanup EXIT
 
-echo "[probe-multi-project] A·B 동시 agenphony-up..."
-HARNESS_PROJECT="$TMP1" bash "$ROOT/bin/agenphony-up.sh" default >/dev/null 2>&1
-HARNESS_PROJECT="$TMP2" bash "$ROOT/bin/agenphony-up.sh" default >/dev/null 2>&1
+echo "[probe-multi-project] A·B 동시 awa-up..."
+HARNESS_PROJECT="$TMP1" bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP2" bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
 sleep 30  # claude REPL 준비
 
 echo "[probe-multi-project] A 의 dev 페인에 Write 지시..."
-TGT_A="$(tmux list-panes -t agenphony-projectA:0 -F '#{pane_index}\t#{pane_title}' | awk -F'\t' '$2=="dev"{print "agenphony-projectA:0."$1}')"
+TGT_A="$(tmux list-panes -t awa-projectA:0 -F '#{pane_index}\t#{pane_title}' | awk -F'\t' '$2=="dev"{print "awa-projectA:0."$1}')"
 tmux send-keys -t "$TGT_A" -l "make a file named hello-a.txt with content hi using the Write tool"
 sleep 1; tmux send-keys -t "$TGT_A" Enter
 echo "[probe-multi-project] B 의 dev 페인에 Write 지시..."
-TGT_B="$(tmux list-panes -t agenphony-projectB:0 -F '#{pane_index}\t#{pane_title}' | awk -F'\t' '$2=="dev"{print "agenphony-projectB:0."$1}')"
+TGT_B="$(tmux list-panes -t awa-projectB:0 -F '#{pane_index}\t#{pane_title}' | awk -F'\t' '$2=="dev"{print "awa-projectB:0."$1}')"
 tmux send-keys -t "$TGT_B" -l "make a file named hello-b.txt with content hi using the Write tool"
 sleep 1; tmux send-keys -t "$TGT_B" Enter
 

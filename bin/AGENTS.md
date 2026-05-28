@@ -10,12 +10,12 @@ agenphony 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 d
 
 ## 2. CONTENTS
 
-- `agenphony-up.sh` — 프로파일 기반 tmux 세션 가동(워커 페인·부트 프롬프트 주입)
-- `agenphony-down.sh` — 런타임 정리(tasks/results는 보존)
-- `agenphony-main.sh` — `/agpn` 비대화 명령 백엔드 (resume/attach/launch/resolve-path)
-- `agenphony-down-menu.sh` — `/agpn down` 진입점 (N=0/1/multi 분기 + down.sh 위임)
-- `agenphony-symphony.sh` — _SYMPHONY 멀티뷰 (compose/add/detach/disband/kill)
-- `agenphony-bookmarks.sh` — bookmarks wrapper (list/set-alias/remove/prune)
+- `awa-up.sh` — 프로파일 기반 tmux 세션 가동(워커 페인·부트 프롬프트 주입)
+- `awa-down.sh` — 런타임 정리(tasks/results는 보존)
+- `awa-main.sh` — `/agpn` 비대화 명령 백엔드 (resume/attach/launch/resolve-path)
+- `awa-down-menu.sh` — `/agpn down` 진입점 (N=0/1/multi 분기 + down.sh 위임)
+- `awa-symphony.sh` — _SYMPHONY 멀티뷰 (compose/add/detach/disband/kill)
+- `awa-bookmarks.sh` — bookmarks wrapper (list/set-alias/remove/prune)
 - `dispatch.sh` — lead/외부가 `<role> <task-id>` 형식으로 워커에 작업 주입
 - `watcher.sh` — events.log/pending-asks 폴링 데몬, lead/reviewer 페인을 깨움
 - `classify.sh` — 명령어를 danger→matrix→auto→gray로 분류
@@ -40,7 +40,7 @@ _(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은
 <!-- 모두 약결합(마크다운 링크) — 강결합 승격은 /update에서 판단 -->
 
 - **의존**:
-  - [`profiles/`](../profiles/) — `agenphony-up.sh`가 프로파일 셸 fragment를 source (`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT`/`LEAD_MODEL`)
+  - [`profiles/`](../profiles/) — `awa-up.sh`가 프로파일 셸 fragment를 source (`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT`/`LEAD_MODEL`)
   - [`prompts/`](../prompts/) — `_common.md` + `roles/NN-part/<역할>.md` 글롭으로 자동 카탈로그, `{{HARNESS_ROOT}}` 토큰을 sed 치환 후 워커 stdin에 주입
   - [`templates/`](../templates/) — `lib.sh::generate_worker_settings`가 역할군에 맞는 `settings.<군>.json.tpl` 선택
   - [`config/lead-auto-allow.yaml`](../config/lead-auto-allow.yaml) — `matrix-lookup.sh`의 awk 파서가 카테고리 패턴 읽음 (`category:` + 2칸 들여쓰기 + `- "패턴"` 단순 형식만)

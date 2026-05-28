@@ -64,15 +64,15 @@ fi
 
 WORKSPACE="$PROJECT_ROOT/.agent-harness"
 
-# 인자 path 의 basename 을 sanitize 해서 'agenphony-<safe>' 세션명 반환.
+# 인자 path 의 basename 을 sanitize 해서 'awa-<safe>' 세션명 반환.
 # 순수 함수(외부 전역 미참조). _session_autoname 이 이 함수에 위임 (sanitize 단일 출처).
 # basename sanitize: tmux 세션명 규칙([A-Za-z0-9_-]).
 # bash 3.2 ${var//pattern} 의 glob/정규식 모호성 회피 위해 sed (D3).
-session_name_for() {  # $1=project path → echo "agenphony-<sanitized>"
+session_name_for() {  # $1=project path → echo "awa-<sanitized>"
   local b safe
   b="$(basename "$1")"
   safe="$(printf '%s' "$b" | sed 's/[^A-Za-z0-9_-]/_/g')"
-  printf 'agenphony-%s' "$safe"
+  printf 'awa-%s' "$safe"
 }
 
 # PROJECT_ROOT 기반 자동명 — session_name_for 위임으로 sanitize 로직 단일화.
@@ -129,7 +129,7 @@ fix_session_titles() {
   tmux set-option -t "$s" automatic-rename off 2>/dev/null || true
   # pane border 에 라벨 표시 — title 보존 옵션 옆 단일 출처 (UX 14차).
   tmux set-option -t "$s" pane-border-status top                                      2>/dev/null || true
-  tmux set-option -t "$s" pane-border-format ' [ #{@agenphony-project-name} ] #{pane_title} ' 2>/dev/null || true
+  tmux set-option -t "$s" pane-border-format ' [ #{@awa-project-name} ] #{pane_title} ' 2>/dev/null || true
 }
 
 # 워커 이름 → 부트스트랩 합본 파일 경로

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # T3 회귀: bootstrap_pane 이 {{HARNESS_ROOT}} 토큰을 절대경로로 치환.
-# AGENT_CMD=cat 으로 agenphony-up 실행 → .boot/<worker>.md 파일 검사.
+# AGENT_CMD=cat 으로 awa-up 실행 → .boot/<worker>.md 파일 검사.
 # 워커·lead·리뷰어 3종 boot 모두 sed 치환·토큰 검증 통과 확인.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -13,7 +13,7 @@ TMP_PROJ="$(mktemp -d)"
 FIX_BASE="$(mktemp -d)"
 FIX_PROMPTS="$FIX_BASE/prompts"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -57,15 +57,15 @@ REVIEWERS=("rev:test-reviewer")
 LEAD_MODEL=sonnet
 EOF
 
-# agenphony-up 호출 (AGENT_CMD=cat 더미).
+# awa-up 호출 (AGENT_CMD=cat 더미).
 export SESSION_OVERRIDE="$SESSION"
 export HARNESS_PROJECT="$TMP_PROJ"
 export AGENT_CMD="cat"
 export PROMPTS_DIR="$FIX_PROMPTS"
 
-bash "$ROOT/bin/agenphony-up.sh" "$PROF" >/tmp/_t-boot-tokens-out.log 2>/tmp/_t-boot-tokens-err.log
+bash "$ROOT/bin/awa-up.sh" "$PROF" >/tmp/_t-boot-tokens-out.log 2>/tmp/_t-boot-tokens-err.log
 rc=$?
-assert_eq "0" "$rc" "agenphony-up 성공 (rc=$rc, err=$(head -3 /tmp/_t-boot-tokens-err.log 2>/dev/null))"
+assert_eq "0" "$rc" "awa-up 성공 (rc=$rc, err=$(head -3 /tmp/_t-boot-tokens-err.log 2>/dev/null))"
 
 WORKER_BOOT="$TMP_PROJ/.agent-harness/.boot/dev.md"
 LEAD_BOOT="$TMP_PROJ/.agent-harness/.boot/LEAD.md"

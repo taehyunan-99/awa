@@ -2,7 +2,7 @@
 # 파일 폴링 watcher (9차). tmux pane 으로 기동 — 세션 kill 시 자동 사망.
 # 의존성 0(순수 셸). control mode/fswatch 배제.
 #
-# env (agenphony-up 이 주입):
+# env (awa-up 이 주입):
 #   SESSION         감시 대상 세션명 (has-session 가드)
 #   LEAD_PANE       lead pane_id (%N) — @gate:/@done: 대상
 #   REVIEWER_PANES  공백구분 reviewer pane_id 목록 (0~N, 빈 문자열 가능)
@@ -30,7 +30,7 @@ pane_alive() {
 
 # last_events 를 기동 시 events.log 현재 줄 수로 초기화 (R4 — 첫 폴링 stale done 폭주 방지).
 # 0 으로 두면 기동 첫 사이클이 events.log 전체를 "새 줄"로 간주해 과거 done 라인을 일제히
-# @done: 재발화한다. 정상 흐름은 agenphony-down 이 events.log 를 지워 무해하나, 비정상 종료 후
+# @done: 재발화한다. 정상 흐름은 awa-down 이 events.log 를 지워 무해하나, 비정상 종료 후
 # 재가동(events.log 잔존) 시 lead 가 이미 끝난 task 들을 재종합 — 현재 줄 수에서 시작해 차단.
 last_events="$(awk 'END{print NR}' "$EVENTS" 2>/dev/null || echo 0)"
 debounced_rev=0

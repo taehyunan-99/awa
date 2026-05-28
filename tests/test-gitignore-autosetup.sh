@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 12차: agenphony-up 이 타깃 .gitignore 에 하네스 산출물 멱등 자동추가.
+# 12차: awa-up 이 타깃 .gitignore 에 하네스 산출물 멱등 자동추가.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -13,8 +13,8 @@ trap 'rm -rf "$_AGPN15_XDG"' EXIT
 
 run_up() { # $1=프로젝트경로
   local p="$1" safe; safe="$(basename "$p" | sed 's/[^A-Za-z0-9_-]/_/g')"
-  HARNESS_PROJECT="$p" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" default >/dev/null 2>&1
-  tmux kill-session -t "agenphony-$safe" 2>/dev/null || true
+  HARNESS_PROJECT="$p" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+  tmux kill-session -t "awa-$safe" 2>/dev/null || true
 }
 
 echo "[GI1] git repo: .gitignore 에 하네스 산출물 전부 추가"

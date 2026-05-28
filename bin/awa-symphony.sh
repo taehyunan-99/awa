@@ -58,7 +58,7 @@ _sym_set_window_label() {
   # _sym_apply_window_opts 가 default format 으로 덮은 후 호출되어야 라벨이 유지됨.
   local session="$1"
   local proj_name
-  proj_name="$(basename "$(tmux show-options -t "$session" -v @agenphony-project 2>/dev/null || echo "$session")" 2>/dev/null || echo "$session")"
+  proj_name="$(basename "$(tmux show-options -t "$session" -v @awa-project 2>/dev/null || echo "$session")" 2>/dev/null || echo "$session")"
   tmux set-option -w -t "$SYM:$session-team" pane-border-format \
     " [ $proj_name ] #{pane_title} " 2>/dev/null || true
 }
@@ -272,9 +272,9 @@ action_kill() {
   for w in "${wins[@]}"; do
     orig="${w%-team}"
     sym_detach_one "$w" || continue
-    proj=$(tmux show-options -t "$orig" -v @agenphony-project 2>/dev/null || echo "")
+    proj=$(tmux show-options -t "$orig" -v @awa-project 2>/dev/null || echo "")
     if [ -n "$proj" ]; then
-      bash "$_DIR/agenphony-down.sh" --project "$proj" || true
+      bash "$_DIR/awa-down.sh" --project "$proj" || true
     fi
   done
   sym_post_check_last

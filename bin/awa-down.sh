@@ -51,9 +51,9 @@ MARKER="$PROJECT_ROOT/.claude/.agent-harness-marker"
 if [ ! -f "$MARKER" ]; then
   echo "경고: marker 없음 ($MARKER) — '$PROJECT_ROOT' 는 하네스로 가동된 적 없는 것으로 판단." >&2
   echo "  .agent-harness/·settings.json 은 건드리지 않음 (세션은 위에서 종료됨)." >&2
-  _alive="$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^agenphony-' || true)"
+  _alive="$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^awa-' || true)"
   if [ -n "$_alive" ]; then
-    echo "  참고: 살아있는 agenphony-* 세션:" >&2
+    echo "  참고: 살아있는 awa-* 세션:" >&2
     echo "$_alive" | sed 's/^/    /' >&2
     echo "  특정 프로젝트 종료: '--project /path' 명시" >&2
   fi
@@ -94,7 +94,7 @@ rm -f "${STATE_DIR}/permission-gate.log" 2>/dev/null || true
 rm -f "${STATE_DIR}/.watcher-seen" 2>/dev/null || true
 rmdir "${STATE_DIR}" 2>/dev/null || true
 
-# settings.json + marker 정리 (marker 자체도 마지막에). 다음 agenphony-up 이 재생성.
+# settings.json + marker 정리 (marker 자체도 마지막에). 다음 awa-up 이 재생성.
 rm -f "$PROJECT_ROOT/.claude/settings.json" 2>/dev/null || true
 rm -f "$MARKER" 2>/dev/null || true
 

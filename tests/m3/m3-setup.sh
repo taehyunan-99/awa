@@ -69,12 +69,12 @@ tmux select-layout -t "$SES" tiled 2>/dev/null || true
 #   (mktemp)에서만 도는 격리 관측이라 안전.
 tmux send-keys -t "$LEAD_PANE" -l "claude --dangerously-skip-permissions"
 tmux send-keys -t "$LEAD_PANE" Enter
-# REPL 준비 폴링 (agenphony-up wait_repl 패턴 축약).
+# REPL 준비 폴링 (awa-up wait_repl 패턴 축약).
 ready=0
 for _i in $(seq 1 60); do
   sleep 2
   # -S -200: 스크롤백 포함 캡처. 현 화면만 보면 welcome 박스 헤더(ready 신호)가
-  # 위로 밀려 false negative → 영구 폴링 hang(실측 2026-05-25). agenphony-up
+  # 위로 밀려 false negative → 영구 폴링 hang(실측 2026-05-25). awa-up
   # bootstrap_pane 과 동일 정책. [[wait-repl-pattern-fragility]] 회피.
   dump="$(tmux capture-pane -t "$LEAD_PANE" -p -S -200 2>/dev/null)"
   # trust 화면 + --dangerously-skip-permissions 첫 실행 경고 수락 화면 모두 기본선택 Enter 통과.

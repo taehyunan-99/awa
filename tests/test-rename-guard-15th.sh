@@ -17,7 +17,7 @@ patterns=(
   "/agpn plan"
   "/agpn stage"
   "/agpn list"
-  "agenphony-list"
+  "awa-list"
 )
 for p in "${patterns[@]}"; do
   hits=$(grep -rln --include='*.md' --include='*.sh' -F "$p" "$ROOT" 2>/dev/null \

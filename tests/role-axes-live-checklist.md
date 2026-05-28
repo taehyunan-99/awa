@@ -3,7 +3,7 @@
 자동 하니스 없음 — 사용자가 `!` 로 1회 부트 후 육안 확인. (실험은 lead-arena 에서 완료; 이건 본구현 sanity.)
 
 ## 부트
-`! bash bin/agenphony-up.sh <profile>` (격리 PROJECT_ROOT 권장).
+`! bash bin/awa-up.sh <profile>` (격리 PROJECT_ROOT 권장).
 
 ## lead 트리거 확인 (승자 구조 기준)
 - [ ] 부트 직후 lead idle — 스스로 출력·폴링 안 함.

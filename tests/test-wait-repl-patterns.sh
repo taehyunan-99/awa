@@ -13,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
 
-# wait_repl 의 ready/negative 패턴 (agenphony-up.sh:218,222 와 동일 — 단일 진실원).
-# 변경 시 agenphony-up.sh 와 동시 갱신 필요.
+# wait_repl 의 ready/negative 패턴 (awa-up.sh:218,222 와 동일 — 단일 진실원).
+# 변경 시 awa-up.sh 와 동시 갱신 필요.
 READY_PAT='Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'
 NEG_PAT='Error:|Could not authenticate|not logged in|failed to start'
 
@@ -62,9 +62,9 @@ EOF
 printf '%s' "$LEAD_FIXTURE" | grep -qE "$READY_PAT"
 assert_success "$?" "T4: 실제 final 캡처 (lead) ready 매치"
 
-# T5: agenphony-up.sh 안 wait_repl 함수에 옛 단일 패턴 잔존 없음 (회귀 가드).
+# T5: awa-up.sh 안 wait_repl 함수에 옛 단일 패턴 잔존 없음 (회귀 가드).
 # 'grep -q' (옵션 q 만, E 없음) + 'bypass permissions on' 단일 조합이 없어야 함.
-WAIT_REPL_BODY="$(awk '/^wait_repl\(\)/,/^}/' "$HARNESS_ROOT/bin/agenphony-up.sh")"
+WAIT_REPL_BODY="$(awk '/^wait_repl\(\)/,/^}/' "$HARNESS_ROOT/bin/awa-up.sh")"
 printf '%s' "$WAIT_REPL_BODY" | grep -E "grep -q 'bypass permissions on'$"
 assert_fail "$?" "T5: wait_repl 안 옛 단일 패턴 잔존 없음"
 

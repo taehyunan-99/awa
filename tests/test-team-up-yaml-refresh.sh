@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agenphony-up 의 lead-auto-allow.yaml marker 게이트 + 백업 갱신 검증 (8차).
+# awa-up 의 lead-auto-allow.yaml marker 게이트 + 백업 갱신 검증 (8차).
 # 4 시나리오: 최초설치 / marker있음+다름→백업갱신 / marker있음+같음→스킵 / marker없음→보호경고.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -7,9 +7,9 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
-SESSION="agenphony-$SAFE"
+SESSION="awa-$SAFE"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -20,7 +20,7 @@ trap cleanup EXIT
 
 YAML="$TMP/config/lead-auto-allow.yaml"
 MARKER="$TMP/config/.lead-auto-allow-marker"
-run_teamup() { HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" feature-team >/dev/null 2>&1; tmux kill-session -t "$SESSION" 2>/dev/null || true; }
+run_teamup() { HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team >/dev/null 2>&1; tmux kill-session -t "$SESSION" 2>/dev/null || true; }
 
 echo "[YR1] 최초설치: yaml 없음 → 복사 + marker 생성"
 run_teamup
@@ -44,7 +44,7 @@ grep -q OLDVERSION "$TMP/config/"*.bak; assert_success "$?" "YR3 구버전이 .b
 echo "[YR4] marker없음+있음: 사용자 작성 → 보존(불변) + 경고"
 rm -f "$TMP/config/"*.bak "$MARKER"                          # marker 제거 = 사용자 작성 취급
 printf 'read-only:\n  - "Bash(USERCUSTOM:*)"\n' > "$YAML"
-warn="$(HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" feature-team 2>&1 >/dev/null)"
+warn="$(HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team 2>&1 >/dev/null)"
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 grep -q USERCUSTOM "$YAML"; assert_success "$?" "YR4 사용자 yaml 보존(불변)"
 printf '%s' "$warn" | grep -qiE 'lead-auto-allow|marker|사용자'; assert_success "$?" "YR4 경고 출력"

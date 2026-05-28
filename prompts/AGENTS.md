@@ -31,7 +31,7 @@ _(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은
 
 - **의존**: (없음 — 마크다운만)
 - **피의존**:
-  - [`bin/agenphony-up.sh`](../bin/agenphony-up.sh) — sed 치환 + stdin 주입
+  - [`bin/awa-up.sh`](../bin/awa-up.sh) — sed 치환 + stdin 주입
   - [`profiles/*.sh`](../profiles/) — `WORKERS=("이름:역할:..")`의 `역할` 토큰이 여기 파일명과 매칭
 - **경계 / 어댑터**:
   - 토큰 계약 — `{{HARNESS_ROOT}}` / `{{SESSION}}` / `{{WORKER_NAME}}`은 가동 시 치환되므로 텍스트에 리터럴 사용 금지

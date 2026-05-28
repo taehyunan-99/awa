@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PostToolUse hook 스크립트. stdin 으로 hook JSON 수신 →
 # 수정 파일 경로를 repo 상대경로 5필드 라인으로 events.log 에 결정적 append.
-# 워커명=HARNESS_WORKER, task=HARNESS_TASK (agenphony-up 이 pane env 로 주입).
+# 워커명=HARNESS_WORKER, task=HARNESS_TASK (awa-up 이 pane env 로 주입).
 # 자기보고 아님 — claude 가 Edit/Write 쓰면 hook 이 무조건 실행됨(이슈 6).
 set -uo pipefail
 

@@ -11,7 +11,7 @@
 #   문서에 미명시 → command-line 의 PreToolUse 가 project 의 PostToolUse 를 통째로 덮으면
 #   events.log 가 죽어 리뷰어 감시·done 신호가 전부 무력화된다.
 #
-#   이 probe 는 agenphony-up 과 동일한 2-스코프 구성을 재현하고, 워커가 파일 Edit 한 번 + 회색 명령
+#   이 probe 는 awa-up 과 동일한 2-스코프 구성을 재현하고, 워커가 파일 Edit 한 번 + 회색 명령
 #   한 번을 실행해 *두 hook 이 동시에 살아있는지* 를 확인한다:
 #     H1. Edit → .agent-harness/events.log 에 줄 기록    (PostToolUse 생존)
 #     H2. 회색 명령 → permission-gate 가 pending-ask 생성 (PreToolUse 생존)
@@ -47,14 +47,14 @@ YAML
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh"
 
-# ── 스코프 1: project .claude/settings.json — agenphony-up 과 동일 (6차: 빈 {}, hook 은 워커로 이관) ──
+# ── 스코프 1: project .claude/settings.json — awa-up 과 동일 (6차: 빈 {}, hook 은 워커로 이관) ──
 #   이게 빈 {} 인데도 events.log 가 찍혀야 함 = PostToolUse 가 워커 --settings 에서 산다는 증명.
 sed -e "s#{{PROJECT_ROOT}}#$PROBE_DIR#g" \
     -e "s#{{HARNESS_ROOT}}#$ROOT#g" \
     "$ROOT/templates/settings.json.tpl" > "$PROBE_DIR/.claude/settings.json"
 
 # ── 스코프 2: 워커 --settings — generate_worker_settings 로 실제 산출(PreToolUse + PostToolUse 공존) ──
-#   agenphony-up 과 동일 경로. dev 템플릿엔 Edit allow 가 없어 회색 → H1 게이트 걸림 방지 위해
+#   awa-up 과 동일 경로. dev 템플릿엔 Edit allow 가 없어 회색 → H1 게이트 걸림 방지 위해
 #   acceptEdits + Edit/Write allow 후처리 (Edit 이 확실히 게이트 없이 통과 → PostToolUse 도달 보장).
 SET="$(generate_worker_settings dev dev-1)"
 jq '.permissions.defaultMode="acceptEdits" | .permissions.allow=((.permissions.allow//[])+["Edit","Write"]|unique)' \
@@ -65,7 +65,7 @@ echo 'line1' > "$PROBE_DIR/target.txt"
 
 tmux kill-session -t "$SES" 2>/dev/null || true
 tmux new-session -d -s "$SES" -c "$PROBE_DIR" -x 200 -y 50
-# ★ HARNESS_WORKER pane env 주입 (agenphony-up 이 주는 것 — log-event 가 워커명에 사용).
+# ★ HARNESS_WORKER pane env 주입 (awa-up 이 주는 것 — log-event 가 워커명에 사용).
 tmux send-keys -t "$SES" "export HARNESS_WORKER=dev-1" Enter
 tmux send-keys -t "$SES" "cd '$PROBE_DIR' && claude --model claude-haiku-4-5-20251001 --settings '$SET' --session-id $WUUID" Enter
 

@@ -9,7 +9,7 @@ S="tuh_$$"
 TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
 export HARNESS_PROJECT="$TMP_PROJ"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -30,9 +30,9 @@ REVIEWERS=("qual:reviewer-quality:haiku")
 LEAD_MODEL="opus"
 EOF
 
-AGENT_CMD="cat" bash "$ROOT/bin/agenphony-up.sh" "$PROF" >/dev/null 2>&1
+AGENT_CMD="cat" bash "$ROOT/bin/awa-up.sh" "$PROF" >/dev/null 2>&1
 rc=$?
-assert_success "$rc" "agenphony-up 2윈도우 가동"
+assert_success "$rc" "awa-up 2윈도우 가동"
 
 # 14차 UX: window 0=team, window 1=workers, window 2=review.
 wins="$(tmux list-windows -t "$S" -F '#{window_index}' | tr '\n' ' ')"

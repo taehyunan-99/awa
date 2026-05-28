@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agenphony-down 이 .boot-settings/ 제거 확인.
+# awa-down 이 .boot-settings/ 제거 확인.
 # T19: state 디렉터리 정리(게이트 안) 검증. 6차: 데몬 폐기 — watch-asks/tail-pids 단언 제거.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -8,9 +8,9 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
-SESSION="agenphony-$SAFE"
+SESSION="awa-$SAFE"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -23,9 +23,9 @@ cleanup() {
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team >/dev/null 2>&1
 
-# agenphony-up 후 권한 산출물 + 사용자 흔적 만들기.
+# awa-up 후 권한 산출물 + 사용자 흔적 만들기.
 WS="$TMP/.agent-harness"
 mkdir -p "$WS/.boot-settings"
 echo '{"x":"y"}' > "$WS/.boot-settings/dev.json"
@@ -40,8 +40,8 @@ echo '{}' > "$WS/state/pending-asks/u1.json"
 echo '{}' > "$WS/state/incidents/i1.json"
 echo "ts dev - PRE Bash" > "$WS/state/permission-gate.log"   # 6차 게이트 로그 정리 검증
 
-# agenphony-down 실행
-HARNESS_PROJECT="$TMP" bash "$ROOT/bin/agenphony-down.sh" >/dev/null 2>&1
+# awa-down 실행
+HARNESS_PROJECT="$TMP" bash "$ROOT/bin/awa-down.sh" >/dev/null 2>&1
 
 [ ! -d "$WS/.boot-settings" ]; assert_success "$?" ".boot-settings 제거"
 
@@ -50,7 +50,7 @@ HARNESS_PROJECT="$TMP" bash "$ROOT/bin/agenphony-down.sh" >/dev/null 2>&1
 assert_success "$?" ".boot/*.md 제거 (기존 동작)"
 
 # T19/6차: state 디렉터리 + 게이트 로그 정리 단언 (데몬 폐기 — 데몬 파일 단언 제거).
-echo "[D-state] agenphony-down 후 pending-asks/incidents/removal 정리"
+echo "[D-state] awa-down 후 pending-asks/incidents/removal 정리"
 [ ! -d "$WS/state/pending-asks" ]; assert_success "$?" "pending-asks 정리"
 [ ! -d "$WS/state/incidents" ]; assert_success "$?" "incidents 정리"
 [ ! -d "$WS/state/removal-requests" ]; assert_success "$?" "state/removal-requests 제거"

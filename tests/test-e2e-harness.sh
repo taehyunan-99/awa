@@ -57,9 +57,9 @@ done_logged "$EV" dev 1; assert_success "$?" "done 라인 감지"
 # 6. 커서 멱등: 재처리 시 새 줄 없음
 assert_eq "" "$(cursor_new_lines quality-rev "$EV")" "커서 멱등(새 줄 없음)"
 
-# 7. agenphony-down 하네스 정리 검증 — results/tasks 보존, events/cursor/review 정리
+# 7. awa-down 하네스 정리 검증 — results/tasks 보존, events/cursor/review 정리
 echo "결과" > "$TMP/results/1.md"
-# agenphony-down.sh 의 하네스 정리 로직을 직접 모사 검증(claude/tmux 미기동 — WORKSPACE 산출물만)
+# awa-down.sh 의 하네스 정리 로직을 직접 모사 검증(claude/tmux 미기동 — WORKSPACE 산출물만)
 [ -f "$EV" ] && [ -f "$TMP/.review-cursor.quality-rev" ] && [ -d "$TMP/review" ] || { echo "사전조건 실패"; }
 rm -f "$WORKSPACE"/events.log "$WORKSPACE"/.review-cursor.* "$WORKSPACE"/.harness-state 2>/dev/null || true
 rm -rf "$WORKSPACE"/review 2>/dev/null || true

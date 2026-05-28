@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agenphony-up 후 .boot-settings/<role>.json 6 파일 생성 + 매핑 검증.
+# awa-up 후 .boot-settings/<role>.json 6 파일 생성 + 매핑 검증.
 # AGENT_CMD=cat 으로 더미 실행 — claude 부재 환경에서도 동작.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -8,9 +8,9 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
-SESSION="agenphony-$SAFE"
+SESSION="awa-$SAFE"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -24,9 +24,9 @@ trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
 # feature-team 프로파일: dev/test/researcher 워커 + 3 reviewer.
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/agenphony-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team >/dev/null 2>&1
 rc=$?
-assert_eq "0" "$rc" "agenphony-up 성공"
+assert_eq "0" "$rc" "awa-up 성공"
 
 BOOTSET="$TMP/.agent-harness/.boot-settings"
 [ -d "$BOOTSET" ]; assert_success "$?" ".boot-settings 디렉터리 생성"

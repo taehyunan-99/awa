@@ -11,7 +11,7 @@ TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
 export HARNESS_PROJECT="$TMP_PROJ"
 mkdir -p "$TMP_PROJ/.agent-harness/tasks"
 
-# 15th: bookmarks 격리 — agenphony-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
+# 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/agenphony/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
@@ -23,7 +23,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$ROOT/bin/agenphony-up.sh" default >/dev/null
+bash "$ROOT/bin/awa-up.sh" default >/dev/null
 sleep 0.3
 
 # 작업 파일 준비

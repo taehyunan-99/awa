@@ -10,16 +10,16 @@ Redefined as a single responsibility — *team execution and management*. Plan w
 ## Execution Model (§1.1)
 
 **(A) User `!` required** — claude child process / stdin/stdout hijack risk
-- `bash "$HARNESS_ROOT/bin/agenphony-up.sh" ...` (launch = spawns claude REPL per worker)
+- `bash "$HARNESS_ROOT/bin/awa-up.sh" ...` (launch = spawns claude REPL per worker)
 - `tmux attach -t <session>`
 
 **(B) claude code auto-execute OK** — no risk above
 - All tmux ops (move-window / kill-session / set-option / ...)
-- `bash "$HARNESS_ROOT/bin/agenphony-down.sh" --project ...` (runtime cleanup only)
-- `bash "$HARNESS_ROOT/bin/agenphony-down-menu.sh"`
-- `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" <action>`
-- `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" <action>`
-- `bash "$HARNESS_ROOT/bin/agenphony-main.sh" ...` (non-interactive arg mode)
+- `bash "$HARNESS_ROOT/bin/awa-down.sh" --project ...` (runtime cleanup only)
+- `bash "$HARNESS_ROOT/bin/awa-down-menu.sh"`
+- `bash "$HARNESS_ROOT/bin/awa-symphony.sh" <action>`
+- `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" <action>`
+- `bash "$HARNESS_ROOT/bin/awa-main.sh" ...` (non-interactive arg mode)
 
 ## Routing
 
@@ -37,7 +37,7 @@ elif [ -L ~/.claude/skills/agpn ]; then
   _link="$(readlink ~/.claude/skills/agpn)"
   HARNESS_ROOT="$(cd "$(dirname "$_link")/../.." && pwd)"
 elif [ -d ~/.claude/skills/agpn ] && [ -f ~/.claude/skills/agpn/SKILL.md ]; then
-  # global install via copy: search up for repo root marker (bin/agenphony-main.sh)
+  # global install via copy: search up for repo root marker (bin/awa-main.sh)
   HARNESS_ROOT=""  # fallback to user prompt
 else
   HARNESS_ROOT=""  # last resort — ask user for harness path
@@ -46,9 +46,9 @@ fi
 
 **All Bash invocations MUST use `bash "$HARNESS_ROOT/bin/<script>.sh" ...` (absolute path).** Never use relative `bin/...` — cwd is unreliable across new terminal sessions. lib.sh's "not a git repo" warning is suppressed because `$HARNESS_ROOT` is always the repo root.
 
-1. **Step 0 — Resume check (Bash):** `bash "$HARNESS_ROOT/bin/agenphony-main.sh" resume`
+1. **Step 0 — Resume check (Bash):** `bash "$HARNESS_ROOT/bin/awa-main.sh" resume`
    - Parses TSV output (header line + 0+ rows). If rows exist, present them to user via chat. `_SYMPHONY` row is labeled `multi-view`.
-   - User picks one → `bash "$HARNESS_ROOT/bin/agenphony-main.sh" attach --session <name>` → print attach cmd → END.
+   - User picks one → `bash "$HARNESS_ROOT/bin/awa-main.sh" attach --session <name>` → print attach cmd → END.
    - User picks none / no rows → continue to Step 1.
 
 2. **Step 1 — Plan (SKILL chat):**
@@ -76,11 +76,11 @@ fi
      - Reviewer roles inventory: `$HARNESS_ROOT/prompts/roles/03-quality/reviewer-{spec,arch,quality}.md` (excluding `reviewer-common.md`).
      - AskUserQuestion: which worker roles (multi-select). For each chosen role ask count (1-3) and model (`opus|sonnet|haiku`, recommended default sonnet).
      - AskUserQuestion: which reviewer roles (multi-select, optional).
-     - Assemble `--workers "name1:role1:model1,name2:role2:model2,..."` (matches agenphony-up.sh `WORKERS_ARG` format).
+     - Assemble `--workers "name1:role1:model1,name2:role2:model2,..."` (matches awa-up.sh `WORKERS_ARG` format).
      - Validation: SKILL checks every role file exists via Bash test; reject with clear error if missing.
 
 3. **Step 2 — Mode (SKILL chat, dynamic):**
-   - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(agenphony-|_SYMPHONY$)' | wc -l`
+   - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_SYMPHONY$)' | wc -l`
    - count ≥ 1 → ask user: Single vs Multi-view
    - count = 0 → mode=single auto, inform user
 
@@ -90,20 +90,20 @@ fi
      1. **Bookmarks** — pick from saved list
      2. **Custom path** — paste absolute path or alias (this is also the channel for "my current cwd": just paste it)
      3. **Harness root** — developer-only, runs against the harness repo itself
-   - For Bookmarks: `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" list` → present rows to user → user picks number or alias
+   - For Bookmarks: `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" list` → present rows to user → user picks number or alias
    - For Custom path: ask path/alias from user (label hints "absolute path or alias; if your terminal cwd, paste it here")
    - For Harness root: use `$HARNESS_ROOT` directly
-   - **Resolve to absolute path:** `bash "$HARNESS_ROOT/bin/agenphony-main.sh" resolve-path --input <user-input>` → returns resolved path or exit 1.
+   - **Resolve to absolute path:** `bash "$HARNESS_ROOT/bin/awa-main.sh" resolve-path --input <user-input>` → returns resolved path or exit 1.
 
 5. **Step 4 — Launch command output (Bash, non-interactive):**
    ```
-   bash "$HARNESS_ROOT/bin/agenphony-main.sh" launch \
+   bash "$HARNESS_ROOT/bin/awa-main.sh" launch \
      --project <resolved-path> \
      --mode-launch <single|multi> \
      [--preset <name>|--workers <spec>] \
      [--plan <path>]
    ```
-   main.sh prints the agenphony-up.sh command + `# AGPN_META: session=<n> mode=<m>` line.
+   main.sh prints the awa-up.sh command + `# AGPN_META: session=<n> mode=<m>` line.
 
    **AGPN_META parsing** (10th review [CRIT-27]):
    ```bash
@@ -120,24 +120,24 @@ fi
 
 7. **Step 5 — Auto-follow for multi-view (10th review [CRIT-28]):**
    - **Only fires when** `launch_mode == "multi-view"` AND the launch result was exit 0.
-   - SKILL fetches current live agenphony-* sessions (Bash): `tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^agenphony-' || true`
+   - SKILL fetches current live awa-* sessions (Bash): `tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^awa-' || true`
    - **Excluding `launch_session`** from the result list, compute `existing[]`.
    - Branch:
-     - `tmux has-session -t _SYMPHONY` → exit 0 → `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" add <launch_session>`
-     - else → `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" compose <existing[]...> <launch_session>`
+     - `tmux has-session -t _SYMPHONY` → exit 0 → `bash "$HARNESS_ROOT/bin/awa-symphony.sh" add <launch_session>`
+     - else → `bash "$HARNESS_ROOT/bin/awa-symphony.sh" compose <existing[]...> <launch_session>`
    - symphony.sh dedupes defensively, but SKILL should send a clean list.
 
 8. **Step 6 — Attach guidance:** SKILL prints to user `tmux attach -t _SYMPHONY` (multi-view) or `tmux attach -t <launch_session>` (single) → user runs with `!`. SKILL turn ends.
 
 ### `/agpn down`
-Bash: `bash "$HARNESS_ROOT/bin/agenphony-down-menu.sh"` — auto, menu + multi-select.
+Bash: `bash "$HARNESS_ROOT/bin/awa-down-menu.sh"` — auto, menu + multi-select.
 
 ### `/agpn symphony [action]`
-Bash: `bash "$HARNESS_ROOT/bin/agenphony-symphony.sh" <action> [args]` — auto.
+Bash: `bash "$HARNESS_ROOT/bin/awa-symphony.sh" <action> [args]` — auto.
 actions: `compose <s1> [s2...]` | `add <s>` | `detach <w...>` | `disband` | `kill <w...>`
 
 ### `/agpn bookmarks [action]`
-Bash: `bash "$HARNESS_ROOT/bin/agenphony-bookmarks.sh" <action>` — auto.
+Bash: `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" <action>` — auto.
 actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 
 ## References

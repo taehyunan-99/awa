@@ -8,7 +8,7 @@ ORIG_PWD="$PWD"
 # 서브셸 안 assert 는 카운터 부모 전파 안 됨(T1 교훈). 모두 메인 셸 평탄 호출.
 # 케이스 간 오염 차단: source 부수효과 변수와 env/cwd 명시 복원.
 
-# T3.1 — 폴백: agenphony-<basename>
+# T3.1 — 폴백: awa-<basename>
 unset SESSION_OVERRIDE PROFILE_SESSION SESSION HARNESS_PROJECT 2>/dev/null || true
 G_PARENT="$(mktemp -d)"
 G="$G_PARENT/projectA"
@@ -17,7 +17,7 @@ mkdir -p "$G"
 cd "$G"
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh" 2>/dev/null
-assert_eq "agenphony-projectA" "$(resolve_session)" "자동명 폴백"
+assert_eq "awa-projectA" "$(resolve_session)" "자동명 폴백"
 cd "$ORIG_PWD"
 rm -rf "$G_PARENT"
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT
@@ -31,7 +31,7 @@ mkdir -p "$G"
 cd "$G"
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh" 2>/dev/null
-assert_eq "agenphony-proj_A-1" "$(resolve_session)" "sanitize . → _"
+assert_eq "awa-proj_A-1" "$(resolve_session)" "sanitize . → _"
 cd "$ORIG_PWD"
 rm -rf "$G_PARENT"
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT
@@ -51,7 +51,7 @@ unset SESSION_OVERRIDE
 export PROFILE_SESSION="profile_x"
 assert_eq "profile_x" "$(resolve_session)" "resolve_session PROFILE_SESSION 우선"
 unset PROFILE_SESSION
-assert_eq "agenphony-projectA" "$(resolve_session)" "자동명 폴백"
+assert_eq "awa-projectA" "$(resolve_session)" "자동명 폴백"
 cd "$ORIG_PWD"
 rm -rf "$G_PARENT"
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT
