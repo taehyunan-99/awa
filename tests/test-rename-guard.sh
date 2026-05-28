@@ -45,8 +45,8 @@ echo "[G5] bin/agenphony-*.sh 부재 (파일명 리네이밍 완료)"
 old_bin_files="$(ls "$ROOT"/bin/agenphony-*.sh 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "0" "$old_bin_files" "G5 bin/agenphony-*.sh 파일 부재"
 
-echo "[G6] 폴더명 일관성 — basename(PROJECT_ROOT) == 'AWA'"
+echo "[G6] 폴더명 일관성 — basename(PROJECT_ROOT) == 'awa'"
 actual_basename="$(basename "$ROOT")"
-assert_eq "AWA" "$actual_basename" "G6 PROJECT_ROOT basename = AWA (잔존: $actual_basename)"
+assert_eq "awa" "$actual_basename" "G6 PROJECT_ROOT basename = awa (잔존: $actual_basename)"
 
 test_summary

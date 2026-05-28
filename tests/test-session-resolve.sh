@@ -6,7 +6,7 @@ ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh"
 
 # 기본: 인자 없고 env 없으면 자동명 (awa-<basename of PROJECT_ROOT>) — T3.
-# repo basename 이 'AWA' 이므로 'awa-AWA'.
+# repo basename 이 'awa' 이므로 'awa-awa'.
 unset SESSION_OVERRIDE PROFILE_SESSION SESSION 2>/dev/null || true
 expected_auto="awa-$(basename "$PROJECT_ROOT")"
 assert_eq "$expected_auto" "$(resolve_session)" "기본 → 자동명 폴백"
