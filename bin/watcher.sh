@@ -71,6 +71,15 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           tmux send-keys -t "$LEAD_PANE" -l "@done: $wt 완료. results/ 확인 후 종합." 2>/dev/null
           tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
         done
+    # @plan-defect: 라인 worker/task/설명 추출 → lead ⓖ 라우팅 (§4 임시 채널). done 분기와 동일 패턴.
+    sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
+      | awk -F'\t' '$4=="plan-defect"{print $2"/"$3"\t"$5}' \
+      | while IFS=$'\t' read -r wt desc; do
+          [ -n "$wt" ] || continue
+          pane_alive "$LEAD_PANE" || continue
+          tmux send-keys -t "$LEAD_PANE" -l "@plan-defect: $wt $desc" 2>/dev/null
+          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+        done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
   fi
 

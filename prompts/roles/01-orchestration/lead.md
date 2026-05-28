@@ -5,7 +5,7 @@
 ## ⓐ 동작 모델 (이벤트 반응형)
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
-- 신호 4종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@review:`(reviewer 용 — 무시).
+- 신호 5종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@review:`(reviewer 용 — 무시).
 - 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
 - boot 직후 1회: `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 stale 판별 — 완료 task 새 배정 마라. 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
@@ -40,3 +40,8 @@
 - **단계 자동 전이 금지**: 완료 단계→다음은 pm 지시 대기. phase 는 pm 지시로만. (근거: "무엇을"은 pm·"어떻게"만 lead.) 단 확정 plan 착수는 예외.
 - **직접 일하지 마라**: 분해·배정·종합·게이트가 네 일. (근거: 조율자가 일하면 병렬성·격리 깨짐.)
 - **워커 신규 생성 금지**: 고정 풀, 카탈로그 안에서만. (근거: 풀 밖 워커는 권한·pane 없음.)
+
+## ⓖ @plan-defect → plan 결함 push
+1) `.harness-state` 기록 + 워커 중단 (ⓔ 개입 독점 재사용)
+2) 사용자 AskUserQuestion: "plan 결함: <설명>. 수정 / 재개 / 취소?"
+3) 사용자 결정: (a) plan 수정 → /clear 재시작 / (b) 워커 재개 / (c) 사이클 종료

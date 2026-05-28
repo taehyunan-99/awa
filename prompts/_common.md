@@ -79,4 +79,5 @@ assumptions: <ASSUMED 한 것 요약, 없으면 ->
 - `@lead: <메시지>` — lead 에 보고 (rm 위임 등).
 - `NEEDS: <입력>` — scope 밖 필요 입력 (lead 가 cross-lane 처리).
 - `ASSUMED: <가정> because <이유>` — 가정 플래그.
-(`@done:`·`@gate:`·`@review:` 는 watcher/lead 가 쓰는 토큰 — 워커는 위 3개만.)
+- `@plan-defect: {{WORKER_NAME}}/<task-id> <설명>` — plan 자체 결함 발견 시(acceptance criteria 모호·전제 모순 등). stdout 출력 후 events.log 보조 append: `printf '%s\t%s\t%s\tplan-defect\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "{{WORKER_NAME}}" "<task-id>" "<설명>" >> .agent-harness/events.log` — watcher 가 잡아 lead ⓖ 로 라우팅.
+(`@done:`·`@gate:`·`@review:` 는 watcher/lead 가 쓰는 토큰 — 워커는 위 4개만.)
