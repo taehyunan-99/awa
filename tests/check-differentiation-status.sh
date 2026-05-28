@@ -7,7 +7,7 @@ set -uo pipefail
 HARNESS_ROOT="${HARNESS_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 SCRIPT_BIRTHDAY_FILE="${HARNESS_ROOT}/docs/differentiation-checkpoints/.birthday"
 
-PASS=0; FAIL=0; SKIP=0
+PASS=0; FAIL=0; SKIP=0; GRACE=0
 declare -a RESULTS
 
 check() {
@@ -97,13 +97,14 @@ check E 4 "차별화 매핑 표 README" \
 check E 5 "identity-AWA.md 풀버전" \
   "test -f ${HARNESS_ROOT}/docs/identity-AWA.md"
 
-# Sanity log grace period (§9.9) — PASS/FAIL 카운트에 반영되도록 출력 전에 계산
+# Sanity log grace period (§9.9) — GRACE 별도 카운트 (영구 PASS 와 구분, §9.9 임시성 정합)
 if [[ -f "$SCRIPT_BIRTHDAY_FILE" ]]; then
   birthday=$(cat "$SCRIPT_BIRTHDAY_FILE")
   now_epoch=$(date +%s)
   grace_end=$((birthday + 30*86400))
   if (( now_epoch < grace_end )); then
-    RESULTS+=("[grace] sanity-log.md PASS 조건 임시 PASS (신설 후 30일 grace, ${grace_end} 까지)")
+    RESULTS+=("[GRACE] sanity-log.md PASS 조건 임시 PASS (신설 후 30일 grace, ${grace_end} 까지)")
+    GRACE=$((GRACE+1))
   else
     if ! find "${HARNESS_ROOT}/docs/differentiation-checkpoints/sanity-log.md" -mtime -30 2>/dev/null | grep -q .; then
       RESULTS+=("[FAIL] sanity-log.md 직전 30일 기록 없음")
@@ -118,6 +119,6 @@ echo
 echo "차별화 임계점: A 전수 + B ≥ 4/5 + C 전수 + D ≥ 1"
 echo "외부 노출 임계점: 위 + E3·E4 + D4 + 조건 3 정량 증명 동반"
 echo
-echo "PASS=$PASS FAIL=$FAIL SKIP=$SKIP"
+echo "PASS=$PASS FAIL=$FAIL SKIP=$SKIP GRACE=$GRACE"
 
 exit $(( FAIL > 0 ? 1 : 0 ))
