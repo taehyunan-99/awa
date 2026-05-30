@@ -55,6 +55,32 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
   done
 
+  # 1b) dispatch-queue 새 .json → dispatch.sh 실행 (P11 탈-tmux: lead 가 sandbox 안이라
+  #     tmux has-session/send-keys 를 직접 못 함. lead 는 dispatch-queue/<id>.json 에 배정
+  #     의도만 파일로 쓰고, watcher(sandbox 밖)가 폴링해 실제 dispatch.sh 를 대신 실행).
+  #     pending-asks 분기와 동형. 처리 후 .json 삭제(재실행 방지 — seen 누적 대신 소비).
+  for f in "$STATE_DIR"/dispatch-queue/*.json; do
+    [ -f "$f" ] || continue
+    dq_worker="$(jq -r '.worker // empty' "$f" 2>/dev/null)"
+    dq_task="$(jq -r '.task_id // empty' "$f" 2>/dev/null)"
+    if [ -z "$dq_worker" ] || [ -z "$dq_task" ]; then
+      # 형식 불량 — 소비해 폐기(무한 재시도 방지). lead 가 재배정하면 새 .json 생성.
+      rm -f "$f" 2>/dev/null
+      continue
+    fi
+    # dispatch.sh 가 has-session/list-panes/send_prompt(tmux) 를 watcher(sandbox 밖)에서
+    # 정상 실행. --project 로 PROJECT_ROOT 명시(watcher cwd=본체라 git toplevel 오인 방지).
+    if bash "$(dirname "$0")/dispatch.sh" \
+         ${HARNESS_PROJECT:+--project "$HARNESS_PROJECT"} "$dq_worker" "$dq_task" >/dev/null 2>&1; then
+      :   # 성공 — dispatch.sh 가 워커 페인에 TASK 주입. lead 통지 불필요(조용).
+    elif pane_alive "$LEAD_PANE"; then
+      # 실패만 lead 에 통지(세션/페인/task 파일 이상). -l 과 Enter 분리(half-sent 방지).
+      tmux send-keys -t "$LEAD_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)." 2>/dev/null
+      tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+    fi
+    rm -f "$f" 2>/dev/null   # 소비 완료(성공·실패 무관 1회만 — 실패는 위에서 lead 통지)
+  done
+
   # 2) events.log 증가 → reviewer 깨움(디바운스) + done 라인이면 lead 도
   cur="$(awk 'END{print NR}' "$EVENTS" 2>/dev/null || echo 0)"
   if [ "$cur" -gt "$last_events" ]; then

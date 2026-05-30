@@ -718,7 +718,7 @@ if [ "$_last" != "watcher" ]; then
   exit 1
 fi
 # watcher 기동: pane 에 env 세팅 후 watcher.sh 실행 명령 주입.
-tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" REVIEW_MANAGER_PANE=\"${REVIEW_MANAGER_PANE:-}\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
+tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" REVIEW_MANAGER_PANE=\"${REVIEW_MANAGER_PANE:-}\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" HARNESS_PROJECT=\"$PROJECT_ROOT\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
 tmux send-keys -t "$WATCHER_PANE" Enter
 
 # 14차 UX: 첫 attach 시 항상 team(LEAD+PM) 윈도우로 접속 ('window 0=LEAD+PM' 확정과 정합).

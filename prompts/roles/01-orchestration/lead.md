@@ -6,14 +6,20 @@
 ## ⓐ 동작 모델 (이벤트 반응형)
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
-- 신호 7종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@review:`(reviewer 용 — 무시).
+- 신호 8종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@review:`(reviewer 용 — 무시).
 - 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
 - boot 직후 1회: `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 stale 판별 — 완료 task 새 배정 마라. 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
 
 ## ⓑ @pm → 위임 계약
 `@pm: <지시>` 또는 확정 plan 을 작업으로 분해해 배정한다.
-- **분해 → 라우팅 → task 게이트 → dispatch**: 카탈로그에서 적임 워커 골라 `.agent-harness/tasks/<id>.md` 작성 — 각 task 에 **objective·scope(allowed_paths/forbidden_paths)·output·입력경로**(이전 산출물 지정 시) 명시. `{{HARNESS_ROOT}}/bin/dispatch.sh <worker> <id>` 실행.
+- **분해 → 라우팅 → task 게이트 → dispatch**: 카탈로그에서 적임 워커 골라 `.agent-harness/tasks/<id>.md` 작성 — 각 task 에 **objective·scope(allowed_paths/forbidden_paths)·output·입력경로**(이전 산출물 지정 시) 명시. 그다음 **dispatch-queue 에 배정 의도를 파일로 쓴다**(tmux 직접 실행 금지 — 너는 격리 경계 안이라 tmux 소켓 접근이 차단될 수 있다. watcher 가 큐를 폴링해 실제 dispatch 를 대행한다):
+  ```
+  mkdir -p .agent-harness/state/dispatch-queue
+  printf '{"worker":"<worker>","task_id":"<id>"}' > .agent-harness/state/dispatch-queue/<id>.json.tmp
+  mv .agent-harness/state/dispatch-queue/<id>.json.tmp .agent-harness/state/dispatch-queue/<id>.json
+  ```
+  (atomic write: tmp→mv. watcher 가 이 .json 을 소비해 `dispatch.sh <worker> <id>` 실행 → 워커 깨움. 실패 시 watcher 가 `@dispatch-fail:` 로 통지.)
   - **forbidden_paths 불변식**: 워커 하니스 산출 경로(`.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state`)는 forbidden 에 **넣지 마라** — 모든 워커가 반드시 써야 하는 경로다. `.agent-harness/` 를 통째로 forbidden 지정 금지. forbidden 은 *실제 작업 대상 밖* 소스 경로에만 건다(리뷰 VIOLATION 오탐 차단).
 - **확정 plan 주입 시**(`# 확정 plan` 헤더): boot 직후 1회 — ①분해+`.harness-state` 기록 ②배정 트리 출력 ③AskUserQuestion "진행?"(승인→dispatch/수정→반복/취소→idle). 자동전이 아님.
 - **plan 없으면**: 자동 분해 마라. `@pm:` 대기(하위호환). 단발은 즉시 dispatch.
