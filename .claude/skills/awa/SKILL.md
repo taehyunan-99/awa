@@ -1,9 +1,9 @@
 ---
-name: agpn
-description: AWA harness entry point. /agpn (no args) launches with 4-axis plan review + preset + mode. Subcommands: down/symphony/bookmarks. User `!` required for launch/attach.
+name: awa
+description: AWA harness entry point. /awa (no args) launches with 4-axis plan review + preset + mode. Subcommands: down/dash/bookmarks. User `!` required for launch/attach.
 ---
 
-# agpn — AWA harness entry point (15th cycle)
+# awa — AWA harness entry point (15th cycle)
 
 Redefined as a single responsibility — *team execution and management*. Plan writing is external.
 
@@ -17,26 +17,26 @@ Redefined as a single responsibility — *team execution and management*. Plan w
 - All tmux ops (move-window / kill-session / set-option / ...)
 - `bash "$HARNESS_ROOT/bin/awa-down.sh" --project ...` (runtime cleanup only)
 - `bash "$HARNESS_ROOT/bin/awa-down-menu.sh"`
-- `bash "$HARNESS_ROOT/bin/awa-symphony.sh" <action>`
+- `bash "$HARNESS_ROOT/bin/awa-dashboard.sh" <action>`
 - `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" <action>`
 - `bash "$HARNESS_ROOT/bin/awa-main.sh" ...` (non-interactive arg mode)
 
 ## Routing
 
-### `/agpn` (no args) — launch flow
+### `/awa` (no args) — launch flow
 
 SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatches main.sh non-interactively.
 
 **HARNESS_ROOT discovery (MUST run before first Bash call)** — claude code Bash tool cwd is the user's *terminal cwd*, not the harness. Relative `bin/...` paths break when claude is started from outside the repo. (15th live finding [L-1])
 
 ```bash
-if [ -n "${AGPN_HARNESS_ROOT:-}" ]; then
-  HARNESS_ROOT="$AGPN_HARNESS_ROOT"
-elif [ -L ~/.claude/skills/agpn ]; then
-  # global install via symlink: ~/.claude/skills/agpn → <repo>/.claude/skills/agpn
-  _link="$(readlink ~/.claude/skills/agpn)"
+if [ -n "${AWA_HARNESS_ROOT:-}" ]; then
+  HARNESS_ROOT="$AWA_HARNESS_ROOT"
+elif [ -L ~/.claude/skills/awa ]; then
+  # global install via symlink: ~/.claude/skills/awa → <repo>/.claude/skills/awa
+  _link="$(readlink ~/.claude/skills/awa)"
   HARNESS_ROOT="$(cd "$(dirname "$_link")/../.." && pwd)"
-elif [ -d ~/.claude/skills/agpn ] && [ -f ~/.claude/skills/agpn/SKILL.md ]; then
+elif [ -d ~/.claude/skills/awa ] && [ -f ~/.claude/skills/awa/SKILL.md ]; then
   # global install via copy: search up for repo root marker (bin/awa-main.sh)
   HARNESS_ROOT=""  # fallback to user prompt
 else
@@ -47,7 +47,7 @@ fi
 **All Bash invocations MUST use `bash "$HARNESS_ROOT/bin/<script>.sh" ...` (absolute path).** Never use relative `bin/...` — cwd is unreliable across new terminal sessions. lib.sh's "not a git repo" warning is suppressed because `$HARNESS_ROOT` is always the repo root.
 
 1. **Step 0 — Resume check (Bash):** `bash "$HARNESS_ROOT/bin/awa-main.sh" resume`
-   - Parses TSV output (header line + 0+ rows). If rows exist, present them to user via chat. `_SYMPHONY` row is labeled `multi-view`.
+   - Parses TSV output (header line + 0+ rows). If rows exist, present them to user via chat. `_DASHBOARD` row is labeled `multi-view`.
    - User picks one → `bash "$HARNESS_ROOT/bin/awa-main.sh" attach --session <name>` → print attach cmd → END.
    - User picks none / no rows → continue to Step 1.
 
@@ -84,7 +84,7 @@ fi
      - Validation: SKILL checks every role file exists via Bash test; reject with clear error if missing.
 
 3. **Step 2 — Mode (SKILL chat, dynamic):**
-   - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_SYMPHONY$)' | wc -l`
+   - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_DASHBOARD$)' | wc -l`
    - count ≥ 1 → ask user: Single vs Multi-view
    - count = 0 → mode=single auto, inform user
 
@@ -107,11 +107,11 @@ fi
      [--preset <name>|--workers <spec>] \
      [--plan <path>]
    ```
-   main.sh prints the awa-up.sh command + `# AGPN_META: session=<n> mode=<m>` line.
+   main.sh prints the awa-up.sh command + `# AWA_META: session=<n> mode=<m>` line.
 
-   **AGPN_META parsing** (10th review [CRIT-27]):
+   **AWA_META parsing** (10th review [CRIT-27]):
    ```bash
-   meta=$(grep '^# AGPN_META:' <main.sh-output>)
+   meta=$(grep '^# AWA_META:' <main.sh-output>)
    launch_session=$(printf '%s' "$meta" | sed -n 's/.*session=\([^ ]*\).*/\1/p')
    launch_mode=$(printf '%s' "$meta" | sed -n 's/.*mode=\([^ ]*\).*/\1/p')
    ```
@@ -127,20 +127,20 @@ fi
    - SKILL fetches current live awa-* sessions (Bash): `tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^awa-' || true`
    - **Excluding `launch_session`** from the result list, compute `existing[]`.
    - Branch:
-     - `tmux has-session -t _SYMPHONY` → exit 0 → `bash "$HARNESS_ROOT/bin/awa-symphony.sh" add <launch_session>`
-     - else → `bash "$HARNESS_ROOT/bin/awa-symphony.sh" compose <existing[]...> <launch_session>`
-   - symphony.sh dedupes defensively, but SKILL should send a clean list.
+     - `tmux has-session -t _DASHBOARD` → exit 0 → `bash "$HARNESS_ROOT/bin/awa-dashboard.sh" add <launch_session>`
+     - else → `bash "$HARNESS_ROOT/bin/awa-dashboard.sh" merge <existing[]...> <launch_session>`
+   - awa-dashboard.sh dedupes defensively, but SKILL should send a clean list.
 
-8. **Step 6 — Attach guidance:** SKILL prints to user `tmux attach -t _SYMPHONY` (multi-view) or `tmux attach -t <launch_session>` (single) → user runs with `!`. SKILL turn ends.
+8. **Step 6 — Attach guidance:** SKILL prints to user `tmux attach -t _DASHBOARD` (multi-view) or `tmux attach -t <launch_session>` (single) → user runs with `!`. SKILL turn ends.
 
-### `/agpn down`
+### `/awa down`
 Bash: `bash "$HARNESS_ROOT/bin/awa-down-menu.sh"` — auto, menu + multi-select.
 
-### `/agpn symphony [action]`
-Bash: `bash "$HARNESS_ROOT/bin/awa-symphony.sh" <action> [args]` — auto.
-actions: `compose <s1> [s2...]` | `add <s>` | `detach <w...>` | `disband` | `kill <w...>`
+### `/awa dash [action]`
+Bash: `bash "$HARNESS_ROOT/bin/awa-dashboard.sh" <action> [args]` — auto.
+actions: `merge <s1> [s2...]` | `add <s>` | `detach <proj...>` | `split` | `kill <proj...>`
 
-### `/agpn bookmarks [action]`
+### `/awa bookmarks [action]`
 Bash: `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" <action>` — auto.
 actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 
@@ -148,4 +148,4 @@ actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 
 - `references/review-prompt.md` — 4-axis review subagent prompt
 - `references/presets.md` — preset suggestion heuristics
-- spec: `docs/superpowers/specs/2026-05-27-agpn-unified-entry-symphony.md`
+- spec: `docs/superpowers/specs/2026-05-27-awa-unified-entry-dashboard.md`

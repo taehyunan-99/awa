@@ -5,7 +5,7 @@ set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
-src="$(cat "$ROOT/.claude/skills/agpn/SKILL.md")"
+src="$(cat "$ROOT/.claude/skills/awa/SKILL.md")"
 
 echo "[F1] plan 자동탐색 경로"
 assert_contains "$src" "docs/superpowers/plans" "F1 plans 디렉터리 스캔"

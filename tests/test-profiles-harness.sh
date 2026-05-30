@@ -8,13 +8,14 @@ ROOT="$(cd .. && pwd)"
 ( source "$ROOT/profiles/feature-team.sh"
   [ "${#WORKERS[@]}" -ge 1 ] && echo "W_OK"
   [ "${#REVIEWERS[@]}" -ge 1 ] && echo "R_OK"
-  printf 'LEAD=%s\n' "$LEAD_MODEL"
+  # 모델 정책 위임: profile 은 LEAD_MODEL 을 하드코딩하지 않는다(벤더 기본 폴백 위임).
+  printf 'LEAD=%s\n' "${LEAD_MODEL:-<unset>}"
   printf 'W0=%s\n' "${WORKERS[0]}"
 ) > /tmp/prof_out_$$ 2>&1
 out="$(cat /tmp/prof_out_$$)"; rm -f /tmp/prof_out_$$
 assert_contains "$out" "W_OK" "WORKERS 정의됨"
 assert_contains "$out" "R_OK" "REVIEWERS 정의됨"
-assert_contains "$out" "LEAD=" "LEAD_MODEL 정의됨"
+assert_contains "$out" "LEAD=<unset>" "LEAD_MODEL 미하드코딩(벤더 기본 위임)"
 assert_contains "$out" ":" "워커 엔트리에 역할 구분자(:) 존재"
 
 # 리뷰어 역할명은 reviewer-<관점> 형식

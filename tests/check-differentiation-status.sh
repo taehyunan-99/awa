@@ -41,8 +41,8 @@ echo
 
 # A. Plan 인프라
 check A 1 "Plan 스키마 강제" \
-  "grep -q '검증가능성.*abort\\|검증가능성.*FAIL.*abort' ${HARNESS_ROOT}/.claude/skills/agpn/SKILL.md" \
-  "test -f ${HARNESS_ROOT}/tests/test-agpn-plan-review.sh"
+  "grep -q '검증가능성.*abort\\|검증가능성.*FAIL.*abort' ${HARNESS_ROOT}/.claude/skills/awa/SKILL.md" \
+  "test -f ${HARNESS_ROOT}/tests/test-awa-plan-review.sh"
 check A 2 "plan-defect 신호 채널" \
   "grep -q '@plan-defect' ${HARNESS_ROOT}/prompts/roles/01-orchestration/lead.md" \
   "test -f ${HARNESS_ROOT}/tests/test-plan-defect-e2e.sh"

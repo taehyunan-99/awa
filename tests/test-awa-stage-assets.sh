@@ -4,8 +4,8 @@ set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
-RP="$ROOT/.claude/skills/agpn/references/review-prompt.md"
-PF="$ROOT/.claude/skills/agpn/references/presets.md"
+RP="$ROOT/.claude/skills/awa/references/review-prompt.md"
+PF="$ROOT/.claude/skills/awa/references/presets.md"
 
 echo "[R1] 4축 리뷰 프롬프트 — 네 축 모두 명시"
 rp="$(cat "$RP")"

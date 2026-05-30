@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 12차: agpn SKILL.md 가 plan/stage/list 분기·핵심 규약 포함.
+# 12차: awa SKILL.md 가 plan/stage/list 분기·핵심 규약 포함.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
-SK="$ROOT/.claude/skills/agpn/SKILL.md"
+SK="$ROOT/.claude/skills/awa/SKILL.md"
 
 echo "[S1] SKILL.md 존재 + frontmatter"
 assert_eq "1" "$([ -f "$SK" ] && echo 1 || echo 0)" "S1a 파일 존재"

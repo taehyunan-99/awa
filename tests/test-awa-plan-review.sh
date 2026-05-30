@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test-agpn-plan-review.sh — agpn 검증가능성 abort 시나리오 카탈로그
+# tests/test-awa-plan-review.sh — awa 검증가능성 abort 시나리오 카탈로그
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
@@ -7,11 +7,11 @@ ROOT="$(cd .. && pwd)"
 
 # Scenario (a) — 검증가능성 FAIL plan → 1차 abort
 hits_a=$(grep -E '검증가능성.*abort|검증가능성.*FAIL.*abort|검증가능성 축 FAIL.*즉시 abort' \
-  "$ROOT/.claude/skills/agpn/SKILL.md" 2>/dev/null | head -1 || true)
+  "$ROOT/.claude/skills/awa/SKILL.md" 2>/dev/null | head -1 || true)
 assert_contains "$hits_a" "검증가능성" "(a) SKILL.md 검증가능성 abort 분기 존재"
 
 # Scenario (b) — 다른 축 FAIL plan → proceed despite gaps? 옵션 노출
-hits_b=$(grep "proceed despite gaps" "$ROOT/.claude/skills/agpn/SKILL.md" 2>/dev/null | head -1 || true)
+hits_b=$(grep "proceed despite gaps" "$ROOT/.claude/skills/awa/SKILL.md" 2>/dev/null | head -1 || true)
 assert_contains "$hits_b" "proceed despite gaps" "(b) SKILL.md proceed despite gaps 분기 존재"
 
 # Scenario (c) — acceptance criteria 누락 task → lead push (Task 5 책임)

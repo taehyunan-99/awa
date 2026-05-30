@@ -15,11 +15,11 @@ trap 'rm -rf "$_AGPN15_XDG"' EXIT
 echo "[U1] new-session 에 -c PROJECT_ROOT"
 assert_contains "$src" 'new-session -d -s "$SESSION" -c "${PROJECT_ROOT}"' "U1 new-session -c"
 
-echo "[U2] 워커 settings 2인자 호출"
-assert_contains "$src" 'generate_worker_settings "$ENTRY_ROLE" "$ENTRY_NAME"' "U2 워커 2인자"
+echo "[U2] 워커 settings 2인자 호출 (벤더 위임 — Task3 부터 vendor_gen_settings)"
+assert_contains "$src" 'vendor_gen_settings "$ENTRY_ROLE" "$ENTRY_NAME"' "U2 워커 2인자"
 
-echo "[U3] lead settings 2인자 호출"
-assert_contains "$src" 'generate_worker_settings "LEAD" "LEAD"' "U3 lead 2인자"
+echo "[U3] lead settings 2인자 호출 (벤더 위임)"
+assert_contains "$src" 'vendor_gen_settings "LEAD" "LEAD"' "U3 lead 2인자"
 
 echo "[U6] cat 더미로 awa-up 성공 (데몬 폐기 후 cat 경로 무손상)"
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; SESSION="awa-$SAFE"

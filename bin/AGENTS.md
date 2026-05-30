@@ -14,9 +14,10 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 
 - `awa-up.sh` — 프로파일 기반 tmux 세션 가동(워커 페인·부트 프롬프트 주입)
 - `awa-down.sh` — 런타임 정리(tasks/results는 보존)
-- `awa-main.sh` — `/agpn` 비대화 명령 백엔드 (resume/attach/launch/resolve-path)
-- `awa-down-menu.sh` — `/agpn down` 진입점 (N=0/1/multi 분기 + down.sh 위임)
-- `awa-symphony.sh` — _SYMPHONY 멀티뷰 (compose/add/detach/disband/kill)
+- `awa-main.sh` — `/awa` 비대화 명령 백엔드 (resume/attach/launch/resolve-path)
+- `awa-down-menu.sh` — `/awa down` 진입점 (N=0/1/multi 분기 + down.sh 위임)
+- `awa-dashboard.sh` — _DASHBOARD 멀티뷰 관제탑: 각 프로젝트 lead/pm pane 만 한 윈도우 grid 로 집결(골격 split + swap-pane, dash_render 중앙 재구성). 프로젝트당 1행(좌 lead·우 pm), 윈도우당 3프로젝트, 4번째부터 grid-2. 액션 merge/add/detach/split/kill (detach·kill 인자=프로젝트명)
+- `awa-splash.sh` — attach 첫 화면 splash (client-attached 훅의 display-popup 모달로 실행, 팀 요약 파일 읽어 브랜딩+팀 표 렌더, read -t N 키/타임아웃 닫힘)
 - `awa-bookmarks.sh` — bookmarks wrapper (list/set-alias/remove/prune)
 - `dispatch.sh` — lead/외부가 `<role> <task-id>` 형식으로 워커에 작업 주입
 - `watcher.sh` — events.log/pending-asks 폴링 데몬, lead/reviewer 페인을 깨움

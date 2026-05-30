@@ -100,8 +100,7 @@ PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 if [ -n "${WORKERS_ARG:-}" ]; then
   [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --workers 와 프로파일 동시 지정 불가" >&2; exit 1; }
   PROFILE="(custom)"                    # 종료 메시지(팀 '$PROFILE' 가동 완료)용 라벨.
-  LEAD_MODEL="${LEAD_MODEL:-opus}"
-  PM_MODEL="${PM_MODEL:-sonnet}"
+  # LEAD_MODEL/PM_MODEL 디폴트 미지정 — EFF 폴백이 빈값을 보고 vendor_default_model 로 채움.
   WORKERS=()
   IFS=',' read -ra _wk <<< "$WORKERS_ARG"
   for _w in "${_wk[@]}"; do WORKERS+=("$_w"); done
@@ -133,14 +132,38 @@ SESSION="$(resolve_session)"
 # 워커 명령 (기본 claude, 테스트는 AGENT_CMD 로 더미 치환)
 AGENT_CMD="${AGENT_CMD:-claude}"
 
-# "pane:역할[:모델]" 파싱. 모델 생략 시 sonnet. (spec §7.1)
-parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_MODEL 설정
+# "이름:역할[:벤더][:모델]" 파싱. (spec §2.2 화이트리스트 모호성 해소)
+parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_VENDOR ENTRY_MODEL 설정
   local e="$1"
   ENTRY_NAME="${e%%:*}"
   local rest="${e#*:}"
   ENTRY_ROLE="${rest%%:*}"
-  if [ "$rest" = "$ENTRY_ROLE" ]; then ENTRY_MODEL="sonnet"; else ENTRY_MODEL="${rest#*:}"; fi
-  [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
+  ENTRY_VENDOR=""
+  if [ "$rest" = "$ENTRY_ROLE" ]; then
+    # 2필드 (이름:역할) — 모델 역할기본(기존 동작 보존), 벤더 빈값.
+    ENTRY_MODEL="sonnet"
+  else
+    local f3 after_role="${rest#*:}"
+    f3="${after_role%%:*}"
+    if [ "$after_role" = "$f3" ]; then
+      # 3필드 (이름:역할:X) — §2.2: X 가 알려진 벤더면 벤더, 아니면 모델.
+      if is_known_vendor "$f3"; then
+        ENTRY_VENDOR="$f3"; ENTRY_MODEL=""      # 모델은 폴백 체인이 채움
+      else
+        ENTRY_MODEL="$f3"                        # 역호환: 3번째=모델
+      fi
+    else
+      # 4필드 (이름:역할:벤더:모델).
+      ENTRY_VENDOR="$f3"; ENTRY_MODEL="${after_role#*:}"
+    fi
+  fi
+  # 5필드 이상 거부 — ENTRY_MODEL 에 콜론 잔존 = 필드 초과(오타 silent 수용 차단).
+  case "$ENTRY_MODEL" in
+    *:*)
+      echo "오류: 엔트리 '$e' 필드 초과 (이름:역할[:벤더][:모델] 4필드까지)" >&2
+      exit 1
+      ;;
+  esac
   # ENTRY_NAME 은 path 아닌 워커 이름 — sed `#` 구분자·tmux pane title·boot 파일명에 쓰이므로
   # 좁게 [A-Za-z0-9_-] 만 허용 (메타문자 사전 차단, T3 Important 2).
   case "$ENTRY_NAME" in
@@ -160,14 +183,13 @@ parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_MODEL 설정
   return 0
 }
 
-# 엔진 명령 조립: claude 는 --model, 그 외 엔진은 분기점 한 곳(codex 후속 확장지점, spec §7.2)
-agent_cmd_for() {  # $1=model → echo 실행 명령
-  local model="$1"
-  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-    printf 'claude --model %s' "$model"
-  else
-    printf '%s' "$AGENT_CMD"   # 테스트(cat/dummy) 또는 codex 등
-  fi
+# 벤더 디스패처: 해석된 벤더 어댑터를 source 하고 vendor_boot_cmd 호출.
+# $1=model $2=settings_path $3=session_id $4=plan_file(opt) $5=vendor(opt)
+agent_cmd_for() {
+  local model="$1" settings="${2:-}" sid="${3:-}" plan="${4:-}" vendor="${5:-}"
+  [ -n "$vendor" ] || vendor="${HARNESS_VENDOR:-claude}"
+  vendor_source "$vendor" || return 1
+  vendor_boot_cmd "$model" "$settings" "$sid" "$plan"
 }
 
 # 중복 세션 거부
@@ -226,6 +248,23 @@ fi
 mkdir -p "$WORKSPACE/.boot" "$WORKSPACE/tasks" "$WORKSPACE/results" "$WORKSPACE/review"
 # 6차: 게이트 state 디렉터리 (lead 가 매 사이클 ls — 데몬이 만들던 것을 이관). marker 게이트 통과 후라 leak 없음.
 mkdir -p "$WORKSPACE/state/pending-asks" "$WORKSPACE/state/incidents" "$WORKSPACE/state/removal-requests"
+# splash 팀 요약 파일 — attach 시 display-popup 안의 awa-splash.sh 가 읽는다.
+# HOME 캐시에 둔다(awa-down 이 WORKSPACE 를 지워도 attach 첫 화면이 안전).
+# splash 는 보조 기능 — 캐시 쓰기 실패가 set -e 로 부팅을 죽이면 안 된다. || true 로 흡수.
+SPLASH_TEAM_FILE="$HOME/.cache/awa/team-summary.txt"
+mkdir -p "$(dirname "$SPLASH_TEAM_FILE")" 2>/dev/null || true
+: > "$SPLASH_TEAM_FILE" 2>/dev/null || true
+
+# 멤버 한 줄 append: 이름<TAB>역할<TAB>모델. role 빈값(LEAD/PM)은 lead/pm 으로 정규화.
+# 쓰기 실패는 흡수(set -e 하에서 부팅 보호). splash 가 파일 부재 시 멤버 표만 생략.
+splash_append_member() {  # $1=이름 $2=역할(bare, 빈값 가능) $3=모델
+  local _n="$1" _r="${2:-}" _m="${3:-}"
+  case "$_n" in
+    LEAD) _r="lead" ;;
+    PM)   _r="pm" ;;
+  esac
+  printf '%s\t%s\t%s\n' "$_n" "$_r" "$_m" >> "$SPLASH_TEAM_FILE" 2>/dev/null || true
+}
 # I-10 정정 — events.log 빈 파일 생성 보장. add_to_allow 가 `[ -f events.log ]` 가드로
 # 신호 발화 — boot 직후 events.log 미생성 시 첫 호출 신호 silent drop. touch 로 빈 파일
 # 생성하면 watcher 의 last_events 초기화(현재 줄 수=0) 와 정합 — 과거 done 폭주 없음.
@@ -285,11 +324,14 @@ fix_session_titles "$SESSION"
 # lead 페인의 영속 pane_id 캡처 후 id 로 title 설정.
 LEAD_PID="$(tmux display-message -p -t "$SESSION:0.1" '#{pane_id}')"
 tmux select-pane -t "$LEAD_PID" -T "LEAD"
+# 대시보드 grid 식별용 — title 매칭 대신 기계 식별 단일 출처 (awa-dashboard.sh 가 신뢰).
+tmux set-option -p -t "$LEAD_PID" @awa-role lead 2>/dev/null || true
 
 # pm pane: window 0(team) 에 lead 옆으로 가로 split (사용자 창구). pane_id 캡처(layout 면역).
-# 14차 UX: -h 가로 명시. window 0 = LEAD+PM 만 (관제탑 join-pane 단위).
+# 14차 UX: -h 가로 명시. window 0 = LEAD+PM 만 (관제탑 swap-pane 단위).
 PM_PID="$(tmux split-window -h -t "$SESSION:0" -d -P -F '#{pane_id}')"
 tmux select-pane -t "$PM_PID" -T "PM"
+tmux set-option -p -t "$PM_PID" @awa-role pm 2>/dev/null || true
 tmux select-layout -t "$SESSION:0" even-horizontal
 
 # 14차 UX: 워커 페인은 별도 windows 윈도우(1)에 세로 스택.
@@ -333,7 +375,7 @@ done
 # continuum 오염 방지.
 tmux set-option -t "$SESSION" @continuum-save-interval '0' 2>/dev/null || true
 
-# 12차: PROJECT_ROOT (풀경로) — /agpn (Step 0 resume) 또는 /agpn bookmarks list 가 읽음.
+# 12차: PROJECT_ROOT (풀경로) — /awa (Step 0 resume) 또는 /awa bookmarks list 가 읽음.
 tmux set-option -t "$SESSION" @awa-project "$PROJECT_ROOT" 2>/dev/null || true
 # 14차 UX: basename — pane-border-format 의 #{@awa-project-name} 으로 사용.
 tmux set-option -t "$SESSION" @awa-project-name "$(basename "$PROJECT_ROOT")" 2>/dev/null || true
@@ -368,42 +410,9 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   tmux select-layout -t "$SESSION:review" even-vertical
 fi
 
-# claude REPL 준비 대기: probe-loop.sh 검증 패턴 이식.
-# trust 화면("Is this a project you trust?") 자동 Enter 통과 + REPL 준비 폴링.
-# probe 는 세션명 인자였으나 awa-up 은 pane_id/target 을 쓴다 — capture-pane/
-# send-keys 는 pane target 도 동작하므로 인자만 pane target 으로 일반화(로직 동일).
-#
-# 2026-05-21 P2 회귀 fix: claude v2.1.145 상태줄에 'bypass permissions on' 더 이상
-#   출력 안 함 → 옛 단일 패턴은 false negative 로 항상 timeout. 다중 OR 매치로 회복.
-#   ready 신호 (any-of):
-#     - 'Claude Code v[0-9]' — welcome 박스 헤더 (가장 안정·버전 무관)
-#     - 'Welcome back'       — welcome 박스 본문
-#     - 'bypass permissions on' — 옛 상태줄 (역호환 — 옛 claude 살아있을 때 대비)
-#     - 'accept edits on'    — 옛 상태줄 (마찬가지)
-#   negative 신호 (즉시 fail):
-#     - 'Error:', 'Could not authenticate', 'not logged in', 'failed to start'
-#     - 폴링 timeout 까지 헛돌지 않고 조기 종료 (사용자 진단 빠름)
-wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
-  local s="$1" i dump
-  for i in $(seq 1 60); do
-    sleep 2
-    dump="$(tmux capture-pane -t "$s" -p 2>/dev/null)"
-    # trust 화면이 보이면 매 폴링마다 Enter 재전송 (첫 전송 씹힘·재출현 대비).
-    if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust'; then
-      tmux send-keys -t "$s" Enter   # 기본 선택 "1. Yes, I trust this folder"
-      continue
-    fi
-    # negative 신호 — 명백한 에러면 timeout 까지 안 기다리고 즉시 fail.
-    if printf '%s' "$dump" | grep -qE 'Error:|Could not authenticate|not logged in|failed to start'; then
-      return 1
-    fi
-    # ready 신호 — 다중 OR 매치. 하나라도 떴으면 REPL 준비됨.
-    if printf '%s' "$dump" | grep -qE 'Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'; then
-      return 0
-    fi
-  done
-  return 1
-}
+# claude REPL 준비 대기(trust 통과 + ready 폴링)는 bin/vendors/claude.sh 의
+#   vendor_wait_ready 로 이관됨 (벤더 어댑터 규약). 화면 패턴·sleep·반복은 그곳이 단일 진실원.
+#   회귀 가드: tests/test-wait-repl-patterns.sh (T5-T7 이 vendor_wait_ready 본문 검사).
 
 # P2 §2.2: pane 부트스트랩 — 셸 ready 폴링 + Enter-만 재전송 안전망.
 # 세 경로(워커/lead/리뷰어)에 동일한 흐름을 일원화.
@@ -422,35 +431,44 @@ wait_repl() {  # $1=pane target(pane_id), 최대 ~120s
 #   본 함수는 integration 수준 — Final probe (probe-cold-start-timing) 가 측정.
 # 본 함수는 4 책임 (shell ready 폴링, claude 송신, Enter 재시도, REPL 폴링) 통합.
 #   T5 후 회고적 정리에서 _send_worker_cmd / _boot_repl_ready 로 분해 검토.
-bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label
-  local pid="$1" wname="$2" cmd="$3" label="$4"
-  if [ "${AGENT_CMD:-claude}" = "claude" ]; then
-    if ! shell_ready_wait "$pid"; then
-      echo "경고: '$wname' pane shell_ready_wait timeout — claude 송신 skip" >&2
-      SKIPPED_PANES="${SKIPPED_PANES:-} $wname"
-      return 0   # 다른 pane 진행 (기존 동작 유지·set -e 충돌 회피).
-    fi
-    tmux send-keys -t "$pid" -l "export HARNESS_WORKER=$wname"
-    tmux send-keys -t "$pid" Enter
-    tmux send-keys -t "$pid" -l "cd \"$PROJECT_ROOT\" && $cmd"
-    tmux send-keys -t "$pid" Enter
-    # 2차: capture 검사 전 짧은 대기. claude 기동·trust 화면 출력 여유.
-    sleep "${BOOT_REPL_CHECK_DELAY:-5}"
-    # 3차: ASCII 한정 패턴 (POSIX ERE). 매치 실패면 Enter 만 1회 재전송.
-    # wait_repl 과 같은 신호 집합 (Welcome back 추가, Claude Code → Claude Code v[0-9] 로 strict).
-    if ! tmux capture-pane -p -S -200 -t "$pid" 2>/dev/null | \
-         grep -qE 'trust this folder|Yes, I trust|bypass permissions on|accept edits on|Claude Code v[0-9]|Welcome back'; then
-      tmux send-keys -t "$pid" Enter
-    fi
-    wait_repl "$pid" || echo "경고: $label '$wname' pane REPL 준비 실패(trust/기동 확인 필요)" >&2
-  else
+bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label $5=role $6=model $7=vendor(opt)
+  local pid="$1" wname="$2" cmd="$3" label="$4" role="${5:-}" model="${6:-}" vendor="${7:-}"
+  [ -n "$vendor" ] || vendor="${HARNESS_VENDOR:-claude}"
+  # _test 강제 규칙 (vendor_source 와 동일) — AGENT_CMD 가 claude 아닌 값이면 더미 경로.
+  if [ -n "${AGENT_CMD:-}" ] && [ "${AGENT_CMD}" != "claude" ]; then vendor="_test"; fi
+  if [ "$vendor" = "_test" ]; then
     # 더미(cat) 경로: shell_ready_wait skip (claude PATH 부재 → 무의미 timeout 회피).
     tmux send-keys -t "$pid" -l "export HARNESS_WORKER=$wname"
     tmux send-keys -t "$pid" Enter
     tmux send-keys -t "$pid" -l "cd \"$PROJECT_ROOT\" && $cmd"
     tmux send-keys -t "$pid" Enter
     sleep 0.2
+    return 0
   fi
+  # CLI 바이너리 존재 검증 — 벤더별(claude→claude, codex→codex). codex 워커가 claude PATH
+  #   부재 환경에서도 부트되도록 벤더명을 cli_bin 으로 넘긴다(=현재 벤더명이 곧 바이너리명).
+  if ! shell_ready_wait "$pid" "" "$vendor"; then
+    echo "경고: '$wname' pane shell_ready_wait timeout($vendor CLI 부재?) — 송신 skip" >&2
+    SKIPPED_PANES="${SKIPPED_PANES:-} $wname"
+    return 0   # 다른 pane 진행 (기존 동작 유지·set -e 충돌 회피).
+  fi
+  tmux send-keys -t "$pid" -l "export HARNESS_WORKER=$wname"
+  tmux send-keys -t "$pid" Enter
+  # 셸 splash 미주입 — attach 첫 화면은 client-attached 훅의 display-popup 이 담당
+  # (셸 splash 는 claude 출력에 scrollback 으로 밀려 첫 화면 보존 실패 → popup 으로 이전).
+  tmux send-keys -t "$pid" -l "cd \"$PROJECT_ROOT\" && $cmd"
+  tmux send-keys -t "$pid" Enter
+  # 2차: capture 검사 전 짧은 대기. CLI 기동·trust 화면 출력 여유.
+  sleep "${BOOT_REPL_CHECK_DELAY:-5}"
+  # 3차: Enter-만 재전송 안전망. claude 전용 화면 패턴이므로 claude 벤더에서만 검사
+  #   (codex 의 trust/ready 는 vendor_wait_ready 가 담당 — 벤더별 화면 문자열 분리).
+  if [ "$vendor" = "claude" ] && ! tmux capture-pane -p -S -200 -t "$pid" 2>/dev/null | \
+       grep -qE 'trust this folder|Yes, I trust|bypass permissions on|accept edits on|Claude Code v[0-9]|Welcome back'; then
+    tmux send-keys -t "$pid" Enter
+  fi
+  # 4차: REPL ready 폴링 — 벤더 어댑터 위임 (claude 는 vendor_wait_ready = 기존 wait_repl).
+  vendor_source "$vendor" || { echo "경고: $label '$wname' 벤더 source 실패" >&2; return 0; }
+  vendor_wait_ready "$pid" || echo "경고: $label '$wname' pane REPL 준비 실패(trust/기동 확인 필요)" >&2
   return 0
 }
 
@@ -477,21 +495,28 @@ for entry in "${WORKERS[@]}"; do
 
   tgt="${WORKER_PIDS[$i]}"
   # 4차 P0: 워커 역할 → settings 사본 *항상* 도출 (AGENT_CMD 무관 — 테스트 가능성).
-  # --settings 인자만 claude 분기에 추가 — cat/dummy 는 인자 의미 없음.
-  cmd="$(agent_cmd_for "$ENTRY_MODEL")"
   settings_path=""
-  if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE" "$ENTRY_NAME")"; then
-    echo "오류: '$ENTRY_NAME' settings 생성 실패 — 부트 skip" >&2
-    SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"
-    i=$((i + 1))
-    continue
-  fi
+  # settings 생성을 벤더에 위임 (claude=generate_worker_settings, codex=config.toml+hooks.json).
+  # gen_settings 실패 시 워커 가동 거부(fail-safe).
+  if ! vendor_source "${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
+    echo "오류: '$ENTRY_NAME' 벤더 source 실패 — 부트 skip" >&2
+    SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; i=$((i + 1)); continue; fi
+  if ! settings_path="$(vendor_gen_settings "$ENTRY_ROLE" "$ENTRY_NAME")"; then
+    echo "오류: '$ENTRY_NAME' settings 생성 실패(fail-safe) — 부트 skip" >&2
+    SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; i=$((i + 1)); continue; fi
   # 6차: 세션 ID 를 우리가 지정 → jsonl 파일명이 이 uuid 로 결정 (디버그 추적성). 데몬 discovery 폐기로 경로 계산은 불필요.
   worker_sid="$(uuidgen | tr 'A-Z' 'a-z')"
-  if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-    cmd="$cmd --settings \"$settings_path\" --session-id $worker_sid"
+  # 모델 미지정(3필드 벤더·4필드 빈모델) → 해석된 벤더의 역할 기본 모델로 폴백.
+  if [ -z "$ENTRY_MODEL" ]; then
+    vendor_source "${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null \
+      && ENTRY_MODEL="$(vendor_default_model "$ENTRY_ROLE")"
+    [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
   fi
-  bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커"
+  cmd="$(agent_cmd_for "$ENTRY_MODEL" "$settings_path" "$worker_sid" "" "${ENTRY_VENDOR:-}")" || {
+    echo "오류: '$ENTRY_NAME' 벤더 명령 조립 실패 — 부트 skip" >&2
+    SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; i=$((i + 1)); continue; }
+  bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커" "$ENTRY_ROLE" "$ENTRY_MODEL" "${ENTRY_VENDOR:-}"
+  splash_append_member "$ENTRY_NAME" "$ENTRY_ROLE" "$ENTRY_MODEL"
   send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
@@ -532,23 +557,30 @@ if [ "${#PLAN_FILES[@]}" -gt 0 ]; then
     done; } > "$PLAN_BOOT_FILE"
 fi
 
-# 5차: LEAD 도 generate_worker_settings 로 settings 생성 (lead 템플릿 적용, F40).
-lead_cmd="$(agent_cmd_for "${LEAD_MODEL:-opus}")"
+# 5차: LEAD 도 settings 생성 (lead 템플릿 적용, F40). 벤더 위임(claude/codex).
 settings_path=""
-if ! settings_path="$(generate_worker_settings "LEAD" "LEAD")"; then
-  echo "오류: LEAD settings 생성 실패 — 부트 중단" >&2
+if ! vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
+  echo "오류: LEAD 벤더 source 실패 — 부트 중단" >&2
   exit 1
 fi
+if ! settings_path="$(vendor_gen_settings "LEAD" "LEAD")"; then
+  echo "오류: LEAD settings 생성 실패(fail-safe) — 부트 중단" >&2
+  exit 1
+fi
+# 11차: plan 주입(--append-system-prompt-file)은 vendor_boot_cmd 가 처리 — claude 어댑터 내부 suffix.
 lead_sid="$(uuidgen | tr 'A-Z' 'a-z')"
-if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-  lead_cmd="$lead_cmd --settings \"$settings_path\" --session-id $lead_sid"
+# LEAD 모델 미지정 → LEAD_VENDOR(미설정 시 HARNESS_VENDOR)의 lead 기본 모델로 폴백.
+# splash/pane title 표기와 실제 boot 모델 일치를 위해 EFF 변수로 일원화.
+LEAD_MODEL_EFF="${LEAD_MODEL:-}"
+if [ -z "$LEAD_MODEL_EFF" ]; then
+  vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null \
+    && LEAD_MODEL_EFF="$(vendor_default_model lead)"
+  [ -n "$LEAD_MODEL_EFF" ] || LEAD_MODEL_EFF="opus"
 fi
-# 11차: plan 주입은 settings 와 독립 관심사 — 별도 블록으로 분리(결합도 제거).
-# claude 분기에서만(cat 더미는 cmd 에 안 붙음, 합본 생성은 위에서 이미 AGENT_CMD 무관).
-if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$PLAN_BOOT_FILE" ]; then
-  lead_cmd="$lead_cmd --append-system-prompt-file \"$PLAN_BOOT_FILE\""
-fi
-bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD"
+lead_cmd="$(agent_cmd_for "$LEAD_MODEL_EFF" "$settings_path" "$lead_sid" "$PLAN_BOOT_FILE" "${LEAD_VENDOR:-}")" || {
+  echo "오류: LEAD 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
+bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD" "" "$LEAD_MODEL_EFF" "${LEAD_VENDOR:-}"
+splash_append_member "LEAD" "" "$LEAD_MODEL_EFF"
 # plan 주입 시 lead 부트 입력은 "확정 plan 즉시 진행" 으로 분기 — lead.md ⓑ 자동 착수 트리거를
 # 부트 입력이 부정하던 결함 해결(13차 D 실험 발견). 워커·reviewer 는 대기형 유지.
 if [ -n "$PLAN_BOOT_FILE" ]; then
@@ -570,17 +602,27 @@ if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$pbf"; then
   echo "오류: $pbf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$pbf" | sort -u | tr '\n' ' ')" >&2
   exit 1
 fi
-pm_cmd="$(agent_cmd_for "${PM_MODEL:-sonnet}")"
 settings_path=""
-if ! settings_path="$(generate_worker_settings "pm" "PM")"; then
-  echo "오류: PM settings 생성 실패 — 부트 중단" >&2
+if ! vendor_source "${PM_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
+  echo "오류: PM 벤더 source 실패 — 부트 중단" >&2
+  exit 1
+fi
+if ! settings_path="$(vendor_gen_settings "pm" "PM")"; then
+  echo "오류: PM settings 생성 실패(fail-safe) — 부트 중단" >&2
   exit 1
 fi
 pm_sid="$(uuidgen | tr 'A-Z' 'a-z')"
-if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-  pm_cmd="$pm_cmd --settings \"$settings_path\" --session-id $pm_sid"
+# PM 모델 미지정 → PM_VENDOR(미설정 시 HARNESS_VENDOR)의 pm 기본 모델로 폴백.
+PM_MODEL_EFF="${PM_MODEL:-}"
+if [ -z "$PM_MODEL_EFF" ]; then
+  vendor_source "${PM_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null \
+    && PM_MODEL_EFF="$(vendor_default_model pm)"
+  [ -n "$PM_MODEL_EFF" ] || PM_MODEL_EFF="sonnet"
 fi
-bootstrap_pane "$PM_PID" "PM" "$pm_cmd" "PM"
+pm_cmd="$(agent_cmd_for "$PM_MODEL_EFF" "$settings_path" "$pm_sid" "" "${PM_VENDOR:-}")" || {
+  echo "오류: PM 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
+bootstrap_pane "$PM_PID" "PM" "$pm_cmd" "PM" "" "$PM_MODEL_EFF" "${PM_VENDOR:-}"
+splash_append_member "PM" "" "$PM_MODEL_EFF"
 send_prompt "$PM_PID" "$pbf 를 읽고 그 규약을 그대로 따르라. 사용자와 대화할 준비를 하라."
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
@@ -605,19 +647,25 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     fi
     rtgt="${REV_PIDS[$j]}"
     # 4차 P0: 리뷰어 역할 (reviewer-quality·reviewer-arch·reviewer-spec) → reviewer 템플릿.
-    rev_cmd="$(agent_cmd_for "$ENTRY_MODEL")"
     settings_path=""
-    if ! settings_path="$(generate_worker_settings "$ENTRY_ROLE" "$ENTRY_NAME")"; then
-      echo "오류: 리뷰어 '$ENTRY_NAME' settings 생성 실패 — 부트 skip" >&2
-      SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"
-      j=$((j + 1))
-      continue
-    fi
+    if ! vendor_source "${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
+      echo "오류: 리뷰어 '$ENTRY_NAME' 벤더 source 실패 — 부트 skip" >&2
+      SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; j=$((j + 1)); continue; fi
+    if ! settings_path="$(vendor_gen_settings "$ENTRY_ROLE" "$ENTRY_NAME")"; then
+      echo "오류: 리뷰어 '$ENTRY_NAME' settings 생성 실패(fail-safe) — 부트 skip" >&2
+      SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; j=$((j + 1)); continue; fi
     rev_sid="$(uuidgen | tr 'A-Z' 'a-z')"
-    if [ "${AGENT_CMD:-claude}" = "claude" ] && [ -n "$settings_path" ]; then
-      rev_cmd="$rev_cmd --settings \"$settings_path\" --session-id $rev_sid"
+    # 모델 미지정 → 해석된 벤더의 역할 기본 모델로 폴백 (claude reviewer-* → opus).
+    if [ -z "$ENTRY_MODEL" ]; then
+      vendor_source "${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null \
+        && ENTRY_MODEL="$(vendor_default_model "$ENTRY_ROLE")"
+      [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
     fi
-    bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어"
+    rev_cmd="$(agent_cmd_for "$ENTRY_MODEL" "$settings_path" "$rev_sid" "" "${ENTRY_VENDOR:-}")" || {
+      echo "오류: 리뷰어 '$ENTRY_NAME' 벤더 명령 조립 실패 — 부트 skip" >&2
+      SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; j=$((j + 1)); continue; }
+    bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어" "$ENTRY_ROLE" "$ENTRY_MODEL" "${ENTRY_VENDOR:-}"
+    splash_append_member "$ENTRY_NAME" "$ENTRY_ROLE" "$ENTRY_MODEL"
     send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
     j=$((j + 1))
   done
@@ -647,6 +695,25 @@ fi
 # watcher 기동: pane 에 env 세팅 후 watcher.sh 실행 명령 주입.
 tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION LEAD_PANE=$LEAD_PID REVIEWER_PANES=\"$_rev_panes\" REVIEW_MANAGER_PANE=\"${REVIEW_MANAGER_PANE:-}\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
 tmux send-keys -t "$WATCHER_PANE" Enter
+
+# 14차 UX: 첫 attach 시 항상 team(LEAD+PM) 윈도우로 접속 ('window 0=LEAD+PM' 확정과 정합).
+# watcher split(-d, focus 미이동) 후라 review/workers 가 active 로 남는 문제 해소.
+# window 0 은 fix_session_indexing 으로 base-index 무관히 0 고정 → $SESSION:0 안전.
+tmux select-window -t "$SESSION:0"
+# attach 첫 화면 splash — client-attached 훅이 attach 시 display-popup(모달)을 띄운다.
+#
+# ⚠️ 훅 값에 display-popup 을 *직접* 넣으면 안 된다(조용히 무시됨). 훅 컨텍스트의
+#    display-popup 은 attach 중인 클라이언트를 타깃으로 잡지 못한다(실측: 훅은 발화하나
+#    popup 안 뜸). run-shell 로 감싸 그 안에서 별도 `tmux display-popup` 을 호출하면
+#    attach 클라이언트를 정상 타깃팅한다 — 첫 가동·재attach 모두 이 한 경로로 커버.
+# -t $SESSION: awa 세션에만 설치(사용자 다른 세션 무영향). -E: awa-splash.sh 종료 시 자동 닫힘.
+# -b rounded: 둥근 테두리. -w 100% -h 100%: 뒤 claude 화면을 가리는 전체 모달.
+#   (하드웨어 커서는 awa-splash.sh 가 \033[?25l 로 숨긴다 — popup 크기로는 못 가림.)
+# -e AWA_SPLASH_TEAM_FILE: 팀 요약 파일 경로를 popup 환경변수로 명시 전달(별도 프로세스
+#   트리라 var 상속 안 됨). $SPLASH_TEAM_FILE 는 $HOME 해소된 절대경로·공백 없음.
+# || true: splash 는 보조 기능 — set -e 하에서 set-hook 비정상 반환이 부팅을 죽이지 않게.
+SPLASH_POPUP="run-shell 'tmux display-popup -E -b rounded -w 100% -h 100% -e AWA_SPLASH_TEAM_FILE=$SPLASH_TEAM_FILE \"$HARNESS_ROOT/bin/awa-splash.sh\"'"
+tmux set-hook -t "$SESSION" client-attached "$SPLASH_POPUP" || true
 
 echo "팀 '$PROFILE' 가동 완료. 세션='$SESSION', 워커=${#WORKERS[@]}개."
 echo "attach: tmux attach -t $SESSION"

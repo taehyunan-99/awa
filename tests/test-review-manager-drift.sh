@@ -23,7 +23,8 @@ done
 assert_eq "1" "$ok" "L1 reviewer 4건 plan_alignment 출력 계약"
 
 # Layer 1: profiles/feature-team.sh review-manager 등록
-grep -q 'review-mgr:review-manager:opus' "$ROOT/profiles/feature-team.sh"
+# 모델 접미사(:opus)는 제거됨 — vendor_default_model(claude review-manager→opus) 폴백 위임.
+grep -qE 'review-mgr:review-manager(:|")' "$ROOT/profiles/feature-team.sh"
 assert_success "$?" "L1 profiles review-manager pane 등록"
 
 # Layer 1: watcher.sh drift-check 트리거 + lib.sh worker_turn_count 함수

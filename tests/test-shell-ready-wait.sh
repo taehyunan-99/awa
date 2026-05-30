@@ -56,6 +56,27 @@ SHELL_READY_TIMEOUT=0 shell_ready_wait "$PID0"
 rc=$?
 assert_eq "1" "$rc" "timeout=0 → 즉시 return 1"
 
+# T2.4: cli_bin 인자 벤더화 — $3 으로 검증 바이너리명 지정(codex 워커가 claude PATH 없어도 부트).
+#   fake codex 만 PATH 에 두고 claude 는 없게 함 → claude 검증은 실패, codex 검증은 통과.
+cat > "$FAKE_BIN/codex" <<'EOF'
+#!/bin/sh
+echo "fake codex"
+EOF
+chmod +x "$FAKE_BIN/codex"
+tmux send-keys -t "$PID0" "export PATH=\"$FAKE_BIN:/usr/bin:/bin\"" Enter
+sleep 0.5
+rm -f "$FAKE_BIN/claude"   # claude 만 제거 — codex 만 남김(벤더 분리 검증)
+
+# 기본($3 미지정=claude) → claude 부재라 timeout(역호환 기본이 claude 임을 증명).
+SHELL_READY_TIMEOUT=1 shell_ready_wait "$PID0"
+assert_eq "1" "$?" "T2.4a cli_bin 기본=claude → claude 부재 시 timeout"
+# $3=codex → codex 존재라 통과(벤더별 바이너리 검증).
+if shell_ready_wait "$PID0" 5 codex; then
+  assert_eq "0" "0" "T2.4b cli_bin=codex → codex 존재 시 통과"
+else
+  assert_eq "0" "1" "T2.4b cli_bin=codex → codex 존재 시 통과 (실패)"
+fi
+
 rm -rf "$FAKE_BIN"
 
 test_summary

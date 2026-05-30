@@ -154,6 +154,27 @@ resolve_role_file() {  # $1=prompts_dir $2=role → echo 경로, rc 0/1
   printf '%s\n' "$matches"
 }
 
+# 벤더 화이트리스트 = bin/vendors/<v>.sh 존재 여부. $1=vendor → rc 0/1.
+is_known_vendor() {
+  local v="$1"
+  [ -n "$v" ] && [ -f "$HARNESS_ROOT/bin/vendors/${v}.sh" ]
+}
+
+# 벤더 어댑터 source. $1=vendor → 5함수 로드. 실패 시 rc 1.
+# _test 강제 규칙: AGENT_CMD 가 claude 아닌 값이면 _test 어댑터 우선(역호환).
+vendor_source() {
+  local v="$1"
+  if [ -n "${AGENT_CMD:-}" ] && [ "${AGENT_CMD}" != "claude" ]; then
+    v="_test"
+  fi
+  if ! is_known_vendor "$v" && [ "$v" != "_test" ]; then
+    echo "오류: 미지원 벤더 '$v' (bin/vendors/${v}.sh 없음)" >&2
+    return 1
+  fi
+  # shellcheck disable=SC1090
+  . "$HARNESS_ROOT/bin/vendors/${v}.sh"
+}
+
 # 워커 역할 → settings 사본 산출 (5차: 2 인자).
 # $1=entry_role (settings 파일명 결정: dev/test/reviewer-*/lead/...) → echo path
 # $2=entry_name (settings 의 {{ENTRY_NAME}} 토큰 치환값 — WORKER env 통일, F22 옵션 A)
@@ -357,17 +378,20 @@ _normalize_project() {  # $1=raw → stdout=절대경로
 # claude PATH 존재까지 확인해 PATH 갱신 지연 케이스도 잡음.
 # return 0 = ready, return 1 = timeout.
 # P2 spec §2.1.
-shell_ready_wait() {  # $1=pane_id  $2=timeout_sec(기본 SHELL_READY_TIMEOUT 또는 15)
+shell_ready_wait() {  # $1=pane_id  $2=timeout_sec(기본 SHELL_READY_TIMEOUT 또는 15)  $3=cli_bin(기본 claude)
   local pid="$1"
   local timeout="${2:-${SHELL_READY_TIMEOUT:-15}}"
+  # $3 = 검증할 CLI 바이너리명 — 벤더화(claude/codex). 빈값이면 claude(역호환 기본).
+  #   codex 워커는 claude PATH 부재 환경에서도 부트돼야 하므로 bootstrap_pane 이 벤더별 bin 을 넘긴다.
+  local cli_bin="${3:-claude}"
   # sentinel salt 는 부모 셸 (lib.sh source 한 셸) 의 $$/$RANDOM 으로 expand — pane 셸에선 추가 expand 없음.
   # split 형태 "__SHRDY"${salt}"_DONE__" 는 명령 라인 echo 와 실제 출력의 grep 매치 분리 효과 (위양성 차단).
   local salt="$$_$RANDOM"
   local sentinel="__SHRDY${salt}_DONE__"
-  # claude 존재 검증 + sentinel 출력.
+  # cli_bin 존재 검증 + sentinel 출력.
   # command -v, type, which 셋 중 하나라도 성공하면 OK (alias 환경 fallback).
   # sentinel 을 변수 concat 로 보내 명령 라인엔 prefix/suffix 가 분리된 채 보이게 함.
-  tmux send-keys -t "$pid" "( command -v claude || type claude || which claude ) >/dev/null 2>&1 && echo \"__SHRDY\"${salt}\"_DONE__\"" Enter
+  tmux send-keys -t "$pid" "( command -v $cli_bin || type $cli_bin || which $cli_bin ) >/dev/null 2>&1 && echo \"__SHRDY\"${salt}\"_DONE__\"" Enter
   local max_iter=$((timeout * 5))   # 0.2s * 5 = 1s 단위.
   local i=0
   while [ "$i" -lt "$max_iter" ]; do

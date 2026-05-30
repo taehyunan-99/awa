@@ -13,8 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
 
-# wait_repl 의 ready/negative 패턴 (awa-up.sh:218,222 와 동일 — 단일 진실원).
-# 변경 시 awa-up.sh 와 동시 갱신 필요.
+# vendor_wait_ready 의 ready/negative 패턴 (bin/vendors/claude.sh 와 동일 — 단일 진실원).
+# 변경 시 claude.sh 와 동시 갱신 필요. (ready 폴링은 wait_repl → vendor_wait_ready 로 이관됨.)
 READY_PAT='Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'
 NEG_PAT='Error:|Could not authenticate|not logged in|failed to start'
 
@@ -62,17 +62,19 @@ EOF
 printf '%s' "$LEAD_FIXTURE" | grep -qE "$READY_PAT"
 assert_success "$?" "T4: 실제 final 캡처 (lead) ready 매치"
 
-# T5: awa-up.sh 안 wait_repl 함수에 옛 단일 패턴 잔존 없음 (회귀 가드).
+# T5-T7: 운영 ready 폴링 경로 = bin/vendors/claude.sh:vendor_wait_ready (wait_repl 이관처).
+# 회귀 가드가 실제 운영 함수를 겨냥하도록 vendor_wait_ready 본문을 검사한다.
+# T5: vendor_wait_ready 에 옛 단일 패턴 잔존 없음 (회귀 가드).
 # 'grep -q' (옵션 q 만, E 없음) + 'bypass permissions on' 단일 조합이 없어야 함.
-WAIT_REPL_BODY="$(awk '/^wait_repl\(\)/,/^}/' "$HARNESS_ROOT/bin/awa-up.sh")"
+WAIT_REPL_BODY="$(awk '/^vendor_wait_ready\(\)/,/^}/' "$HARNESS_ROOT/bin/vendors/claude.sh")"
 printf '%s' "$WAIT_REPL_BODY" | grep -E "grep -q 'bypass permissions on'$"
-assert_fail "$?" "T5: wait_repl 안 옛 단일 패턴 잔존 없음"
+assert_fail "$?" "T5: vendor_wait_ready 안 옛 단일 패턴 잔존 없음"
 
-# T6: 새 ready 다중 OR 패턴이 wait_repl 안에 있음.
+# T6: 새 ready 다중 OR 패턴이 vendor_wait_ready 안에 있음.
 printf '%s' "$WAIT_REPL_BODY" | grep -qE "Claude Code v\\[0-9\\].*Welcome back|Welcome back.*Claude Code v\\[0-9\\]"
 assert_success "$?" "T6: 새 ready 다중 패턴 존재"
 
-# T7: negative 패턴이 wait_repl 안에 있음.
+# T7: negative 패턴이 vendor_wait_ready 안에 있음.
 printf '%s' "$WAIT_REPL_BODY" | grep -qE 'Could not authenticate|not logged in'
 assert_success "$?" "T7: negative 패턴 존재"
 
