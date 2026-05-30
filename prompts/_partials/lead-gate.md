@@ -14,12 +14,8 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
   printf '%s' "<decision>" > .agent-harness/state/pending-asks/<uuid>.response.tmp
   mv .agent-harness/state/pending-asks/<uuid>.response.tmp .agent-harness/state/pending-asks/<uuid>.response
   ```
-- hook 깨우기 — 채널은 .json 의 `channel` 필드(워커 고정명):
-  ```
-  ch="$(jq -r .channel .agent-harness/state/pending-asks/<uuid>.json)"
-  tmux wait-for -S "$ch"
-  ```
-  > stale woken 은 wake-gating 으로 막지 않는다. `.response` 단일 방어선이 자가치유로 흡수(resp 없으면 hook 이 deny 판정). 거짓 allow 0, 회색명령에 최대 1회 거짓 deny → 워커 재폴링으로 정상화. timeout 시 -S 안 보냄(.json 만 정리).
+- hook 깨우기 **불필요**(P11 탈-tmux): `.response` 를 atomic 작성하면 hook 이 그 파일 출현을 직접 폴링해 즉시 판정한다. lead 는 tmux 를 건드리지 마라(격리 경계 안 — tmux 소켓 접근 차단 가능). timeout 으로 처리 불가한 항목은 `.json` 만 정리하면 hook 이 응답없음→deny 로 자가치유.
+  > `.response` 단일 방어선: 파일 있으면 그 결정, 없으면 hook 이 deny. 거짓 allow 0. tmux 채널 자체를 안 쓰므로 채널 누수·stale woken 문제도 소멸.
 
 ### 2단계. state/incidents/ 처리 (danger 자동거부 사후 보고)
 `ls .agent-harness/state/incidents/*.json` + `jq '.notified==false'`. 각 항목:

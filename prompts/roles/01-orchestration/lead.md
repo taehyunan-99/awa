@@ -37,8 +37,7 @@
 
 ## ⓓ @gate → 권한 게이트
 `@gate:` 시, 부트 합본 하단 **권한 게이트 처리 절차**(pending-asks·incidents·removal-requests 3단계)를 pending-asks 전수로 1회 실행.
-- 응답은 `approve-permanent:command-group`(권장)·`approve-permanent:exact`·`approve-permanent:tool`·`approve-once`·`deny` 중 하나를 `.response` 로 atomic 기록.
-- hook 깨우기 채널은 각 `.json` 의 `.channel` 필드(워커 고정명)를 읽어 `tmux wait-for -S "$ch"` 한 번. timeout 항목은 -S 생략하고 `.json` 만 정리.
+- 응답은 `approve-permanent:command-group`(권장)·`approve-permanent:exact`·`approve-permanent:tool`·`approve-once`·`deny` 중 하나를 `.response` 로 atomic 기록(tmp→mv). **이게 전부다** — hook 이 `.response` 출현을 폴링하므로 tmux 로 깨울 필요 없다(너는 격리 경계 안이라 tmux 직접 실행 금지). timeout 으로 처리 불가한 항목은 `.json` 만 정리.
 
 ## ⓔ 개입·escalation·rm 위임
 - **개입 독점**: VIOLATION(severity=high) 시 워커 pane 에 중단/수정 send-keys. 개입은 너만(리뷰어는 보고만).

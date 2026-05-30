@@ -102,8 +102,10 @@ if [ -n "$PJSON" ]; then
   PA="$PROBE_DIR/.agent-harness/state/pending-asks"
   printf 'approve-once' > "$PA/${GUUID}.response.tmp"
   mv "$PA/${GUUID}.response.tmp" "$PA/${GUUID}.response"   # atomic
-  tmux wait-for -S "$GCHAN"   # lead 가 channel 필드로 wake
-  sleep 6
+  # P11 탈-tmux: lead 가 tmux 로 hook 을 깨우지 않는다. hook 이 .response 출현을 폴링(1s 간격)
+  #   하므로 atomic write 만으로 충분. wait-for -S 제거(GCHAN 은 로그 추적용으로만 jq 추출).
+  : "${GCHAN:?}"   # 채널 필드 존재 검증(추적성)만 — wake 용도 아님
+  sleep 6   # 폴링 1s + hook 처리 + 워커 재개 여유
   out2="$(tmux capture-pane -t "$SES" -p)"
   echo "$out2" | grep -qi 'permission required\|allow this' && echo "  (E3 아직 권한대기? 화면 확인)" || chk yes yes "E3 approve 후 워커 진행"
 fi

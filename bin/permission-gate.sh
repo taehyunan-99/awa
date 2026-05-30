@@ -140,20 +140,25 @@ gate_gray() {
   local resp="${STATE_DIR}/pending-asks/${uuid}.response"
   queue_pending_ask "$uuid" "$WORKER" "$ENTRY_ROLE" "$tool" "$input" "$$" "$tuid" "$channel"
   notify_gray_log "$uuid" "$tool"
-  # wait-for 블로킹 (서버 부재면 즉시 rc=0). run_with_timeout 무응답 상한
-  #   (macOS timeout 부재 → lib.sh 의 SIGKILL 폴백, Task 0). 결과 rc 무시 — .response 로만 판정.
-  # ★ stale woken 안전 (4차 리뷰 — .response 단일 방어선이 자가치유로 흡수): 워커 고정 채널
-  #   재사용 시 "이전 라운드 죽은 hook 에 -S → woken 잔존 → 이번 wait 즉시반환" 이 생길 수
-  #   있으나, 즉시 깬 hook 도 아래 `.response` 존재 검증을 거치므로 resp 없으면 deny → 거짓
-  #   allow 0, 회색명령 1회 거짓 deny 만(워커 재시도로 자가치유). stale 은 cmd_wait_for_remove
-  #   로 1회만 소비(실측) → 다음 wait 정상 블로킹. 3차의 lead `kill -0` wake-gating 은 race 를
-  #   못 막으면서(hook 셸 스폰~wait enqueue 사이 틈) 불필요 → 제거. hook 은 단순 유지.
-  # GATE_SKIP_WAIT=1 (단위 테스트 전용): 실제 tmux wait-for 호출을 건너뛴다. 단위 테스트가
-  #   외부 tmux 서버 상태에 의존하지 않도록 격리 — 서버가 있으면 대기자 없는 채널에 진짜
-  #   블로킹돼 hang, 채널 woken 잔존에 따라 비결정적(실측 확인)이기 때문. 테스트는 .response 를
-  #   미리 깔고 이 분기로 곧장 검증 로직(아래)만 본다. 실제 wait-for 블로킹 경로는 probe 가 커버.
-  [ "${GATE_SKIP_WAIT:-0}" = "1" ] || run_with_timeout "$poll_max" tmux wait-for "$channel" >/dev/null 2>&1 || true
-  # ★ 단일 방어선: .response 존재만이 allow 근거 (서버부재·서버사망·timeout 모두 파일 없음).
+  # ★ .response 파일 폴링 (P11 탈-tmux 2026-05-31): 기존엔 `tmux wait-for "$channel"`
+  #   1회 블로킹으로 lead 의 -S 깨움을 기다렸다. 그러나 hook 은 워커 프로세스 안에서 돌고,
+  #   codex sandbox(seatbelt network deny)에선 tmux 소켓 connect 가 즉시 실패(rc≠0, 10ms)
+  #   → wait-for 가 응답 전에 빠져나가 .response 없음 → 거짓 deny 양산(회색명령 사실상 전부
+  #   차단). 해소: tmux 의존 제거하고 .response 파일이 나타날 때까지 폴링. lead 는 .response
+  #   를 atomic write 만 하면 되고 -S 로 깨울 필요 없음(hook 이 능동 폴링). claude(비-sandbox)도
+  #   동일 경로 — wait-for 즉시 wake 대비 최대 1s 지연만 추가(허용). 채널 누수·stale woken
+  #   문제도 동반 소멸(tmux 채널 자체를 안 씀).
+  # GATE_SKIP_WAIT=1 (단위 테스트 전용): 폴링 없이 곧장 .response 검증 로직만 본다(테스트가
+  #   .response 를 미리 깔아둠). 실제 폴링 경로는 probe/통합 테스트가 커버.
+  if [ "${GATE_SKIP_WAIT:-0}" != "1" ]; then
+    local _i
+    for _i in $(seq 1 "$poll_max"); do
+      [ -f "$resp" ] && break
+      # hook 자신이 살아있는 한 폴링. lead 가 응답 쓰면 즉시 종료. 1s 간격(watcher 폴링과 정합).
+      sleep 1
+    done
+  fi
+  # ★ 단일 방어선: .response 존재만이 allow 근거 (응답없음·timeout 모두 파일 없음).
   if [ ! -f "$resp" ]; then
     cleanup_pending "$uuid"
     log_safe "[$(timestamp)] ${WORKER} gate DENY (응답없음) uuid=${uuid} ch=${channel}"

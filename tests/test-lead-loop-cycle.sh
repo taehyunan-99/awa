@@ -13,9 +13,10 @@ assert_contains "$content" "incidents" "2단계 incidents"
 assert_contains "$content" "removal-requests" "3단계 removal-requests"
 assert_contains "$content" "AskUserQuestion" "사용자 위임"
 assert_contains "$content" "approve-permanent:command-group" "응답 형식"
-# 6차 wake 메커니즘 (워커 고정 채널 + 단순 -S, wake-gating 없음)
-assert_contains "$content" "wait-for -S" "hook wake (-S)"
-assert_contains "$content" ".channel" "워커 고정 채널 필드로 wake"
+# P11 탈-tmux wake: lead 는 tmux 로 hook 을 안 깨운다. .response atomic write 만 하면
+#   hook 이 .response 출현을 폴링해 자동 진행. lead tmux 직접호출 0(deny-bounded 정합).
+assert_contains "$content" ".response" "hook wake = .response 파일(폴링)"
+case "$content" in *"tmux wait-for -S"*) assert_eq 1 0 "lead 에 tmux wait-for -S 잔존(P11 위반)";; *) assert_eq 0 0 "lead tmux wait-for -S 제거 확인(P11)";; esac
 # reviewer 거버넌스 보존 (회귀 방지 — spec §3.4 결함 6)
 assert_contains "$content" "VIOLATION" "review VIOLATION 보존"
 
