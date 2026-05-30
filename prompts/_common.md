@@ -19,7 +19,7 @@
 
 ## 하네스 규약 (scope·events.log)
 
-- 배정된 `.agent-harness/tasks/<id>.md` 의 `allowed_paths` 안에서만 파일을 수정하라. `forbidden_paths` 는 절대 건드리지 마라. scope 밖 작업은 즉시 차단·재지시 대상이다.
+- 배정된 `.agent-harness/tasks/<id>.md` 의 `allowed_paths` 안에서만 파일을 수정하라. `forbidden_paths` 는 절대 건드리지 마라. scope 밖 작업은 즉시 차단·재지시 대상이다. *단, `.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state` 산출은 하니스 규약상 항상 허용 — forbidden 에 걸려도 이 경로 기록은 scope 위반이 아니다(리뷰도 VIOLATION 처리 마라).*
 - 파일을 수정하면 events.log 가 자동 기록된다(PostToolUse hook). 너는 별도 조치 불필요하나, hook 이 못 잡는 비-도구 변경을 했다면 `.agent-harness/events.log` 에 한 줄을 보조로 append 하라. 필드는 **탭 문자**로 구분한다(리터럴 `\t` 문자열이 아니라 실제 탭). 예: `printf '%s\t%s\t%s\tmodify\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" "<상대경로>" >> .agent-harness/events.log`
 - 작업 완료 시 `.agent-harness/results/<id>.md` 에 변경 요약을 쓰고, `.agent-harness/events.log` 에 done 라인을 기록한 뒤 `tmux wait-for -S done-{{SESSION}}-{{WORKER_NAME}}-<task>` 를 실행하라. done 라인 예: `printf '%s\t%s\t%s\tdone\t-\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" >> .agent-harness/events.log` (필드=탭, 5필드: ts/이름/task/action/필드5)
 - **필드5 의미는 action 별 분기** (C-1 정정 후):

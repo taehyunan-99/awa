@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/tests/assert.sh"
 TMPDIR_T="$(mktemp -d)"; trap 'rm -rf "$TMPDIR_T"' EXIT
 
-FUNCS="vendor_boot_cmd vendor_wait_ready vendor_gen_settings vendor_inject_role vendor_default_model"
+FUNCS="vendor_boot_cmd vendor_wait_ready vendor_gen_settings vendor_inject_role vendor_lead_plan_directive vendor_default_model"
 
 check_funcs() {  # $1=adapter_path
   ( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
@@ -25,6 +25,19 @@ assert_contains "$out" "--session-id abc-123" "A3c boot_cmd sid"
 out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
   . "$ROOT/bin/vendors/claude.sh"; vendor_boot_cmd "opus" "/tmp/s.json" "abc-123" "/tmp/plan.md" )"
 assert_contains "$out" "--append-system-prompt-file" "A4 boot_cmd plan 주입"
+
+# P10(2026-05-30): vendor_lead_plan_directive 벤더중립 — claude=빈값(plan 이 이미 시스템
+#   컨텍스트), codex=plan 경로 명시 Read 지시(--append-system-prompt-file 부재 보완, 결정적).
+out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
+  . "$ROOT/bin/vendors/claude.sh"; vendor_lead_plan_directive "/tmp/plan.md" )"
+assert_eq "" "$out" "A4b claude plan directive 빈값(시스템 컨텍스트 주입)"
+out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
+  . "$ROOT/bin/vendors/codex.sh"; vendor_lead_plan_directive "/tmp/x/.boot/plan.md" )"
+assert_contains "$out" "/tmp/x/.boot/plan.md" "A4c codex plan directive 경로 명시"
+assert_contains "$out" "Read" "A4d codex plan directive Read 지시"
+out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
+  . "$ROOT/bin/vendors/codex.sh"; vendor_lead_plan_directive "" )"
+assert_eq "" "$out" "A4e codex plan 빈값 → 빈 출력(plan 없으면 지시 없음)"
 
 out="$( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/vendors/claude.sh"
   printf '%s/%s/%s/%s' "$(vendor_default_model lead)" "$(vendor_default_model pm)" \

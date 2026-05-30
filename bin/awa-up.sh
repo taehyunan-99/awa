@@ -606,7 +606,10 @@ splash_append_member "LEAD" "" "$LEAD_MODEL_EFF"
 # plan 주입 시 lead 부트 입력은 "확정 plan 즉시 진행" 으로 분기 — lead.md ⓑ 자동 착수 트리거를
 # 부트 입력이 부정하던 결함 해결(13차 D 실험 발견). 워커·reviewer 는 대기형 유지.
 if [ -n "$PLAN_BOOT_FILE" ]; then
-  send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 시스템 컨텍스트에 주입된 확정 plan 을 ⓑ 절차(분해→배정 트리→AskUserQuestion 승인 게이트)로 즉시 진행하라."
+  # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
+  vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null || true
+  _plan_directive="$(vendor_lead_plan_directive "$PLAN_BOOT_FILE" 2>/dev/null || true)"
+  send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. ${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라."
 else
   send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
 fi

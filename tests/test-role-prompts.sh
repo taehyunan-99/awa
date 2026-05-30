@@ -10,6 +10,17 @@ lead_content="$(rf lead)"
 assert_contains "$lead_content" "단계" "lead 단계전이 금지 규약"
 assert_contains "$lead_content" ".harness-state" "lead harness-state 규약"
 assert_contains "$lead_content" "카탈로그" "lead 워커 카탈로그 사용"
+# P3(2026-05-30): forbidden_paths 불변식 — 워커 산출 경로(.agent-harness/results 등)를
+#   forbidden 에 넣지 마라(리뷰 VIOLATION 오탐 차단).
+assert_contains "$lead_content" "forbidden_paths 불변식" "lead P3 forbidden 산출경로 예외 규약"
+# P8(2026-05-30): 승인 게이트 벤더중립 — AskUserQuestion 부재(codex) 시 텍스트 폴백.
+assert_contains "$lead_content" "벤더중립" "lead P8 게이트 벤더중립 규약"
+assert_contains "$lead_content" "텍스트 응답을 대기" "lead P8 텍스트 폴백 명시"
+# P3 워커측·리뷰어측 예외 정합 (3곳 동시 갱신 보증).
+common_c="$(cat "$ROOT/prompts/_common.md")"
+assert_contains "$common_c" "산출은 하니스 규약상 항상 허용" "_common P3 워커측 산출 예외"
+revc_c="$(rf reviewer-common)"
+assert_contains "$revc_c" "scope VIOLATION 으로 판정하지 마라" "reviewer-common P3 오탐 차단"
 
 revl="$(rf reviewer-common)"
 assert_contains "$revl" "events.log" "reviewer 공통절차가 events.log 감시"

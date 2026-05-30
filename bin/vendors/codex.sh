@@ -106,9 +106,20 @@ TOML
 }
 
 # 역할 주입. codex 는 AGENTS.md(레포 루트) 자동 로드 → no-op.
-# ★ 확정 plan 주입(claude --append-system-prompt-file 등가)은 이번 사이클 연기(§4 비목표).
 # $1=pane_id $2=boot_file
 vendor_inject_role() { :; }
+
+# LEAD 부트 입력에 덧붙일 plan 지시문 (P10 수정 2026-05-30). codex CLI 엔
+# --append-system-prompt-file 이 없어(─ [PROMPT] 위치인자+config+AGENTS.md 자동로드만)
+# plan 을 시스템 컨텍스트로 못 받는다 → LEAD 가 plan 을 능동 탐색해야 하나 비결정적이었음
+# (첫 부트는 rg 로 찾아 성공, 재부트는 헤더 못 찾아 BLOCKED). 해소: plan 파일 절대경로를
+# 부트 입력에 명시해 LEAD 가 반드시 Read 하게 → 결정적. plan 없으면 빈 출력.
+# $1=plan_file → echo directive.
+vendor_lead_plan_directive() {
+  local plan="${1:-}"
+  [ -n "$plan" ] || return 0
+  printf '확정 plan 파일 `%s` 를 먼저 Read 로 읽어라 — 그 내용이 이번 가동의 확정 plan 이다(시스템 컨텍스트엔 없으니 반드시 직접 읽어라). ' "$plan"
+}
 
 # 역할별 기본 모델 — codex 는 모델명 고정(gpt-5.5), 급 차이는 effort 로(gen_settings).
 # 미지정 시 codex 기본은 gpt-5.4 → gpt-5.5 명시. effort 매핑은 vendor_gen_settings 담당.

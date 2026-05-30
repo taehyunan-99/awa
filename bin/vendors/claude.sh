@@ -49,6 +49,11 @@ vendor_gen_settings() {
 # $1=pane_id $2=boot_file
 vendor_inject_role() { :; }
 
+# LEAD 부트 입력에 덧붙일 plan 지시문. claude 는 plan 이 이미 시스템 컨텍스트에
+# 주입(--append-system-prompt-file)되어 LEAD 가 능동 탐색 불필요 → 빈 문자열.
+# $1=plan_file → echo directive(없으면 빈 출력).
+vendor_lead_plan_directive() { :; }
+
 # 역할별 기본 모델. $1=role → echo model (claude CLI alias = 항상 최신 버전).
 # 품질 우선: haiku 미사용. lead·reviewer 는 최고 모델 opus, 그 외 sonnet.
 vendor_default_model() {
