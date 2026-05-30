@@ -25,6 +25,20 @@ resolve_project_root() {
 }
 
 PROJECT_ROOT="$(resolve_project_root)"
+
+# ★ 재발 방지 가드(B): PROJECT_ROOT 가 하네스 본체로 잡혔는지 *플래그만* 기록.
+#   cwd=awa 에서 일회용 스크립트가 `export PROJECT_ROOT=$(mktemp -d)` 로 격리를 의도해도,
+#   이 파일이 source 시 무조건 resolve_project_root 로 재계산해 본체를 잡는다
+#   (2026-05-30 디렉토리 소실 근본원인 — 그 상태의 `rm -rf "$PROJECT_ROOT"` 가 본체 삭제).
+#   여기서 echo 로 경고하면 awa-main.sh 등 정상 resolve-path 경로의 stdout/stderr 를
+#   오염시켜 회귀를 깬다(M8/M3b 실측). → 출력 없는 플래그만 두고, 실제 차단은
+#   danger-check.sh 의 harness-root-rm 규칙이 담당. 호출 스크립트가 필요 시 이 플래그로 분기.
+if [ -z "${HARNESS_PROJECT:-}" ] && [ "$PROJECT_ROOT" = "$HARNESS_ROOT" ]; then
+  PROJECT_ROOT_IS_HARNESS=1
+else
+  PROJECT_ROOT_IS_HARNESS=0
+fi
+
 # git repo 여부 별도 캐싱 (HARNESS_PROJECT 우선 경로에서도 정확)
 if git -C "$PROJECT_ROOT" rev-parse --show-toplevel >/dev/null 2>&1; then
   PROJECT_ROOT_IS_GIT=1
