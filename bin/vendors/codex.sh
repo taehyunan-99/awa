@@ -25,6 +25,17 @@ vendor_wait_ready() {
     #   즉시 성공 반환. 아래 update 분기보다 먼저 둬야 — 안 그러면 ready 후에도 잔상이
     #   매 루프 Down+Enter 를 재송신해 입력창을 오염시키고 ready 진입을 방해(실측 행).
     if printf '%s' "$dump" | grep -qE 'OpenAI Codex|❯'; then
+      # P7 수정(2026-05-30 codex 1사이클 e2e): ready 도달했으나 Update 박스가 잔상으로
+      #   공존하면, 직후 send_prompt 의 텍스트+Enter 중 Enter 가 업데이트 선택지로 새거나
+      #   codex 가 입력을 무시 → 부트 프롬프트 미전송(전 pane 멈춤, 실측). send_prompt 는
+      #   bootstrap_pane(=이 함수) 이후라 아직 부트 텍스트 전이므로, 여기서 박스를 Skip
+      #   (Down→2.Skip + Enter)으로 닫아 깨끗한 입력 상태 확보 후 return. 박스 없으면
+      #   순수 ready 라 건드리지 않음(❯ 입력 프롬프트에 Down+Enter 는 위험). 루프 아닌 1회.
+      if printf '%s' "$dump" | grep -Eq 'Update available|Update now'; then
+        tmux send-keys -t "$s" Down
+        tmux send-keys -t "$s" Enter
+        sleep 1
+      fi
       return 0
     fi
     if printf '%s' "$dump" | grep -Eq 'Do you trust|trust the contents'; then

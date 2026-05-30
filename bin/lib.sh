@@ -372,10 +372,24 @@ done_logged() {  # $1=events.log $2=worker $3=id → done 라인 있으면 0
 }
 
 # 프롬프트 안전 주입: 텍스트(리터럴)와 Enter 분리. spec §4.1.
+# P7 수정(2026-05-30 codex e2e): codex REPL 은 텍스트 입력 직후 Enter 를 즉시 처리 못 함
+#   (텍스트 렌더링 전 Enter 무시 → 부트 프롬프트가 입력창에 잔류·미전송, 전 pane 멈춤 실측).
+#   claude 는 간격 없이도 동작하나 codex 는 텍스트→Enter 사이 지연 + 미전송 시 재Enter 필요.
+#   → 텍스트 후 짧은 지연 + Enter, 그래도 입력창에 텍스트 잔류하면(prompt 마커 '›'+텍스트
+#   앞부분 매치) Enter 1회 재전송. claude 엔 무해(이미 전송됨 → 빈 Enter 또는 잔류 없음).
 send_prompt() {
   local target="$1" text="$2"
   tmux send-keys -t "$target" -l "$text"
+  sleep "${SEND_PROMPT_ENTER_DELAY:-0.4}"   # codex 렌더링 여유 (claude 엔 무해한 짧은 지연)
   tmux send-keys -t "$target" Enter
+  # 미전송 안전망 — 입력창에 텍스트 앞 24자가 prompt 마커와 함께 잔류하면 Enter 재전송.
+  local head; head="$(printf '%s' "$text" | cut -c1-24)"
+  if tmux capture-pane -p -t "$target" 2>/dev/null | grep -Fq "$head"; then
+    # 잔류 확인 — 프롬프트 라인('›' 또는 '>')에 같이 있으면 미전송으로 보고 1회 더.
+    if tmux capture-pane -p -t "$target" 2>/dev/null | grep -E '^[[:space:]]*[›>]' | grep -Fq "$head"; then
+      tmux send-keys -t "$target" Enter
+    fi
+  fi
 }
 
 # --project 인자 정규화 (E12·F2). stdout=절대경로, $?=0 성공, return 1 실패.

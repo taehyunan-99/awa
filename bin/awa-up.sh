@@ -150,8 +150,10 @@ parse_entry() {  # $1=entry → ENTRY_NAME ENTRY_ROLE ENTRY_VENDOR ENTRY_MODEL �
   ENTRY_ROLE="${rest%%:*}"
   ENTRY_VENDOR=""
   if [ "$rest" = "$ENTRY_ROLE" ]; then
-    # 2필드 (이름:역할) — 모델 역할기본(기존 동작 보존), 벤더 빈값.
-    ENTRY_MODEL="sonnet"
+    # 2필드 (이름:역할) — 모델 미지정, 벤더 빈값. 폴백 체인(L530)이 해석된 벤더의
+    # vendor_default_model 로 채움(P9 수정 2026-05-30: codex 벤더 워커가 sonnet 하드코딩 →
+    # "model not supported" 400 에러였음. 빈값으로 두면 claude=sonnet·codex=gpt-5.5 정상 상속).
+    ENTRY_MODEL=""
   else
     local f3 after_role="${rest#*:}"
     f3="${after_role%%:*}"
