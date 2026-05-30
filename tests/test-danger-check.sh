@@ -93,4 +93,26 @@ assert_eq "SAFE" "$(dc 'echo "see /etc/hosts docs"')" "D8 따옴표 텍스트 /e
 assert_eq "SAFE" "$(dc 'echo ".env" >> .gitignore')" "D8 .env 를 .gitignore 에 (대상은 gitignore)"
 assert_eq "SAFE" "$(dc 'echo "/etc/hosts" > notes.txt')" "D8 텍스트 /etc, 대상 notes.txt"
 
+echo "[D9] ★ 2026-05-30 소실 재발방지: harness-root-rm (본체 rm 거부)"
+# 가드는 HARNESS_ROOT 가 set 일 때만 평가된다(source 시 lib.sh 가 export).
+# 별도 헬퍼로 HARNESS_ROOT export 를 선행 — 기존 dc() 는 export 안 해 가드 미평가.
+HR_FIXTURE="/Users/taehyunan/Desktop/Repo/Practice/awa"
+dc_h() {  # $1=command, HARNESS_ROOT 를 fixture 로 export 후 평가
+  local input out rc
+  input="$(jq -nc --arg c "$1" '{command:$c}')"
+  out="$(HARNESS_ROOT="$HR_FIXTURE" danger_check Bash "$input")"; rc=$?
+  if [ "$rc" -eq 0 ]; then printf '%s' "$out"; else printf 'SAFE'; fi
+}
+# DENY 1 — literal 본체 절대경로 rm (소실 당시 lib.sh resolve 후 실제 실행된 형태)
+assert_eq "harness-root-rm" "$(dc_h "rm -rf $HR_FIXTURE")" "D9 literal 본체경로"
+# DENY 2 — $PROJECT_ROOT 변수형 (소실 근본원인 — lib.sh 가 본체로 재계산)
+assert_eq "harness-root-rm" "$(dc_h 'rm -rf "$PROJECT_ROOT"')" "D9 \$PROJECT_ROOT"
+# DENY 3 — ${PROJECT_ROOT} 중괄호형
+assert_eq "harness-root-rm" "$(dc_h 'rm -rf ${PROJECT_ROOT}/sub')" "D9 \${PROJECT_ROOT}"
+# DENY 4 — $HARNESS_ROOT 변수형
+assert_eq "harness-root-rm" "$(dc_h 'rm -rf "$HARNESS_ROOT"/.git')" "D9 \$HARNESS_ROOT"
+# SAFE 오탐금지 — HARNESS_ROOT set 이어도 본체와 무관한 경로 rm 은 통과(rm-recursive 로만 분류)
+assert_eq "rm-recursive" "$(dc_h 'rm -rf /tmp/scratch')" "D9 SAFE /tmp (rm-recursive 만)"
+assert_eq "rm-recursive" "$(dc_h 'rm -rf ./build')" "D9 SAFE 상대 build (rm-recursive 만)"
+
 test_summary

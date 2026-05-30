@@ -12,6 +12,19 @@ danger_check() {
   esac
 
   if [ -n "$cmd" ]; then
+    # ★ 재발 방지 가드(B): 하네스 본체 경로를 rm 대상으로 삼는 명령 거부.
+    #   2026-05-30 소실 근본원인 — 일회용 스크립트의 `rm -rf "$PROJECT_ROOT"` 가
+    #   lib.sh 의 PROJECT_ROOT 재계산으로 HARNESS_ROOT(=awa 본체)를 가리켜 통째 삭제.
+    #   HARNESS_ROOT 가 set 돼 있을 때만 평가(source 시 lib.sh 가 export). literal 경로·
+    #   $HARNESS_ROOT/$PROJECT_ROOT 변수형 모두 차단.
+    #   ★ 반드시 rm-recursive 규칙보다 앞 — 뒤에 두면 `rm -rf` 가 rm-recursive 로 먼저
+    #     return 돼 전용 카테고리에 도달 못 하는 죽은 코드가 된다(2026-05-30 회귀 테스트로 발견).
+    if [ -n "${HARNESS_ROOT:-}" ]; then
+      case "$cmd" in
+        *rm\ *"$HARNESS_ROOT"*|*rm\ *'$HARNESS_ROOT'*|*rm\ *'$PROJECT_ROOT'*|*rm\ *'${PROJECT_ROOT}'*|*rm\ *'${HARNESS_ROOT}'*)
+          echo harness-root-rm; return 0 ;;
+      esac
+    fi
     re='(^|[^a-zA-Z0-9_/])rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*([[:space:]]|$)|--recursive([[:space:]]|$))'
     [[ "$cmd" =~ $re ]] && { echo rm-recursive; return 0; }
     re='(^|[^a-zA-Z0-9_])sudo([[:space:]]|$)'
@@ -38,17 +51,6 @@ danger_check() {
     [[ "$cmd" =~ $re ]] && { echo fork-bomb; return 0; }
     re='(^|[^a-zA-Z0-9_])rm[[:space:]].*[/~](home|Users)'
     [[ "$cmd" =~ $re ]] && { echo home-rm; return 0; }
-    # ★ 재발 방지 가드(B): 하네스 본체 경로를 rm 대상으로 삼는 명령 거부.
-    #   2026-05-30 소실 근본원인 — 일회용 스크립트의 `rm -rf "$PROJECT_ROOT"` 가
-    #   lib.sh 의 PROJECT_ROOT 재계산으로 HARNESS_ROOT(=awa 본체)를 가리켜 통째 삭제.
-    #   HARNESS_ROOT 가 set 돼 있을 때만 평가(source 시 lib.sh 가 export). literal 경로·
-    #   $HARNESS_ROOT/$PROJECT_ROOT 변수형 모두 차단.
-    if [ -n "${HARNESS_ROOT:-}" ]; then
-      case "$cmd" in
-        *rm\ *"$HARNESS_ROOT"*|*rm\ *'$HARNESS_ROOT'*|*rm\ *'$PROJECT_ROOT'*|*rm\ *'${PROJECT_ROOT}'*|*rm\ *'${HARNESS_ROOT}'*)
-          echo harness-root-rm; return 0 ;;
-      esac
-    fi
     re='>[[:space:]]*(~|/(home|Users|root))(/[^[:space:]]+)?/\.ssh/'
     [[ "$cmd" =~ $re ]] && { echo dotssh-write; return 0; }
     re='(^|[^a-zA-Z0-9_])(bash|sh|zsh)[[:space:]]+-c([[:space:]]|$)'
