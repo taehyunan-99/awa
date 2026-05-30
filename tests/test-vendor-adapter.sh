@@ -45,4 +45,31 @@ assert_success "$?" "A7 _test gen_settings(경로 echo)/wait_ready rc0"
     && grep -q "devworker" "$p" )
 assert_success "$?" "A8 claude gen_settings 실행+토큰 치환(lib.sh 의존)"
 
+# ★ codex 어댑터 실부트 스모크 회귀(2026-05-30) — 실 tmux/codex CLI 없이 단위 검증.
+echo "[A9-12] codex 어댑터 (실부트 함정 3종 가드)"
+CODEX_PR="$(mktemp -d)"  # 격리 PROJECT_ROOT
+FAKE_HOME="$(mktemp -d)/.codex"; mkdir -p "$FAKE_HOME"; echo '{"fake":"auth"}' > "$FAKE_HOME/auth.json"
+# A9 — auth.json 전파(심볼링크): 격리 CODEX_HOME 에 사용자 auth 가 링크돼 로그인 화면 회피.
+( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$CODEX_PR"; CODEX_HOME="$FAKE_HOME"
+  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "dev" "dev" >/dev/null
+  [ -e "$CODEX_PR/.agent-harness/.codex/auth.json" ] )
+assert_success "$?" "A9 codex auth.json 전파(로그인 화면 회피)"
+# A10 — config.toml 에 PROJECT_ROOT trusted 등록(trust 프롬프트 사전 제거).
+codex_cfg="$CODEX_PR/.agent-harness/.codex/config.toml"
+assert_success "$([ -f "$codex_cfg" ] && grep -q 'trust_level = "trusted"' "$codex_cfg"; echo $?)" "A10 codex trusted 등록"
+# A11 — effort 매핑: lead=high, dev=medium.
+( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$(mktemp -d)"; CODEX_HOME="$FAKE_HOME"
+  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "lead" "lead" >/dev/null
+  grep -q 'model_reasoning_effort = "high"' "$PROJECT_ROOT/.agent-harness/.codex/config.toml" )
+assert_success "$?" "A11 codex lead effort=high"
+# A12 — wait_ready 본문 회귀 가드(grep): ready 우선 + 업데이트 Skip + trust 처리 패턴 존재.
+cx="$ROOT/bin/vendors/codex.sh"
+assert_success "$(grep -q 'OpenAI Codex' "$cx"; echo $?)" "A12a wait_ready ready 패턴"
+assert_success "$(grep -q 'Update available' "$cx"; echo $?)" "A12b wait_ready 업데이트 Skip 패턴"
+# ready 분기가 update 분기보다 앞에 있어야(잔상 경합 회피) — 줄번호 비교.
+_rl=$(grep -n 'OpenAI Codex|❯' "$cx" | head -1 | cut -d: -f1)
+_ul=$(grep -n 'Update available|Update now' "$cx" | head -1 | cut -d: -f1)
+assert_success "$([ -n "$_rl" ] && [ -n "$_ul" ] && [ "$_rl" -lt "$_ul" ]; echo $?)" "A12c ready 분기가 update 분기보다 앞"
+rm -rf "$CODEX_PR" "$FAKE_HOME"
+
 test_summary

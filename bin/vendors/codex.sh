@@ -20,16 +20,29 @@ vendor_wait_ready() {
   for i in $(seq 1 60); do
     sleep 2
     dump="$(tmux capture-pane -t "$s" -p 2>/dev/null)"
+    # ★ ready 체크 최우선 (실부트 스모크 2026-05-30): ready 화면(OpenAI Codex 헤더)에
+    #   도달하면 업데이트 알림 박스가 위쪽에 잔상으로 남아도(Update available 문자열 공존)
+    #   즉시 성공 반환. 아래 update 분기보다 먼저 둬야 — 안 그러면 ready 후에도 잔상이
+    #   매 루프 Down+Enter 를 재송신해 입력창을 오염시키고 ready 진입을 방해(실측 행).
+    if printf '%s' "$dump" | grep -qE 'OpenAI Codex|❯'; then
+      return 0
+    fi
     if printf '%s' "$dump" | grep -Eq 'Do you trust|trust the contents'; then
+      tmux send-keys -t "$s" Enter
+      continue
+    fi
+    # ★ 업데이트 프롬프트 Skip (실부트 스모크 2026-05-30): 신버전 출시 시 codex 가
+    #   "Update available! / 1.Update now / 2.Skip" 선택 프롬프트를 띄운다(간헐적·버전 의존).
+    #   기본 하이라이트=1(Update now) — Enter 시 npm install 실행돼 부트가 길어지거나 깨진다.
+    #   Down 1회로 2.Skip 이동 후 Enter(실측: Down→'› 2.Skip' 이동 확인). update 박스가
+    #   ready 와 공존하면 위 ready 분기가 이미 잡았으므로, 여기 오는 건 순수 업데이트 프롬프트.
+    if printf '%s' "$dump" | grep -Eq 'Update available|Update now'; then
+      tmux send-keys -t "$s" Down
       tmux send-keys -t "$s" Enter
       continue
     fi
     if printf '%s' "$dump" | grep -qE 'Error:|error:|not authenticated|failed to start'; then
       return 1
-    fi
-    # ready — codex TUI 헤더/입력 프롬프트(출력 전용). 'codex ' 명령 토큰은 제외(echo 오탐 차단).
-    if printf '%s' "$dump" | grep -qE 'OpenAI Codex|❯'; then
-      return 0
     fi
   done
   return 1
@@ -42,6 +55,17 @@ vendor_gen_settings() {
   local role="$1"
   local ch="${PROJECT_ROOT}/.agent-harness/.codex"
   mkdir -p "$ch" || { echo "오류: CODEX_HOME 생성 실패 ($ch)" >&2; return 1; }
+  # ★ 인증 전파 (실부트 스모크 2026-05-30 발견): 어댑터가 CODEX_HOME 을 격리본으로
+  #   override 하면 사용자의 ~/.codex/auth.json 이 안 보여 codex 가 로그인 화면을 띄우고
+  #   vendor_wait_ready 가 ready/error 어느 패턴도 못 잡아 120s timeout → 부트 행.
+  #   원본 auth.json 을 격리본에 symlink 해 사용자 로그인을 워커가 상속(codex 표준 UX).
+  #   소스: $CODEX_HOME(기존 env) 우선, 없으면 ~/.codex. 격리본 자기 자신은 제외(무한참조).
+  local _auth_src="${CODEX_HOME:-$HOME/.codex}/auth.json"
+  if [ "$_auth_src" != "$ch/auth.json" ] && [ -f "$_auth_src" ] && [ ! -e "$ch/auth.json" ]; then
+    ln -sf "$_auth_src" "$ch/auth.json" 2>/dev/null \
+      || cp "$_auth_src" "$ch/auth.json" 2>/dev/null \
+      || echo "경고: auth.json 전파 실패 — codex 워커가 로그인 화면에 멈출 수 있음" >&2
+  fi
   # hooks.json 은 jq 로 생성 — HARNESS_ROOT 에 따옴표/$/백슬래시가 있어도 JSON escape 안전.
   # (heredoc 직접 보간 시 특수문자가 JSON 을 파손할 수 있음 — 견고성.)
   jq -n --arg cmd "${HARNESS_ROOT}/bin/vendors/codex-gate-bridge.sh" \
@@ -54,10 +78,17 @@ vendor_gen_settings() {
     lead|LEAD|reviewer-*|review-manager) effort="high" ;;
     *) effort="medium" ;;
   esac
+  # ★ trust 프롬프트 사전 제거 (실부트 스모크 2026-05-30): 격리 CODEX_HOME 엔
+  #   사용자의 [projects.*] trust_level 이 없어 PROJECT_ROOT 진입 시 "Do you trust" 가
+  #   매번 뜬다. wait_ready 가 Enter 로 통과시키긴 하나, config 에 trusted 로 등록하면
+  #   프롬프트 자체가 안 떠 부트가 결정론적·빨라진다(사용자 config.toml 과 동일 방식).
   cat > "$ch/config.toml" <<TOML || { echo "오류: config.toml 쓰기 실패" >&2; return 1; }
 approval_policy = "never"
 sandbox_mode = "workspace-write"
 model_reasoning_effort = "$effort"
+
+[projects."${PROJECT_ROOT}"]
+trust_level = "trusted"
 TOML
   export CODEX_HOME="$ch"
   printf '%s' "$ch"
