@@ -69,7 +69,10 @@ assert_eq "dev" "$T2" "allow-set-title off: OSC title escape 후에도 pane_titl
 assert_eq "0" "$([ -f "$TMP_PROJ/.agent-harness/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
 BOOT="$(cat "$TMP_PROJ/.agent-harness/.boot/dev.md")"
 assert_contains "$BOOT" "워커 이름: dev" "{{WORKER_NAME}} → dev 치환됨"
-assert_contains "$BOOT" "done-$SESSION_OVERRIDE-dev-" "신호 채널명 SESSION+WORKER 치환됨"
+# P11 탈-tmux: done 채널(`done-{{SESSION}}-...`) 폐지 → {{SESSION}} 토큰이 워커 부트에서 소멸.
+#   완료 신호는 events.log done 라인. 부트에 done 라인 규약 + 워커 tmux 직접호출 금지가 주입됐는지 검증.
+assert_contains "$BOOT" "done 라인" "완료 신호=events.log done 라인 규약 주입됨"
+case "$BOOT" in *"tmux wait-for -S done-"*) assert_eq 1 0 "워커 부트에 wait-for 채널 잔존(P11 위반)";; *) assert_eq 0 0 "워커 부트 wait-for 채널 제거 확인(P11)";; esac
 assert_contains "$BOOT" "역할: 개발자" "역할 프롬프트 합쳐짐"
 if printf '%s' "$BOOT" | grep -qF '{{WORKER_NAME}}'; then r=0; else r=1; fi
 assert_eq "1" "$r" "미치환 토큰 없음"

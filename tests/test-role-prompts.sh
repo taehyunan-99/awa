@@ -84,7 +84,9 @@ assert_contains "$COMMON" 'HYPOTHESIS' "_common ③ HYPOTHESIS 섹션"
 assert_contains "$COMMON" 'confirmed|likely|speculative' "_common ③ confidence 버킷(숫자% 금지)"
 assert_contains "$COMMON" 'BLOCKED' "_common ④ BLOCKED 프로토콜"
 assert_contains "$COMMON" 'ASSUMED:' "_common ⑤ assume-and-flag"
-assert_contains "$COMMON" 'wait-for -S done-{{SESSION}}-{{WORKER_NAME}}' "_common 완료신호 보존(회귀)"
+# P11 탈-tmux: 완료 신호 = events.log done 라인(워커 tmux 직접호출 0). wait-for 제거 확인 + done 라인 규약 보존.
+assert_contains "$COMMON" 'done 라인' "_common 완료신호=events.log done 라인(회귀)"
+case "$COMMON" in *"tmux wait-for -S done-"*) assert_eq 1 0 "_common 에 워커 wait-for 잔존(P11 위반)";; *) assert_eq 0 0 "_common 워커 wait-for 제거 확인";; esac
 
 res_c="$(cat "$(resolve_role_file "$ROOT/prompts" researcher)")"
 assert_contains "$res_c" "budget" "researcher.md ⑤ budget"

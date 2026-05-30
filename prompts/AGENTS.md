@@ -41,7 +41,7 @@
   - [`profiles/*.sh`](../profiles/) — `WORKERS=("이름:역할:..")`의 `역할` 토큰이 여기 파일명과 매칭
 - **경계 / 어댑터**:
   - 토큰 계약 — `{{HARNESS_ROOT}}` / `{{SESSION}}` / `{{WORKER_NAME}}`은 가동 시 치환되므로 텍스트에 리터럴 사용 금지
-  - 완료 신호 채널 — `done-{{SESSION}}-{{WORKER_NAME}}-<task-id>` 형식(앞 2개는 가동 시 박힘, task-id만 워커가 채움)
+  - 완료 신호 — 워커가 `.agent-harness/events.log` 에 탭 5필드 done 라인 append(`...\tdone\t-`). watcher 가 폴링해 lead 를 깨운다. **워커는 tmux 직접호출 안 함**(P11 탈-tmux — sandbox 격리 경계 안에서 tmux 소켓 접근 불가하므로 파일 신호만). 과거 `tmux wait-for -S done-...` 채널은 폐지(잉여 — watcher 가 이미 done 라인 폴링).
 
 ## 6. WHY
 

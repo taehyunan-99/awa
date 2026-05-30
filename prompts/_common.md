@@ -7,21 +7,20 @@
    - 상태: SUCCESS 또는 FAILURE
    - 산출물 경로(있으면)
    - 작업 요약
-4. 완료 신호를 보낸다. 반드시 마지막에 이 명령을 실행한다:
-   tmux wait-for -S done-{{SESSION}}-{{WORKER_NAME}}-<id>
-   주의: 위 채널명의 `done-...-...-<id>` 부분 중 `done-{{SESSION}}-{{WORKER_NAME}}` 은 이미 가동 시 치환되어 박혀있다(예: `done-awa-projectA-dev`). 너의 task id 만 채우고 다른 부분은 변형하지 마라.
+4. 완료 신호를 보낸다. 반드시 마지막에 `.agent-harness/events.log` 에 done 라인을 append 한다(아래 하네스 규약 참조). **이것이 유일한 완료 신호다** — watcher 가 events.log 의 done 라인을 폴링해 lead 를 깨운다. tmux 명령은 실행하지 마라(너는 격리 경계 안이라 tmux 소켓 접근이 차단될 수 있고, 파일 신호만으로 충분하다).
 5. 다음 지시를 대기한다. 임의로 다른 작업을 시작하지 않는다.
 
 ## 금지
 - .agent-harness/tasks/ 외의 지시를 추측해 실행하지 않는다.
-- 완료 신호(wait-for -S) 없이 작업을 끝났다고 간주하지 않는다.
+- events.log 에 done 라인을 남기지 않고 작업을 끝났다고 간주하지 않는다.
+- **tmux 명령(`tmux wait-for`/`send-keys` 등)을 직접 실행하지 않는다** — 모든 신호는 파일(events.log·results/)로만. tmux 는 인프라(watcher)의 책임이다.
 - 다른 워커의 페인이나 파일에 간섭하지 않는다.
 
 ## 하네스 규약 (scope·events.log)
 
 - 배정된 `.agent-harness/tasks/<id>.md` 의 `allowed_paths` 안에서만 파일을 수정하라. `forbidden_paths` 는 절대 건드리지 마라. scope 밖 작업은 즉시 차단·재지시 대상이다. *단, `.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state` 산출은 하니스 규약상 항상 허용 — forbidden 에 걸려도 이 경로 기록은 scope 위반이 아니다(리뷰도 VIOLATION 처리 마라).*
 - 파일을 수정하면 events.log 가 자동 기록된다(PostToolUse hook). 너는 별도 조치 불필요하나, hook 이 못 잡는 비-도구 변경을 했다면 `.agent-harness/events.log` 에 한 줄을 보조로 append 하라. 필드는 **탭 문자**로 구분한다(리터럴 `\t` 문자열이 아니라 실제 탭). 예: `printf '%s\t%s\t%s\tmodify\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" "<상대경로>" >> .agent-harness/events.log`
-- 작업 완료 시 `.agent-harness/results/<id>.md` 에 변경 요약을 쓰고, `.agent-harness/events.log` 에 done 라인을 기록한 뒤 `tmux wait-for -S done-{{SESSION}}-{{WORKER_NAME}}-<task>` 를 실행하라. done 라인 예: `printf '%s\t%s\t%s\tdone\t-\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" >> .agent-harness/events.log` (필드=탭, 5필드: ts/이름/task/action/필드5)
+- 작업 완료 시 `.agent-harness/results/<id>.md` 에 변경 요약을 쓰고, `.agent-harness/events.log` 에 done 라인을 append 하라(이것이 완료 신호 — tmux 명령 불필요). done 라인 예: `printf '%s\t%s\t%s\tdone\t-\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "<너의이름>" "<task>" >> .agent-harness/events.log` (필드=탭, 5필드: ts/이름/task/action/필드5). watcher 가 이 라인을 폴링해 lead 를 깨운다.
 - **필드5 의미는 action 별 분기** (C-1 정정 후):
   - `modify`: 상대경로 (path) — `printf '...\tmodify\t<상대경로>\n'`
   - `done`: `-` (placeholder)
