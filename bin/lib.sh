@@ -32,7 +32,8 @@ PROJECT_ROOT="$(resolve_project_root)"
 #   (2026-05-30 디렉토리 소실 근본원인 — 그 상태의 `rm -rf "$PROJECT_ROOT"` 가 본체 삭제).
 #   여기서 echo 로 경고하면 awa-main.sh 등 정상 resolve-path 경로의 stdout/stderr 를
 #   오염시켜 회귀를 깬다(M8/M3b 실측). → 출력 없는 플래그만 두고, 실제 차단은
-#   danger-check.sh 의 harness-root-rm 규칙이 담당. 호출 스크립트가 필요 시 이 플래그로 분기.
+#   danger-check.sh 의 harness-root-rm 규칙이 담당.
+#   소비처: awa-up.sh 가 이 플래그로 본체 가동 경고를 발화(가동은 진행, --project 권장).
 if [ -z "${HARNESS_PROJECT:-}" ] && [ "$PROJECT_ROOT" = "$HARNESS_ROOT" ]; then
   PROJECT_ROOT_IS_HARNESS=1
 else

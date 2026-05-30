@@ -75,6 +75,16 @@ source "$_DIR/lib.sh"
 # lib.sh 가 이미 stderr 에 오류 사유를 발화함 — 여기선 단순 exit 만 (메시지 책임 일원화, Minor #4).
 [ "${HARNESS_ROOT_VALID:-0}" = "1" ] || exit 1
 
+# ★ 재발 방지 가드(B): PROJECT_ROOT 가 하네스 본체로 잡혔으면 경고(가동은 진행).
+#   lib.sh 가 PROJECT_ROOT_IS_HARNESS 플래그만 set 하고 출력은 안 한다(resolve-path
+#   stdout 오염 회귀 회피, M8/M3b). 가동 진입점인 awa-up 에서만 사용자에게 경고 —
+#   본체를 작업 대상으로 가동하면 워커 cwd 가 본체가 돼 2026-05-30 류 사고에 노출.
+#   의도적 본체 작업도 있으므로 abort 아닌 경고(--project <tmp> 로 격리 권장).
+if [ "${PROJECT_ROOT_IS_HARNESS:-0}" = "1" ]; then
+  echo "경고: PROJECT_ROOT 가 하네스 본체($PROJECT_ROOT)로 잡혔습니다." >&2
+  echo "  워커 cwd 가 본체가 됩니다 — 의도가 아니면 '--project <경로>' 또는 HARNESS_PROJECT=<경로> 로 격리하세요." >&2
+fi
+
 # Task 7 (§7) — yaml 부정합 검사 (boot 직전 가드, C5 PASS 조건).
 # allow ∩ deny 충돌 시 ABORT — 사용자가 학습시킨 패턴이 위험 카탈로그와 겹치는 케이스 차단.
 ALLOW_YAML="${HARNESS_ROOT}/config/lead-auto-allow.yaml"
