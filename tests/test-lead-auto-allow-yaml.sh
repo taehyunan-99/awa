@@ -58,6 +58,14 @@ assert_eq "read-only:Bash(which:*)" "$out" "Y10 which → read-only"
 out="$(lead_auto_allow_lookup Bash '{"command":"echo hi"}')"
 assert_eq "read-only:Bash(echo:*)" "$out" "Y10 echo → read-only"
 
+echo "[Y12] harness-infra: 워커 완료신호 인프라 명령 박제 (P2 수정 2026-05-30)"
+# tmux wait-for(완료 신호) + printf(events.log done 라인) 은 prompts/_common.md 가
+# 워커에게 시키는 하니스 내부 통신 → 첫 사이클부터 게이트 미발생해야 함.
+out="$(lead_auto_allow_lookup Bash '{"command":"tmux wait-for -S done-awa-x-dev-T1"}')"
+assert_eq "harness-infra:Bash(tmux wait-for:*)" "$out" "Y12 tmux wait-for → harness-infra"
+out="$(lead_auto_allow_lookup Bash '{"command":"printf x >> .agent-harness/events.log"}')"
+assert_eq "harness-infra:Bash(printf:*)" "$out" "Y12 printf → harness-infra"
+
 echo "[Y11] 의도적 회색 유지 (안전등급 차이로 사람 1회 승인)"
 lead_auto_allow_lookup Bash '{"command":"bash ./test.sh"}' >/dev/null
 assert_fail "$?" "Y11 bash ./X 는 회색 (auto 제외)"

@@ -59,6 +59,13 @@ git-write:
   # 회색으로 두어 사람이 1회 인지.
   - "Bash(git add:*)"
   - "Bash(git commit:*)"
+harness-infra:
+  # 하니스 자체 메커니즘 — 워커가 task 완료 시 *반드시* 호출하는 내부 통신 명령(P2 수정 2026-05-30).
+  # prompts/_common.md 가 워커에게 지시하는 완료신호·이벤트로그 append. 사용자 학습 대상이 아니라
+  # 하니스가 워커에게 시킨 고정 명령이므로 전역 기본 카탈로그에 박제 — 첫 사이클부터 게이트 미발생.
+  # 둘 다 danger-check SAFE 확인필(printf=부작용없는 출력, >> 민감경로는 danger-check 가 별도 차단).
+  - "Bash(tmux wait-for:*)"
+  - "Bash(printf:*)"
 
 # 학습된 패턴 — add_to_allow 가 사용자 승인 후 누적 (Phase A, §7)
 learned:

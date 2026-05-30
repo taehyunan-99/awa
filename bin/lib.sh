@@ -867,7 +867,13 @@ blocklist_contains() {
 # blocklist 검사 + 사용자 결정에 따라 yaml/stats 분기.
 confirm_allow_yaml() {
   local pattern="$1" decision="$2"
-  local allow_yaml="${HARNESS_ROOT}/config/lead-auto-allow.yaml"
+  # P2/P6 수정(2026-05-30) — learned 쓰기 경로를 프로젝트 영구 파일로 분리.
+  #   기존: ${HARNESS_ROOT}/config/lead-auto-allow.yaml 에 써서
+  #     ① matrix-lookup 읽기(${PROJECT_ROOT}/config)와 불일치 → 학습이 게이트에 미반영(매 task 재프롬프트)
+  #     ② 본체 git 추적 yaml 오염(e2e 마다 learned 누적)
+  #   수정: ${PROJECT_ROOT}/.agent-harness/learned-allow.yaml 에 쓰고 matrix 가 함께 읽음.
+  #   awa-down 이 .agent-harness 디렉토리·learned-allow 를 보존하므로 동일 프로젝트 재부트 시 유지.
+  local learned_yaml="${PROJECT_ROOT}/.agent-harness/learned-allow.yaml"
 
   # Phase C 우회 — blocklist 매치하면 즉시 종료 (어떤 결정이든)
   if blocklist_contains "$pattern"; then
@@ -892,7 +898,12 @@ confirm_allow_yaml() {
         return 1
       fi
       rm -f "$probe_yaml"
-      append_to_yaml "$allow_yaml" "$pattern" "learned"
+      # learned 파일 없으면 헤더와 함께 생성 (append_to_yaml 은 파일·카테고리 존재 가정).
+      if [ ! -f "$learned_yaml" ]; then
+        mkdir -p "$(dirname "$learned_yaml")"
+        printf '# 프로젝트 학습 패턴 — confirm_allow_yaml accepted 가 누적 (P2/P6 수정 2026-05-30)\nlearned:\n' > "$learned_yaml"
+      fi
+      append_to_yaml "$learned_yaml" "$pattern" "learned"
       bump_stats_counter "$pattern" "accepted" || echo "[WARN] bump_stats_counter accepted failed for: $pattern" >&2
       ;;
     rejected)

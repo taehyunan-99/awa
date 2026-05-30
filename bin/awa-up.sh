@@ -311,6 +311,16 @@ if [ -f "$HARNESS_YAML" ]; then
   fi
 fi
 
+# P2/P6 수정(2026-05-30) — 프로젝트 학습 allow 파일 초기화.
+#   confirm_allow_yaml accepted 가 여기에 누적, matrix-lookup 이 함께 읽음.
+#   기본 카탈로그(PROJ_YAML)와 분리 → 부트 덮어쓰기 영향 없음 + 본체 yaml 무오염.
+#   이미 있으면 보존(동일 프로젝트 재부트 시 학습 유지) — awa-down 도 이 파일 보존.
+LEARNED_YAML="$PROJECT_ROOT/.agent-harness/learned-allow.yaml"
+if [ ! -f "$LEARNED_YAML" ]; then
+  mkdir -p "$PROJECT_ROOT/.agent-harness"
+  printf '# 프로젝트 학습 패턴 — confirm_allow_yaml accepted 가 누적 (P2/P6 수정 2026-05-30)\nlearned:\n' > "$LEARNED_YAML"
+fi
+
 # lead 페인으로 세션 생성. 셸 유지.
 tmux new-session -d -s "$SESSION" -c "${PROJECT_ROOT}" -x 220 -y 50 -n team
 

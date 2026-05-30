@@ -79,6 +79,10 @@ EOF
 lead_auto_allow_lookup() {
   local tool="$1" input="$2"
   local yaml="${PROJECT_ROOT}/config/lead-auto-allow.yaml"
+  # P2 수정(2026-05-30) — 기본 카탈로그 + 프로젝트 학습 파일을 함께 매칭 대상으로.
+  #   learned 쓰기가 .agent-harness/learned-allow.yaml 로 분리됐으므로(lib.sh confirm_allow_yaml)
+  #   읽기도 둘 다 평탄화해야 학습 패턴이 게이트에 즉시 반영된다.
+  local learned_yaml="${PROJECT_ROOT}/.agent-harness/learned-allow.yaml"
   [ -f "$yaml" ] || return 1
   local field key
   case "$tool" in
@@ -93,8 +97,11 @@ lead_auto_allow_lookup() {
   fi
   # awk 파서: "category:" 줄 + "  - "pattern"" 줄을 "category<TAB>pattern" 으로 평탄화.
   # 단순 형식만 지원 (§5.9): category: + 들여쓰기 2칸 + - "패턴". 주석(#) 줄 무시.
-  local flat
+  # 두 파일 전달 — awk 가 각 파일 시작 시 cat 초기화(FNR==1)해 카테고리 누수 방지.
+  local flat yaml_args=("$yaml")
+  [ -f "$learned_yaml" ] && yaml_args+=("$learned_yaml")
   flat="$(awk '
+    FNR==1 { cat="" }
     /^[[:space:]]*#/ { next }
     /^[a-zA-Z][a-zA-Z0-9_-]*:[[:space:]]*$/ { cat=$1; sub(/:$/,"",cat); next }
     /^[[:space:]]+-[[:space:]]/ {
@@ -103,7 +110,7 @@ lead_auto_allow_lookup() {
       gsub(/^"|"$/,"",line)
       if (cat != "") print cat "\t" line
     }
-  ' "$yaml")"
+  ' "${yaml_args[@]}")"
   local catname pat ptool pinner prefix
   while IFS="$(printf '\t')" read -r catname pat; do
     [ -n "$pat" ] || continue

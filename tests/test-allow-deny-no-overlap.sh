@@ -30,33 +30,36 @@ bash "$ROOT/bin/danger-check.sh" --check-allow-yaml "$TMPDIR/notexist.yaml" 2>/d
 rc=$?
 assert_eq "1" "$rc" "yaml 미존재 → abort"
 
-# 4. confirm_allow_yaml 함수 동작 — accepted 시 learned 카테고리 누적
-# HARNESS_ROOT 를 TMPDIR 로 격리해 운영 yaml 보호.
-mkdir -p "$TMPDIR/config"
+# 4. confirm_allow_yaml 함수 동작 — accepted 시 프로젝트 learned 파일 누적
+# P2/P6 수정(2026-05-30): learned 쓰기가 PROJECT_ROOT/.agent-harness/learned-allow.yaml 로 분리됨.
+#   격리: HARNESS_PROJECT(쓰기·읽기 기준 PROJECT_ROOT) + HARNESS_ROOT(stats/blocklist 기준) 둘 다.
+mkdir -p "$TMPDIR/config" "$TMPDIR/proj"
 cp "$ROOT/config/lead-auto-allow.yaml" "$TMPDIR/config/lead-auto-allow.yaml"
 cp "$ROOT/config/lead-auto-allow-stats.yaml" "$TMPDIR/config/lead-auto-allow-stats.yaml"
 cp "$ROOT/config/lead-auto-allow-blocklist.yaml" "$TMPDIR/config/lead-auto-allow-blocklist.yaml"
 
-HARNESS_ROOT="$TMPDIR" bash -c '
+HARNESS_ROOT="$TMPDIR" HARNESS_PROJECT="$TMPDIR/proj" bash -c '
   source "'"$ROOT"'/bin/lib.sh"
-  # source 직후 HARNESS_ROOT 가 lib.sh 에서 재계산되므로 override.
+  # source 직후 HARNESS_ROOT 가 lib.sh 에서 재계산되므로 override (stats/blocklist 기준).
   HARNESS_ROOT="'"$TMPDIR"'" confirm_allow_yaml "Bash(testpattern:*)" "accepted"
-  grep -q "Bash(testpattern:\*)" "'"$TMPDIR"'/config/lead-auto-allow.yaml"
+  # learned 는 이제 PROJECT_ROOT/.agent-harness/learned-allow.yaml 에 누적.
+  grep -q "Bash(testpattern:\*)" "'"$TMPDIR"'/proj/.agent-harness/learned-allow.yaml"
 '
-assert_success "$?" "confirm_allow_yaml accepted → learned 카테고리 누적"
+assert_success "$?" "confirm_allow_yaml accepted → 프로젝트 learned-allow.yaml 누적"
 
 # 5. C-2 검증 — accepted 사후 검증으로 위험 패턴 학습 거부
 # 'Bash(git push:*)' 는 다중 probe ('--force') 에서 danger 매치 → learned 누적 안 됨.
-mkdir -p "$TMPDIR/c2/config"
+mkdir -p "$TMPDIR/c2/config" "$TMPDIR/c2/proj"
 cp "$ROOT/config/lead-auto-allow.yaml" "$TMPDIR/c2/config/lead-auto-allow.yaml"
 cp "$ROOT/config/lead-auto-allow-stats.yaml" "$TMPDIR/c2/config/lead-auto-allow-stats.yaml"
 cp "$ROOT/config/lead-auto-allow-blocklist.yaml" "$TMPDIR/c2/config/lead-auto-allow-blocklist.yaml"
 
-HARNESS_ROOT="$TMPDIR/c2" bash -c '
+HARNESS_ROOT="$TMPDIR/c2" HARNESS_PROJECT="$TMPDIR/c2/proj" bash -c '
   source "'"$ROOT"'/bin/lib.sh"
   HARNESS_ROOT="'"$TMPDIR"'/c2" confirm_allow_yaml "Bash(git push:*)" "accepted" 2>/dev/null
-  # 위험 패턴 → rejected 로 전환 → learned 에 누적 안 됨
-  if grep -q "Bash(git push:\*)" "'"$TMPDIR"'/c2/config/lead-auto-allow.yaml"; then exit 1; else exit 0; fi
+  # 위험 패턴 → rejected 로 전환 → learned 누적 안 됨 (파일 자체가 없거나 패턴 미포함).
+  lf="'"$TMPDIR"'/c2/proj/.agent-harness/learned-allow.yaml"
+  if [ -f "$lf" ] && grep -q "Bash(git push:\*)" "$lf"; then exit 1; else exit 0; fi
 '
 assert_success "$?" "C-2: 위험 패턴 accepted → 사후 검증 거부 (learned 누적 안 됨)"
 
