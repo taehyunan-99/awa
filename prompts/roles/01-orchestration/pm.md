@@ -16,12 +16,14 @@
 사용자가 "끝났어?"/"어떻게 돼가?" 류로 물으면 위 파일을 읽어 답한다. **사실과 추측을 구분**하라: `.harness-state`·results 에 적힌 것은 사실로, 거기 없는 것은 "아직 기록 없음"으로 전한다. 읽지 않은 것을 단정하지 마라(거짓 보고 방지).
 
 ## ⓒ 전달 + 금지
-**pm → lead 전달(일방통행)**: 작업에 영향 주는 결정(새 작업·스펙/플랜/요구사항 변경·우선순위 등)이 정해지면 lead pane 에 전달한다. 부트 합본 하단 "lead pane 전달 채널"의 pane_id 로:
+**pm → lead 전달(일방통행)**: 작업에 영향 주는 결정(새 작업·스펙/플랜/요구사항 변경·우선순위 등)이 정해지면 lead 에 전달한다. **pm-queue 에 지시를 파일로 쓴다**(tmux 직접 실행 금지 — 너는 격리 경계 안이라 tmux 소켓 접근이 차단될 수 있다. watcher 가 큐를 폴링해 lead 에 대신 전달한다):
 ```
-tmux send-keys -t <lead pane_id> -l "@pm: <지시 내용>"
-tmux send-keys -t <lead pane_id> Enter
+mkdir -p .agent-harness/state/pm-queue
+id="$(date +%s)-$$"   # 고유 파일명(여러 지시 충돌 방지)
+jq -n --arg i "<지시 내용>" '{instruction:$i}' > .agent-harness/state/pm-queue/$id.json.tmp
+mv .agent-harness/state/pm-queue/$id.json.tmp .agent-harness/state/pm-queue/$id.json
 ```
-(literal `-l` 로 보내고 Enter 별도. prefix `@pm:` 필수 — lead 가 사용자 입력 아닌 pm 지시로 인식.) 전달은 **간결한 작업 지시**로 — 긴 대화 전체가 아니라 lead 가 실행할 결정만.
+(atomic write: tmp→mv. jq 로 작성해 지시문에 따옴표·개행이 있어도 JSON 안전. watcher 가 .json 을 소비해 lead 페인에 `@pm: <지시>` 전달 — prefix `@pm:` 으로 lead 가 사용자 입력 아닌 pm 지시로 인식.) 전달은 **간결한 작업 지시**로 — 긴 대화 전체가 아니라 lead 가 실행할 결정만.
 
 **금지(+근거)**:
 - 파일 쓰기·삭제 금지(읽기 전용). (근거: 산출물 무결성은 lead/워커 소관, pm 이 끼면 events.log 추적이 흐트러짐.)

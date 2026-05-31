@@ -618,7 +618,9 @@ fi
 pbf="$(boot_file PM)"
 { cat "$(resolve_role_file "$PROMPTS_DIR" pm)" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"
-  printf '\n## lead pane 전달 채널\n- lead pane_id: %s — pm→lead 지시는 `tmux send-keys -t %s -l "@pm: <지시>"` 후 Enter.\n' "$LEAD_PID" "$LEAD_PID"; } > "$pbf"
+  # P11 Phase4: pm→lead 전달은 pm-queue 파일(watcher 대행). lead pane_id 주입 불필요
+  #   (PM 은 tmux 직접호출 안 함 — 격리 경계 안에서 소켓 접근 차단 가능). pm.md ⓒ 규약 참조.
+  : ; } > "$pbf"
 _tmp_pbf="$pbf.tmp"
 sed -e "s#{{SESSION}}#$SESSION#g" \
     -e "s#{{HARNESS_ROOT}}#$HARNESS_ROOT#g" \
