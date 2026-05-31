@@ -579,6 +579,9 @@ if [ "${#PLAN_FILES[@]}" -gt 0 ]; then
     done; } > "$PLAN_BOOT_FILE"
 fi
 
+# ★ AWA 방향 가드(2026-05-31): LEAD 는 claude 전용(codex 는 워커/리뷰어만 — P17 회피).
+#   LEAD_VENDOR 를 가드 통과값으로 고정 → 이후 모든 ${LEAD_VENDOR:-...} 참조가 claude 사용.
+LEAD_VENDOR="$(resolve_orchestrator_vendor "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}" "LEAD")"
 # 5차: LEAD 도 settings 생성 (lead 템플릿 적용, F40). 벤더 위임(claude/codex).
 settings_path=""
 if ! vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
@@ -629,6 +632,8 @@ if grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$pbf"; then
   echo "오류: $pbf 에 토큰 미치환 잔존: $(grep -oE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$pbf" | sort -u | tr '\n' ' ')" >&2
   exit 1
 fi
+# ★ AWA 방향 가드(2026-05-31): PM 도 claude 전용(LEAD 와 동일 — P17 회피).
+PM_VENDOR="$(resolve_orchestrator_vendor "${PM_VENDOR:-${HARNESS_VENDOR:-claude}}" "PM")"
 settings_path=""
 if ! vendor_source "${PM_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
   echo "오류: PM 벤더 source 실패 — 부트 중단" >&2

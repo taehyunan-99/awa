@@ -85,4 +85,23 @@ _ul=$(grep -n 'Update available|Update now' "$cx" | head -1 | cut -d: -f1)
 assert_success "$([ -n "$_rl" ] && [ -n "$_ul" ] && [ "$_rl" -lt "$_ul" ]; echo $?)" "A12c ready 분기가 update 분기보다 앞"
 rm -rf "$CODEX_PR" "$FAKE_HOME"
 
+# A13 — 오케스트레이터 가드(2026-05-31): LEAD/PM 은 claude 전용. codex 등 비-claude 지정 시
+#   claude 로 강제(P17 회피 — codex 는 워커/리뷰어만). resolve_orchestrator_vendor 계약.
+( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
+  [ "$(resolve_orchestrator_vendor "codex" "LEAD" 2>/dev/null)" = "claude" ] )
+assert_success "$?" "A13a LEAD codex→claude 강제"
+( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
+  [ "$(resolve_orchestrator_vendor "codex" "PM" 2>/dev/null)" = "claude" ] )
+assert_success "$?" "A13b PM codex→claude 강제"
+( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
+  [ "$(resolve_orchestrator_vendor "claude" "LEAD" 2>/dev/null)" = "claude" ] )
+assert_success "$?" "A13c LEAD claude 는 그대로"
+# 강제 시 stderr 경고가 나와야(사용자 인지) — 침묵 강등 금지.
+( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
+  resolve_orchestrator_vendor "codex" "LEAD" 2>&1 1>/dev/null | grep -q '강제' )
+assert_success "$?" "A13d 강제 시 경고 출력(침묵 강등 금지)"
+# awa-up 이 LEAD/PM 직전에 가드를 호출하는지(회귀 가드).
+assert_success "$(grep -q 'resolve_orchestrator_vendor.*LEAD' "$ROOT/bin/awa-up.sh"; echo $?)" "A13e awa-up LEAD 가드 호출"
+assert_success "$(grep -q 'resolve_orchestrator_vendor.*PM' "$ROOT/bin/awa-up.sh"; echo $?)" "A13f awa-up PM 가드 호출"
+
 test_summary

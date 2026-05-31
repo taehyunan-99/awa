@@ -175,6 +175,23 @@ is_known_vendor() {
   [ -n "$v" ] && [ -f "$HARNESS_ROOT/bin/vendors/${v}.sh" ]
 }
 
+# 오케스트레이터(LEAD/PM) 벤더 가드 — claude 강제. $1=요청벤더 $2=역할라벨(LEAD/PM) → echo 확정벤더.
+#   AWA 방향(2026-05-31): codex 는 워커/리뷰어로만. LEAD/PM 베이스는 claude 전용.
+#   사유=P17 — watcher 가 send-keys 로 LEAD/PM 입력창에 알림을 쏘는데 codex TUI 가 작업 중이면
+#   큐잉만 하고 제출 안 함 → 알림 잔상 + 게이트 타임아웃 → dispatch 반복 실패(실측 cycledemo).
+#   워커는 알림 받는 쪽이 아니라(events.log/results 쓰는 쪽) 무관 → codex 워커/리뷰어는 허용.
+#   claude 가 아닌 벤더가 LEAD/PM 에 지정되면 claude 로 강등하고 경고(부트는 막지 않음).
+#   재진입: codex LEAD/PM 은 P17(send-keys↔TUI 큐잉) 재설계 후. → 메모리 codex-vendor-worker-reviewer-only.
+resolve_orchestrator_vendor() {
+  local req="$1" role="${2:-LEAD}"
+  if [ -n "$req" ] && [ "$req" != "claude" ] && [ "${AGENT_CMD:-claude}" = "claude" ]; then
+    echo "경고: ${role} 벤더 '${req}' → claude 로 강제(AWA: LEAD/PM 은 claude 전용, codex 는 워커/리뷰어만). P17 알림 경합 회피." >&2
+    printf 'claude'
+    return 0
+  fi
+  printf '%s' "${req:-claude}"
+}
+
 # 벤더 어댑터 source. $1=vendor → 5함수 로드. 실패 시 rc 1.
 # _test 강제 규칙: AGENT_CMD 가 claude 아닌 값이면 _test 어댑터 우선(역호환).
 vendor_source() {

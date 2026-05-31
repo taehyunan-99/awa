@@ -81,6 +81,15 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 | `HARNESS_PROJECT` | (없음) | PROJECT_ROOT 강제 지정. 기본은 git toplevel 또는 PWD 폴백. |
 | `PROMPTS_DIR` | `$HARNESS_ROOT/prompts` | 부트 프롬프트 디렉터리 override (주로 테스트 fixture 용). |
 
+## 벤더 정책 (2026-05-31 확정)
+
+**베이스(LEAD/PM)는 claude 전용. codex 는 워커/리뷰어로만.** `awa-up.sh` 는 LEAD/PM 부트 직전 `resolve_orchestrator_vendor`(lib.sh)로 비-claude 벤더를 claude 로 강제(+경고). 워커/리뷰어는 `<role>:codex` 또는 `ENTRY_VENDOR=codex` 로 자유 지정.
+
+- **사유 = P17**: watcher 가 `send-keys` 로 LEAD/PM 입력창에 알림(@gate/@done 등)을 쏘는데, codex TUI 는 작업 중이면 입력을 큐잉만 하고 제출 안 함 → 알림 잔상 + 게이트 타임아웃 → dispatch 반복 실패(실측). 워커는 알림 받는 쪽이 아니라(events.log/results 쓰는 쪽) 무관 → codex 워커/리뷰어는 정상.
+- **codex 워커 게이트 = 해결됨**: P12(trusted_hash)·P14(env 자기도출+fail-closed)·P15(sed -n auto-allow)·P16(allow=빈출력+exit0). 1사이클 완주 실측.
+- **antigravity = 통째 보류**: 헤드리스 부트 자체 불가(conversation ID 미노출·workspace 미루팅·API key 인증 미지원 — 상류 OPEN). 워커조차 불가. `bin/vendors/antigravity.sh` 자리만 정의.
+- 재진입: codex LEAD/PM 은 P17(send-keys↔TUI 큐잉) 재설계 후. 상세 → 메모리 `codex-vendor-worker-reviewer-only-2026-05-31`.
+
 ## 멀티 프로젝트 동시 가동
 
 basename 다를 시 `awa-<basename>` 세션 동시 가동 가능. basename 충돌 시 후행 가동 거부 — `SESSION_OVERRIDE="awa-auth2" bin/awa-up.sh default` 로 회피.
