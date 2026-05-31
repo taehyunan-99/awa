@@ -45,15 +45,22 @@ bootcmd="$( set +u; PROJECT_ROOT="$TMPDIR_F/p"; . "$ROOT/bin/vendors/codex.sh"
 printf '%s' "$bootcmd" | grep -qE 'OpenAI Codex|❯'
 assert_fail "$?" "F5 codex boot 명령이 ready 패턴 미포함(echo 오탐 차단)"
 
-# F6: hooks.json 은 HARNESS_ROOT 에 특수문자(따옴표/$/백슬래시)가 있어도 유효 JSON(jq 생성).
-if command -v jq >/dev/null 2>&1; then
-  ( set +u; HARNESS_ROOT='/tmp/has $pecial"q/and\back'; PROJECT_ROOT="$TMPDIR_F/cx-esc"
+# F6: PreToolUse 게이트가 config.toml 의 [[hooks.PreToolUse]] + [hooks.state] trusted_hash 로
+#   등록되는지 (P12 2026-05-31: codex 는 hooks.json 을 안 읽음 → config.toml 인라인 + trust 필수).
+#   이게 없으면 codex 워커 권한 게이트(danger-check 포함)가 미발화 → 위험명령 우회.
+if command -v python3 >/dev/null 2>&1; then
+  ( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_F/cx-hook"
     mkdir -p "$PROJECT_ROOT"; . "$ROOT/bin/vendors/codex.sh"
     vendor_gen_settings "dev" "d" >/dev/null 2>&1 )
-  jq -e . "$TMPDIR_F/cx-esc/.agent-harness/.codex/hooks.json" >/dev/null 2>&1
-  assert_success "$?" "F6 hooks.json 특수문자 HARNESS_ROOT 에서도 유효 JSON"
+  cfg="$(cat "$TMPDIR_F/cx-hook/.agent-harness/.codex/config.toml" 2>/dev/null)"
+  assert_contains "$cfg" "[[hooks.PreToolUse]]" "F6 config.toml 에 PreToolUse hook 등록(P12)"
+  assert_contains "$cfg" "codex-gate-bridge.sh" "F6b hook command=gate-bridge"
+  assert_contains "$cfg" "trusted_hash" "F6c [hooks.state] trusted_hash(미발화 방지)"
+  # hooks.json 은 더 이상 만들지 않는다(codex 가 안 읽음) — 잔존하면 혼란.
+  assert_eq "1" "$([ -f "$TMPDIR_F/cx-hook/.agent-harness/.codex/hooks.json" ] && echo 0 || echo 1)" \
+    "F6d hooks.json 미생성(P12 — codex 가 로드 안 함)"
 else
-  echo "  SKIP: jq 미설치 — F6 생략"
+  echo "  SKIP: python3 미설치 — F6 생략"
 fi
 
 test_summary

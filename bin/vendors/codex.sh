@@ -59,7 +59,7 @@ vendor_wait_ready() {
   return 1
 }
 
-# settings/hook 생성. codex config.toml + hooks.json(PreToolUse → codex-gate-bridge.sh).
+# settings/hook 생성. codex config.toml 의 [[hooks.PreToolUse]] + trusted_hash(P12) → gate-bridge.
 # $1=role $2=entry_name(codex 미사용 — claude 와 시그니처만 맞춤).
 # fail-safe: 디렉토리/파일 생성 실패 시 rc 1. echo CODEX_HOME 경로.
 vendor_gen_settings() {
@@ -77,11 +77,6 @@ vendor_gen_settings() {
       || cp "$_auth_src" "$ch/auth.json" 2>/dev/null \
       || echo "경고: auth.json 전파 실패 — codex 워커가 로그인 화면에 멈출 수 있음" >&2
   fi
-  # hooks.json 은 jq 로 생성 — HARNESS_ROOT 에 따옴표/$/백슬래시가 있어도 JSON escape 안전.
-  # (heredoc 직접 보간 시 특수문자가 JSON 을 파손할 수 있음 — 견고성.)
-  jq -n --arg cmd "${HARNESS_ROOT}/bin/vendors/codex-gate-bridge.sh" \
-    '{hooks: {PreToolUse: [{matcher: "*", command: $cmd}]}}' \
-    > "$ch/hooks.json" || { echo "오류: hooks.json 쓰기 실패" >&2; return 1; }
   # effort 매칭(품질 우선): lead·reviewer=high, 그 외=medium.
   # model_reasoning_effort 허용값=minimal|low|medium|high|xhigh.
   local effort
@@ -89,11 +84,63 @@ vendor_gen_settings() {
     lead|LEAD|reviewer-*|review-manager) effort="high" ;;
     *) effort="medium" ;;
   esac
-  # ★ trust 프롬프트 사전 제거 (실부트 스모크 2026-05-30): 격리 CODEX_HOME 엔
-  #   사용자의 [projects.*] trust_level 이 없어 PROJECT_ROOT 진입 시 "Do you trust" 가
-  #   매번 뜬다. wait_ready 가 Enter 로 통과시키긴 하나, config 에 trusted 로 등록하면
-  #   프롬프트 자체가 안 떠 부트가 결정론적·빨라진다(사용자 config.toml 과 동일 방식).
-  cat > "$ch/config.toml" <<TOML || { echo "오류: config.toml 쓰기 실패" >&2; return 1; }
+  # ★ PreToolUse 권한 게이트 등록 (P12 수정 2026-05-31). 기존엔 hooks.json 을 만들었으나
+  #   codex 는 그 파일을 로드조차 안 한다(config.toml 의 [hooks] 인라인 구조체 HooksToml 경유).
+  #   게다가 인라인 등록만으론 user-config hook 이 trust_status=Untrusted → discovery 만 되고
+  #   실행 안 됨. [hooks.state] 에 trusted_hash 가 매칭돼야 발화. 이게 없어서 codex 워커의
+  #   권한 게이트(danger-check 포함)가 지금까지 한 번도 안 걸렸다(rm -rf 등 위험명령 우회 가능).
+  #   → config.toml 에 [[hooks.PreToolUse]] + [hooks.state] trusted_hash 동적 계산해 등록.
+  local gate_cmd="${HARNESS_ROOT}/bin/vendors/codex-gate-bridge.sh"
+  # state-map 키는 config.toml 의 realpath(canonical) 경로여야 함(codex 가 sourcePath 를
+  #   canonicalize — macOS /tmp→/private/tmp). 잘못된 경로면 state 조회 실패→Untrusted→미발화.
+  local cfg_real
+  cfg_real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$ch/config.toml" 2>/dev/null)" \
+    || cfg_real="$ch/config.toml"
+  # trusted_hash = sha256: + sha256hex(canonical-json). codex currentHash 와 비트일치 검증된 형식
+  #   (대상: event_name/hooks[async,command,timeout,type]/matcher, 키 재귀정렬, separators 없음).
+  local thash
+  thash="$(GATE_CMD="$gate_cmd" python3 - <<'PY' 2>/dev/null
+import os,json,hashlib
+cmd=os.environ["GATE_CMD"]
+obj={"event_name":"pre_tool_use",
+     "hooks":[{"async":False,"command":cmd,"timeout":600,"type":"command"}],
+     "matcher":"*"}
+def canon(o):
+    if isinstance(o,dict): return {k:canon(o[k]) for k in sorted(o)}
+    if isinstance(o,list): return [canon(x) for x in o]
+    return o
+s=json.dumps(canon(obj),separators=(',',':'))
+print("sha256:"+hashlib.sha256(s.encode()).hexdigest())
+PY
+)"
+  # ★ trust 프롬프트 사전 제거(2026-05-30): [projects.*] trust_level=trusted 로 "Do you trust" 차단.
+  # config.toml 작성 — heredoc 보간(effort/PROJECT_ROOT/gate_cmd/cfg_real/thash).
+  #   경로에 따옴표가 없다는 전제(PROJECT_ROOT 는 awa-up 이 _validate_path_chars 로 사전검증).
+  if [ -n "$thash" ]; then
+    cat > "$ch/config.toml" <<TOML || { echo "오류: config.toml 쓰기 실패" >&2; return 1; }
+approval_policy = "never"
+sandbox_mode = "workspace-write"
+model_reasoning_effort = "$effort"
+
+[projects."${PROJECT_ROOT}"]
+trust_level = "trusted"
+
+[[hooks.PreToolUse]]
+matcher = "*"
+
+[[hooks.PreToolUse.hooks]]
+type = "command"
+command = "${gate_cmd}"
+
+[hooks.state."${cfg_real}:pre_tool_use:0:0"]
+enabled = true
+trusted_hash = "${thash}"
+TOML
+  else
+    # 해시 계산 실패(python3 부재 등) — 게이트 없이 부트하면 위험명령 우회 위험.
+    #   fail-loud: 경고 후에도 hook 미등록 config 로 진행(부트 자체는 막지 않음, 사용자 인지).
+    echo "경고: trusted_hash 계산 실패 — codex 권한 게이트 미등록(위험명령 우회 가능). python3 확인 필요." >&2
+    cat > "$ch/config.toml" <<TOML || { echo "오류: config.toml 쓰기 실패" >&2; return 1; }
 approval_policy = "never"
 sandbox_mode = "workspace-write"
 model_reasoning_effort = "$effort"
@@ -101,6 +148,7 @@ model_reasoning_effort = "$effort"
 [projects."${PROJECT_ROOT}"]
 trust_level = "trusted"
 TOML
+  fi
   export CODEX_HOME="$ch"
   printf '%s' "$ch"
 }
