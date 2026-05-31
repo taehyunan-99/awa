@@ -80,11 +80,24 @@ assert_contains "$out7b" '"permissionDecision":"deny"' "F7b bridge cwd없으면 
 # F8: sed -n(읽기) 자동허용 + sed -i(수정) 게이트 분리 (P15 2026-05-31). codex 는 파일을
 #   sed -n/cat 으로 읽는다(claude 의 Read 도구와 다름) → sed 가 read-only 화이트리스트에 없으면
 #   부트 파일 읽기조차 매번 게이트에 막혀 워커가 일을 못 시작. sed -n 만 허용(sed -i 는 게이트).
+#   ★ P16(아래): allow 는 codex 0.130 에서 빈출력+exit0 이 통과신호(allow JSON 은 거부됨).
+#   따라서 sed -n(allow)→빈출력, sed -i(deny)→JSON deny 로 검증한다.
 out8a="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
   <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -n 1,99p f.md"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
-assert_contains "$out8a" '"permissionDecision":"allow"' "F8a sed -n 읽기 auto-allow(codex 파일읽기)"
+assert_eq "" "$out8a" "F8a sed -n 읽기 allow=빈출력(codex 통과신호, P16)"
 out8b="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
   <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -i s/a/b/ f.md"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
 assert_contains "$out8b" '"permissionDecision":"deny"' "F8b sed -i 수정은 게이트(미응답 deny)"
+
+# F9: codex 0.130 은 permissionDecision:"allow" 를 unsupported 로 거부 (P16 2026-05-31).
+#   → bridge 는 allow 시 *빈 출력 + exit 0*(통과), deny 시에만 JSON. allow JSON 을 내면
+#   codex 가 hook failed 처리 → 워커가 read-only 명령조차 못 하고 멈춤(실측 LEAD 4분+ 행).
+out9a="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
+  <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo hi"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
+rc9a=$?
+assert_eq "" "$out9a" "F9a allow(echo) 빈출력(codex unsupported:allow 회피)"
+assert_eq "0" "$rc9a" "F9b allow exit 0(통과신호)"
+# allow 출력에 'allow' 문자열이 절대 없어야 함(있으면 codex 거부 재발).
+case "$out9a" in *allow*) assert_eq "no-allow-token" "found-allow-token" "F9c allow JSON 미출력";; *) :;; esac
 
 test_summary

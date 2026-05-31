@@ -46,8 +46,23 @@ OUT="$(printf '%s' "$NORMALIZED" | \
   PROJECT_ROOT="$PROJECT_ROOT" HARNESS_ROOT="$HARNESS_ROOT" \
   WORKER="${WORKER:-codex}" ENTRY_ROLE="${ENTRY_ROLE:-dev}" \
   bash "$HARNESS_ROOT/bin/permission-gate.sh")"
-# permission-gate 가 정상 결정을 냈을 때만 emit. 빈 출력이면 trap 이 fail-closed deny.
-if [ -n "$OUT" ]; then
-  _EMITTED=1
-  printf '%s\n' "$OUT"
+
+# ★ allow/deny 분기 (P16 2026-05-31): permission-gate 는 claude wire 형식으로
+#   permissionDecision:"allow"|"deny" 를 낸다. 그런데 codex 0.130 은 "allow" 값을
+#   `unsupported permissionDecision:allow` 로 거부 → hook failed → 워커가 read-only
+#   명령조차 진행 못 하고 멈춤(실측: LEAD 가 AUTO-ALLOW 로그 남기고도 4분+ 행).
+#   codex 의 통과 신호는 "allow JSON" 이 아니라 *빈 출력 + exit 0*(deny 만 JSON 으로 명시).
+#   → allow 면 무출력 종료(통과), deny 면 JSON 그대로 전달(차단). 빈 OUT 은 trap 이 fail-closed.
+if [ -z "$OUT" ]; then
+  exit 1   # 정책 엔진 무출력 = 비정상 → trap fail-closed deny
 fi
+_decision="$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null || true)"
+case "$_decision" in
+  deny)
+    _EMITTED=1
+    printf '%s\n' "$OUT" ;;      # deny JSON 그대로 → codex 차단
+  allow)
+    _EMITTED=1 ;;                # 빈 출력 + exit 0 → codex 통과 (allow JSON 금지)
+  *)
+    exit 1 ;;                    # 알 수 없는 결정 → fail-closed deny
+esac
