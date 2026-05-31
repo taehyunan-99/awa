@@ -63,4 +63,28 @@ else
   echo "  SKIP: python3 미설치 — F6 생략"
 fi
 
+# F7: gate-bridge 가 codex 가 안 주는 HARNESS_ROOT/PROJECT_ROOT env 없이도 동작 (P14 2026-05-31).
+#   codex TUI 는 hook 실행 시 이 env 를 주지 않는다 → 기존 `${PROJECT_ROOT:?}` unbound 즉사 →
+#   codex 가 hook 실패(exit 1)를 "통과"로 처리 → 위험명령 우회(deny-bounded 무력화, 실측).
+#   해소: bridge 가 HARNESS_ROOT 를 자기위치(BASH_SOURCE)에서, PROJECT_ROOT 를 stdin cwd 에서 도출.
+BR="$ROOT/bin/vendors/codex-gate-bridge.sh"
+# F7a: env 전혀 없이(HARNESS_ROOT/PROJECT_ROOT 미설정) rm -rf → deny (danger). HOME/PATH 만 유지.
+out7a="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
+  <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf /"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
+assert_contains "$out7a" '"permissionDecision":"deny"' "F7a bridge env없이 rm -rf deny(자기도출+danger)"
+# F7b: cwd 누락(PROJECT_ROOT 도출 불가) → fail-closed deny (hook 크래시 시 통과 금지).
+out7b="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
+  <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"echo x"}}' 2>/dev/null)"
+assert_contains "$out7b" '"permissionDecision":"deny"' "F7b bridge cwd없으면 fail-closed deny"
+
+# F8: sed -n(읽기) 자동허용 + sed -i(수정) 게이트 분리 (P15 2026-05-31). codex 는 파일을
+#   sed -n/cat 으로 읽는다(claude 의 Read 도구와 다름) → sed 가 read-only 화이트리스트에 없으면
+#   부트 파일 읽기조차 매번 게이트에 막혀 워커가 일을 못 시작. sed -n 만 허용(sed -i 는 게이트).
+out8a="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
+  <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -n 1,99p f.md"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
+assert_contains "$out8a" '"permissionDecision":"allow"' "F8a sed -n 읽기 auto-allow(codex 파일읽기)"
+out8b="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
+  <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"sed -i s/a/b/ f.md"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
+assert_contains "$out8b" '"permissionDecision":"deny"' "F8b sed -i 수정은 게이트(미응답 deny)"
+
 test_summary

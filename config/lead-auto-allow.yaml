@@ -9,6 +9,7 @@ read-only:
   - "Bash(cat:*)"
   - "Bash(head:*)"
   - "Bash(tail:*)"
+  - "Bash(sed -n:*)"
   - "Bash(grep:*)"
   - "Bash(rg:*)"
   - "Bash(find:*)"
