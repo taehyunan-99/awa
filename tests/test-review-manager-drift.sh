@@ -15,12 +15,23 @@ assert_success "$?" "L1 review-manager.md 존재"
 grep -q '주 책임\|plan-diff 시계열' "$ROOT/prompts/roles/03-quality/review-manager.md"
 assert_success "$?" "L1 review-manager 주 책임 명시"
 
-# Layer 1: 개별 reviewer 4건 plan_alignment 출력 계약
-ok=1
-for f in "$ROOT"/prompts/roles/03-quality/reviewer-*.md; do
-  grep -q 'plan_alignment' "$f" || ok=0
+# Layer 1: plan_alignment 렌즈 독립 — reviewer-alignment 전용 출력 계약
+#   (reviewer-common 의 "plan_alignment 는 reviewer-alignment 전용" 불변식 검증.
+#    grep 위양성 차단: 다른 리뷰어가 "출력하지 않는다"고 *언급*만 하는 건 허용하되,
+#    실제 출력 지시(필드 필수/헤더 기록)는 alignment 만 가져야 한다.)
+ALIGN="$ROOT/prompts/roles/03-quality/reviewer-alignment.md"
+grep -qE 'plan_alignment: <0\.0~1\.0>.*필수' "$ALIGN"
+assert_success "$?" "L1 reviewer-alignment 가 plan_alignment 출력 계약 보유"
+
+# 나머지 리뷰어는 plan_alignment 출력을 *요구*하면 안 된다(렌즈 독립).
+#   "출력하지 않는다" 부정 문장은 허용 → "필드 필수/헤더에 기록" 같은 출력 지시 패턴만 위반으로 본다.
+leak=0
+for f in "$ROOT"/prompts/roles/03-quality/reviewer-quality.md \
+         "$ROOT"/prompts/roles/03-quality/reviewer-security.md \
+         "$ROOT"/prompts/roles/03-quality/reviewer-alternative.md; do
+  if grep -qE 'plan_alignment: <0\.0~1\.0>.*필수' "$f"; then leak=1; echo "  누출: $(basename "$f")"; fi
 done
-assert_eq "1" "$ok" "L1 reviewer 4건 plan_alignment 출력 계약"
+assert_eq "0" "$leak" "L1 quality/security/alternative 는 plan_alignment 출력 안 함(렌즈 독립)"
 
 # Layer 1: profiles/feature-team.sh review-manager 등록
 # 모델 접미사(:opus)는 제거됨 — vendor_default_model(claude review-manager→opus) 폴백 위임.
