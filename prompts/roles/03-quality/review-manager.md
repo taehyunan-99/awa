@@ -19,6 +19,10 @@
 - **입력**: watcher 가 `events.log` 의 `worker_turn_count >= N` 트리거 시 깨움.
 - **출력**: `.harness-state` 의 `plan_alignment` 필드 갱신 + 임계 초과 시 `@drift:` 라인 events.log 기록 → lead.
 
+## blocking 집계 인지 (합의 게이트 — 계획 B 회로 연동)
+- 투표 리뷰어(alignment·quality·security)의 `review/*.md` 에 `blocking: true/false` 필드가 있다. review-manager 는 이를 *집계·시계열 기록* 만 한다(차단 발동은 lead/dispatch 가드 몫 — 계획 B).
+- 드리프트 메트릭에 blocking 빈도를 보조 지표로 포함할 수 있다(추세: blocking 누적 증가 = 워커 품질 하강 신호).
+
 ## 운영 모델
 - idle + watcher 깨움 (자가 폴링 금지 — feedback-lead-event-driven-not-loop 일반화).
 - 정량 점수 = `(plan task 매치 reviewer verdict 합) / (전체 reviewer verdict)`.
