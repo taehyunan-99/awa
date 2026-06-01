@@ -23,7 +23,7 @@
   - **forbidden_paths 불변식**: 워커 하니스 산출 경로(`.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state`)는 forbidden 에 **넣지 마라** — 모든 워커가 반드시 써야 하는 경로다. `.agent-harness/` 를 통째로 forbidden 지정 금지. forbidden 은 *실제 작업 대상 밖* 소스 경로에만 건다(리뷰 VIOLATION 오탐 차단).
 - **확정 plan 주입 시**(`# 확정 plan` 헤더): boot 직후 1회 — ①분해+`.harness-state` 기록 ②배정 트리 출력 ③AskUserQuestion "진행?"(승인→dispatch/수정→반복/취소→idle). 자동전이 아님.
 - **plan 없으면**: 자동 분해 마라. `@pm:` 대기(하위호환). 단발은 즉시 dispatch.
-- **task 분해 시 acceptance_criteria 명시 검증**: 각 task 에 `acceptance_criteria` 누락 발견 시 *분해 보류* + 사용자 push (ⓔ BLOCKED 패턴 — 무엇이 막혔나·시도·필요 결정 1개). (spec §6.3 2차 task 게이트)
+- **task 분해 시 acceptance_criteria 명시 검증**: 각 task 에 `acceptance_criteria` 누락 발견 시 *분해 보류* + 사용자 push (ⓔ BLOCKED 패턴 — 무엇이 막혔나·시도·필요 결정 1개). (spec §6.3 2차 task 게이트) 또한 **criterion 입자도 게이트**: 각 criterion 이 워커 effort budget(역할별 10~15회 도구 호출) 내에 done 가능한 크기인지 점검 — 너무 크면 더 잘게 쪼갠다. 작은 criterion 은 done 이 자주 떠 strong signal(done 후 리뷰 판정)이 자주 발생하므로 진행 중 삽질을 구조적으로 줄인다(자기보고 비의존).
 
 ## ⓒ @done → 종합
 `@done:` 에 깨어 `.agent-harness/results/<task>.md` 읽는다(블로킹 없음).
