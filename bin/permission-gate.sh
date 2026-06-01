@@ -83,6 +83,23 @@ main() {
   case "$input" in ""|null) input='{}' ;; esac
   [ -z "$tool" ] && { emit_deny "gray:unparseable-event"; return; }   # tool 못 읽으면 fail-closed
 
+  # ★ 공통산출 특례: 모든 워커/리뷰어는 하니스 규약 경로(results/·events.log·.harness-state)에
+  #   결과를 써야 한다(_common.md:21). settings.allow 와 무관하게 이 경로 Write/Edit 는 무조건 allow.
+  #   읽기전용 권한군(readonly/reviewer)도 자기 산출은 막히면 안 됨. 6종 템플릿 중복 선언 제거.
+  #   경로 위조 방어: PROJECT_ROOT prefix 정확 매칭(중간 삽입 차단).
+  case "$tool" in
+    Write|Edit)
+      local _fp _hp
+      _fp="$(printf '%s' "$input" | jq -r '.file_path // ""' 2>/dev/null || true)"
+      _hp="${PROJECT_ROOT}/.agent-harness"
+      case "$_fp" in
+        "${_hp}/results/"*|"${_hp}/events.log"|"${_hp}/.harness-state"|"${_hp}/.harness-state/"*)
+          emit_allow "common-output"
+          log_safe "[$(timestamp)] ${WORKER} ${tool} → COMMON-OUTPUT-ALLOW (${_fp})"
+          return ;;
+      esac ;;
+  esac
+
   IFS="$T" read -r verdict detail <<EOF
 $(classify "$ENTRY_ROLE" "$tool" "$input")
 EOF
