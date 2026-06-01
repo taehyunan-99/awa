@@ -28,6 +28,22 @@ matrix_lookup() {
   else
     field=""
   fi
+  # Edit/Write file_path 절대경로 정규화 (2026-06-01 라이브 e2e 결함).
+  # 도구가 상대경로(예: 리뷰어의 .agent-harness/review/x.md)로 호출하면 settings allow 의
+  # 절대패턴(Write(/abs/review/**))과 매칭 실패 → gray 봉쇄. 같은 권한인데 호출자의 경로 표기
+  # (상대 vs 절대)에 따라 게이트 결과가 갈리는 비결정성 → N=2 합의 무작위 봉쇄.
+  # ★ pwd -P(심링크 해소) 금지: settings allow 패턴은 PROJECT_ROOT 원본 경로(심링크 미해소,
+  #   예 macOS /var/...)로 생성되므로, 해소하면 /private/var 로 바뀌어 오히려 어긋난다.
+  #   따라서 PROJECT_ROOT prefix 결합만 한다(워커 cwd=PROJECT_ROOT 계약, _common.md).
+  #   `..` 트래버설은 결합 후에도 패턴 prefix 밖이라 scope_match 가 자연히 차단(R5 검증).
+  case "$tool" in
+    Edit|Write)
+      case "$field" in
+        /*) : ;;  # 이미 절대경로 — 그대로
+        "") : ;;  # 빈 값 — 그대로
+        *) field="${PROJECT_ROOT%/}/$field" ;;  # 상대경로 → PROJECT_ROOT 기준 절대화
+      esac ;;
+  esac
   local pat ptool pinner prefix
   while IFS= read -r pat; do
     [ -n "$pat" ] || continue
