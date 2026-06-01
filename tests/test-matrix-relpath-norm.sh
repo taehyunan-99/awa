@@ -58,5 +58,34 @@ echo "[R5] .. 트래버설 상대경로 → 비매칭 (탈출 방어)"
   [ -z "$out" ] )
 assert_success "$?" "R5 .. 트래버설 비매칭"
 
+# ── 심링크 어긋남 회귀 (macOS /var→/private/var 재현) ──────────────────────
+# 라이브 결함: settings allow 패턴은 awa-up --project 값(심링크 SYM)으로 생성되는데
+# 런타임 PROJECT_ROOT 은 lib.sh 가 git toplevel 로 실물경로(REAL)로 재계산 →
+# 한쪽만 정규화하면 REAL vs SYM 으로 어긋나 gray 봉쇄.
+REAL="$(mktemp -d)"
+mkdir -p "$REAL/.agent-harness/.boot-settings" "$REAL/.agent-harness/review"
+SYM="$(mktemp -u)"          # 미존재 경로명
+ln -s "$REAL" "$SYM"        # SYM → REAL 심링크 (/var→/private/var 모사)
+# settings 패턴은 *심링크 경로*(SYM)로 생성 (awa-up --project SYM 모사)
+cat > "$REAL/.agent-harness/.boot-settings/reviewer-alignment.json" <<JSON
+{"permissions":{"allow":["Write($SYM/.agent-harness/review/**)"]}}
+JSON
+
+echo "[R6] PROJECT_ROOT=실물경로 + 패턴=심링크경로 + 절대 file_path(심링크) → 매칭"
+# 리뷰어가 SYM 절대경로로 Write, 런타임 PROJECT_ROOT 은 REAL(실물).
+export PROJECT_ROOT="$REAL"
+out="$(matrix_lookup reviewer-alignment Write "{\"file_path\":\"$SYM/.agent-harness/review/v.md\"}")"
+assert_success "$?" "R6 심링크 절대경로 매칭 성공"
+
+echo "[R7] PROJECT_ROOT=실물경로 + 상대 file_path(cwd=실물) → 매칭"
+# 워커 cwd=REAL, 상대경로 Write. 정규화가 REAL 로 가는데 패턴은 SYM → 양쪽 실물화로 통일돼야 매칭.
+( cd "$REAL" && \
+  out="$(matrix_lookup reviewer-alignment Write '{"file_path":".agent-harness/review/w.md"}')" && \
+  [ -n "$out" ] )
+assert_success "$?" "R7 심링크 환경 상대경로 매칭 성공"
+
+rm -rf "$REAL"; rm -f "$SYM"
+export PROJECT_ROOT="$PT"
+
 rm -rf "$PT"
 test_summary

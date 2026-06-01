@@ -2,6 +2,44 @@
 # matrix_lookup + lead_auto_allow_lookup. source 시 부수효과 없음 (함수 정의만).
 # bash 3.2 호환.
 
+# 경로를 실물경로(심링크 해소)로 정규화. 신규 Write 라 파일 자체는 미존재 가능 →
+# *부모 디렉토리*를 cd && pwd -P 로 해소 후 basename 재결합. 상대경로는 cwd 기준.
+# cd 실패(부모 미존재)면 원본 유지(정규화 불가 — scope_match 가 안전하게 처리).
+# 빈 값은 그대로. (공통산출 특례 permission-gate.sh 와 동일 원리, DRY 불가라 국소 복제)
+_realpath_field() {
+  local p="$1" d b rd
+  [ -n "$p" ] || { printf '%s' "$p"; return 0; }
+  d="$(dirname "$p")"; b="$(basename "$p")"
+  if rd="$(cd "$d" 2>/dev/null && pwd -P)"; then
+    printf '%s/%s' "$rd" "$b"
+  else
+    printf '%s' "$p"
+  fi
+}
+
+# allow 패턴 inner(예: /var/proj/review/** 또는 /var/proj/.review-cursor.*)의
+# glob(* 또는 **) *앞* 고정 디렉토리 prefix 만 실물경로화. glob 이하는 보존.
+# glob 없으면 전체를 _realpath_field 처리. field 와 같은 정규형으로 맞춰 심링크 어긋남 차단.
+_realpath_pattern() {
+  local pat="$1" head tail rd
+  case "$pat" in
+    /*) : ;;            # 절대경로 패턴만 정규화 대상
+    *) printf '%s' "$pat"; return 0 ;;  # 비경로/상대 패턴은 그대로
+  esac
+  case "$pat" in
+    *'*'*)
+      # 첫 '*' 앞까지를 head 로, 그 이후를 tail 로 분리. head 의 마지막 / 까지가 고정 dir.
+      head="${pat%%\**}"; tail="${pat#"$head"}"
+      local dir="${head%/*}"
+      if [ -n "$dir" ] && rd="$(cd "$dir" 2>/dev/null && pwd -P)"; then
+        printf '%s/%s' "$rd" "${head#"$dir"/}$tail"
+      else
+        printf '%s' "$pat"
+      fi ;;
+    *) _realpath_field "$pat" ;;   # glob 없는 정확 경로 패턴
+  esac
+}
+
 # settings.allow 패턴과 input 비교 → MATCH 면 exit 0 + stdout 에 패턴.
 # $1=entry_role $2=tool $3=input_json
 matrix_lookup() {
@@ -28,21 +66,18 @@ matrix_lookup() {
   else
     field=""
   fi
-  # Edit/Write file_path 절대경로 정규화 (2026-06-01 라이브 e2e 결함).
-  # 도구가 상대경로(예: 리뷰어의 .agent-harness/review/x.md)로 호출하면 settings allow 의
-  # 절대패턴(Write(/abs/review/**))과 매칭 실패 → gray 봉쇄. 같은 권한인데 호출자의 경로 표기
-  # (상대 vs 절대)에 따라 게이트 결과가 갈리는 비결정성 → N=2 합의 무작위 봉쇄.
-  # ★ pwd -P(심링크 해소) 금지: settings allow 패턴은 PROJECT_ROOT 원본 경로(심링크 미해소,
-  #   예 macOS /var/...)로 생성되므로, 해소하면 /private/var 로 바뀌어 오히려 어긋난다.
-  #   따라서 PROJECT_ROOT prefix 결합만 한다(워커 cwd=PROJECT_ROOT 계약, _common.md).
-  #   `..` 트래버설은 결합 후에도 패턴 prefix 밖이라 scope_match 가 자연히 차단(R5 검증).
+  # Edit/Write file_path 실물경로 정규화 (2026-06-01 라이브 e2e 결함).
+  # 결함: 도구가 상대경로(.agent-harness/review/x.md)로 호출하면 settings allow 의
+  #   절대패턴과 매칭 실패 → gray 봉쇄. 같은 권한인데 호출자 경로 표기(상대 vs 절대)에 따라
+  #   게이트 결과가 갈리는 비결정성 → N=2 합의 무작위 봉쇄.
+  # 추가 함정(심링크): settings allow 패턴은 awa-up 의 --project 값(예 macOS /var/...,
+  #   심링크)으로 생성되는데, 런타임 PROJECT_ROOT 은 lib.sh 가 git toplevel 로 재계산해
+  #   실물경로(/private/var/...)가 된다. → 한쪽만 정규화하면 /private/var vs /var 로 어긋남.
+  # 해법: field 와 매칭 대상 패턴의 경로를 *둘 다* 실물경로(pwd -P)로 통일(공통산출 특례와
+  #   동일 원리 — _fp·_hp 양쪽 해소). field 는 부모 dir 정규화(신규 Write 미존재 대응),
+  #   패턴은 glob 앞 고정 prefix 만 정규화(_norm_path_field). 상대/절대·심링크 무관 결정적.
   case "$tool" in
-    Edit|Write)
-      case "$field" in
-        /*) : ;;  # 이미 절대경로 — 그대로
-        "") : ;;  # 빈 값 — 그대로
-        *) field="${PROJECT_ROOT%/}/$field" ;;  # 상대경로 → PROJECT_ROOT 기준 절대화
-      esac ;;
+    Edit|Write) field="$(_realpath_field "$field")" ;;
   esac
   local pat ptool pinner prefix
   while IFS= read -r pat; do
@@ -52,6 +87,9 @@ matrix_lookup() {
         ptool="${pat%%(*}"
         pinner="${pat#*(}"; pinner="${pinner%)}"
         [ "$ptool" = "$tool" ] || continue
+        # Edit|Write 패턴 경로를 field 와 같은 실물경로 정규형으로 통일(심링크 어긋남 차단).
+        # 매칭에만 사용 — stdout 출력은 원본 $pat 유지(gate.log 가독성·기존 동작 보존).
+        case "$tool" in Edit|Write) pinner="$(_realpath_pattern "$pinner")" ;; esac
         case "$pinner" in
           *':*')
             prefix="${pinner%:\*}"
