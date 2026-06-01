@@ -107,13 +107,21 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
   cur="$(awk 'END{print NR}' "$EVENTS" 2>/dev/null || echo 0)"
   if [ "$cur" -gt "$last_events" ]; then
     now="$(date +%s)"
-    # M3: reviewer 디바운스
-    if [ "$((now - debounced_rev))" -ge "$REV_DEBOUNCE" ]; then
+    # 새 구간에 done 라인이 있는지 — reviewer 깨움 게이트.
+    # done 만이 강한 신호(결과물 의미 판정)이고 modify/allow-confirm 은 잡음이다.
+    # 잡음마다 깨우면 Opus reviewer 가 매번 cursor~현재를 재검토해 처리량<유입량 적체
+    # → 두 reviewer cursor 가 어긋나 합의 게이트 N 집계 불가(회로① 무력화, 라이브 실측).
+    # done 시점에 reviewer 가 cursor 부터 전 구간을 처리하므로 그 사이 modify scope 위반도
+    # 함께 검토된다 — 깨움을 done 으로 좁혀도 약한 신호 누락 없음.
+    new_done="$(sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
+      | awk -F'\t' '$4=="done"{c++} END{print c+0}')"
+    # M3: reviewer 디바운스 — 단 새 구간에 done 이 있을 때만 깨운다.
+    if [ "$new_done" -gt 0 ] && [ "$((now - debounced_rev))" -ge "$REV_DEBOUNCE" ]; then
       for rp in $REVIEWER_PANES; do
         pane_alive "$rp" || continue
         # I-3 정정: review-manager 는 일반 @review: 깨움에서 제외 — drift-check 전용으로만 깨움.
         [ "$rp" = "$REVIEW_MANAGER_PANE" ] && continue
-        tmux send-keys -t "$rp" -l "@review: events.log 새 줄. 증분 검토." 2>/dev/null
+        tmux send-keys -t "$rp" -l "@review: done 라인 발생. cursor 부터 증분 검토." 2>/dev/null
         tmux send-keys -t "$rp" Enter 2>/dev/null
       done
       debounced_rev="$now"
