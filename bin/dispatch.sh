@@ -76,6 +76,14 @@ if [ -z "$TARGET" ]; then
   exit 1
 fi
 
+# 계획 B: 차단 가드 — 합의 게이트로 자동차단된 워커는 dispatch 거부 (파일 불변식 집행).
+# LEAD 가 ⓒ 종합에서 record_block 한 상태면, LEAD 가 실수/고의로 재배정해도 여기서 막힌다.
+# 해소는 LEAD 가 재판정 OK 후 clear_block 호출 시. watcher 대행 경로도 dispatch.sh 경유라 자동 적용.
+if is_worker_blocked "$WORKER"; then
+  echo "차단됨: 워커 '$WORKER' 는 합의 게이트로 자동차단 상태 (.agent-harness/state/blocked-workers/$WORKER.json). 재판정 OK(clear_block) 또는 격리 전까지 dispatch 거부." >&2
+  exit 2
+fi
+
 write_harness_task "$WORKER" "$TASK_ID"
 send_prompt "$TARGET" "TASK $TASK_ID"
 echo "배정 완료: 워커=$WORKER ($TARGET) ← TASK $TASK_ID"

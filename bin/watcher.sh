@@ -70,11 +70,16 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     fi
     # dispatch.sh 가 has-session/list-panes/send_prompt(tmux) 를 watcher(sandbox 밖)에서
     # 정상 실행. --project 로 PROJECT_ROOT 명시(watcher cwd=본체라 git toplevel 오인 방지).
-    if bash "$(dirname "$0")/dispatch.sh" \
-         ${HARNESS_PROJECT:+--project "$HARNESS_PROJECT"} "$dq_worker" "$dq_task" >/dev/null 2>&1; then
+    _dq_rc=0
+    bash "$(dirname "$0")/dispatch.sh" \
+      ${HARNESS_PROJECT:+--project "$HARNESS_PROJECT"} "$dq_worker" "$dq_task" >/dev/null 2>&1 || _dq_rc=$?
+    if [ "$_dq_rc" = 0 ]; then
       :   # 성공 — dispatch.sh 가 워커 페인에 TASK 주입. lead 통지 불필요(조용).
+    elif [ "$_dq_rc" = 2 ]; then
+      :   # 차단(계획 B 합의 게이트) — dispatch.sh 가 거부. 실패 아님이라 @dispatch-fail 통지 안 함.
+          #   LEAD 가 차단 워커를 재배정한 경우라 조용히 소비(통지 루프 방지). 해소는 clear_block.
     elif pane_alive "$LEAD_PANE"; then
-      # 실패만 lead 에 통지(세션/페인/task 파일 이상). -l 과 Enter 분리(half-sent 방지).
+      # 진짜 실패만 lead 에 통지(세션/페인/task 파일 이상). -l 과 Enter 분리(half-sent 방지).
       tmux send-keys -t "$LEAD_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)." 2>/dev/null
       tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
     fi

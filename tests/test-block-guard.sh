@@ -58,4 +58,17 @@ assert_eq "1" "$?" "L2 격리된 워커는 blocked-workers 비어 비차단 (다
 # Layer 2-f: BLOCK_RETRY_LIMIT 상수 노출
 assert_eq "2" "$BLOCK_RETRY_LIMIT" "L2 BLOCK_RETRY_LIMIT=2 상수"
 
+# Layer 1: dispatch.sh 가 send 전 is_worker_blocked 가드를 호출하는가
+grep -q 'is_worker_blocked' "$ROOT/bin/dispatch.sh"
+assert_success "$?" "L1 dispatch.sh 가 is_worker_blocked 가드 호출"
+# 가드가 write_harness_task/send_prompt *앞* 에 와야 차단이 dispatch 를 막는다
+guard_ln="$(grep -n 'is_worker_blocked' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
+send_ln="$(grep -n 'send_prompt' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
+[ -n "$guard_ln" ] && [ -n "$send_ln" ] && [ "$guard_ln" -lt "$send_ln" ]
+assert_success "$?" "L1 가드가 send_prompt 앞에 위치 (차단이 송신을 막음)"
+
+# Layer 1: watcher.sh 가 dispatch exit 2(차단)를 @dispatch-fail 로 오인하지 않는가
+grep -qE '_dq_rc.*=.*2|= "2"' "$ROOT/bin/watcher.sh"
+assert_success "$?" "L1 watcher 가 exit 2(차단)를 별도 분기로 skip"
+
 test_summary
