@@ -124,4 +124,36 @@ case "$(_block_state_dir)" in
   *) assert_success "1" "L2 격리 실패 — _block_state_dir 가 TMPDIR 밖: $(_block_state_dir)" ;;
 esac
 
+# Layer 1: lead.md ⓒ 가 실제 리뷰어 파일명 규약(.alignment-rev/.quality-rev/.security-rev)을 명시
+# (모호한 <리뷰어> 토큰으로 되돌리면 blocking 집계 0건→만장일치 차단 영원히 미발동 — 회로 무력화 회귀 방지)
+LEAD_F="$ROOT/prompts/roles/01-orchestration/lead.md"
+grep -q 'alignment-rev' "$LEAD_F"
+assert_success "$?" "L1 lead.md 가 .alignment-rev 파일명 규약 명시(토큰 되돌림 회귀 방지)"
+grep -q 'quality-rev' "$LEAD_F"
+assert_success "$?" "L1 lead.md 가 .quality-rev 파일명 규약 명시"
+grep -q 'security-rev' "$LEAD_F"
+assert_success "$?" "L1 lead.md 가 .security-rev 파일명 규약 명시"
+
+# Layer 2: dispatch.sh 가 차단 워커에 정확히 exit 2 (exit 1 로 바뀌면 watcher 오통지 — M1 회귀)
+# 격리 프로젝트 + tmux 세션에서 실제 실행. dispatch.sh 는 차단 가드(L55)가 세션 확인(L46) *뒤*라
+# 세션이 있어야 차단 가드에 도달한다. resolve_session 은 SESSION_OVERRIDE 로 세션명 주입이 가능하므로
+# 테스트가 만든 세션명을 정확히 맞춰 *정확한 exit 2* 를 단언한다(보수적 fallback 불필요).
+if command -v tmux >/dev/null 2>&1; then
+  DT="$(mktemp -d)"
+  ( cd "$DT" && git init -q 2>/dev/null )
+  mkdir -p "$DT/.agent-harness/state/blocked-workers" "$DT/.agent-harness/tasks"
+  printf '{"worker":"blkw","task_id":"BT","attempt":1,"reason":"t"}' > "$DT/.agent-harness/state/blocked-workers/blkw.json"
+  _sess="awatest_blk_$$"
+  if tmux new-session -d -s "$_sess" 2>/dev/null; then
+    _rc=0
+    # SESSION_OVERRIDE 로 resolve_session 을 격리 세션명에 고정 → 세션 확인 통과 → 차단 가드 도달.
+    SESSION_OVERRIDE="$_sess" \
+      bash "$ROOT/bin/dispatch.sh" --project "$DT" blkw BT >/dev/null 2>&1 || _rc=$?
+    tmux kill-session -t "$_sess" 2>/dev/null
+    # 차단 파일이 있는데 통과(exit 0)면 명백한 가드 실패. exit 2 가 정상 차단 종료코드.
+    assert_eq "2" "$_rc" "L2 차단 워커 dispatch 가 정확히 exit 2 (exit 1 회귀 직접 탐지)"
+  fi
+  rm -rf "$DT"
+fi
+
 test_summary
