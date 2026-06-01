@@ -25,6 +25,12 @@ REV_DEBOUNCE="${REV_DEBOUNCE:-3}"
 # §5.7 drift-check 용 worker_turn_count 함수 — lib.sh 에서 끌어온다 (없으면 무해 진행).
 # shellcheck source=lib.sh
 . "$(dirname "$0")/lib.sh" 2>/dev/null || true
+# @done ack 큐 함수(enqueue_pending_done/requeue_pending_done) — 회로① 침묵 차단.
+# shellcheck source=watcher-lib.sh
+. "$(dirname "$0")/watcher-lib.sh" 2>/dev/null || true
+# done 재발화 나이 임계(초). LEAD 가 idle 복귀할 시간을 준 뒤 미ack done 을 재발화.
+REQUEUE_AGE="${REQUEUE_AGE:-20}"
+case "$REQUEUE_AGE" in ''|*[!0-9]*) REQUEUE_AGE=20 ;; esac
 # REV_DEBOUNCE 가 비정수로 주입되면 산술 비교에서 데몬이 즉사 → 정수 아니면 기본값으로.
 case "$REV_DEBOUNCE" in ''|*[!0-9]*) REV_DEBOUNCE=3 ;; esac
 
@@ -126,13 +132,15 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       done
       debounced_rev="$now"
     fi
-    # C2: done 라인 worker/task 추출 → lead 알림. R3: while 은 서브셸 — wt 만 쓰고 외부변수 갱신 금지.
+    # C2: done 라인 worker/task 추출 → lead 알림 + ack 큐 적재. R3: while 은 서브셸 — wt 만 쓰고 외부변수 갱신 금지.
+    # enqueue_pending_done 으로 pending-done/ 에 적재해 LEAD 점유 중 @done 소실 시 재발화 보장(회로① 침묵 차단).
     sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
-      | awk -F'\t' '$4=="done"{print $2"/"$3}' \
-      | while IFS= read -r wt; do
-          [ -n "$wt" ] || continue
+      | awk -F'\t' '$4=="done"{print $2"\t"$3}' \
+      | while IFS=$'\t' read -r dw dt; do
+          [ -n "$dw" ] && [ -n "$dt" ] || continue
+          enqueue_pending_done "$STATE_DIR" "$dw" "$dt"   # ack 큐 적재(LEAD 가 종합 후 rm)
           pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@done: $wt 완료. results/ 확인 후 종합." 2>/dev/null
+          tmux send-keys -t "$LEAD_PANE" -l "@done: $dw/$dt 완료. results/ 확인 후 종합." 2>/dev/null
           tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
         done
     # @drift-check: worker_turn_count 임계 (N=10) 도달 → review-manager 깨움 트리거 (§5.7).
@@ -175,6 +183,19 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
         done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
+  fi
+
+  # 3) @done ack 큐 재발화 — events 증가와 무관하게 매 사이클. LEAD 가 점유 중이라 @done 을
+  #    놓쳤어도(미ack=pending-done/ 잔존) REQUEUE_AGE 초 뒤 재발화 → idle 복귀 시 도달.
+  #    LEAD 가 ⓒ 종합 완료 후 해당 .json 을 rm(ack)하면 더는 재발화 안 함. 회로① 침묵 차단.
+  if [ -n "$STATE_DIR" ] && [ -d "$STATE_DIR/pending-done" ]; then
+    requeue_pending_done "$STATE_DIR" "$REQUEUE_AGE" 2>/dev/null \
+      | while IFS= read -r rq; do
+          [ -n "$rq" ] || continue
+          pane_alive "$LEAD_PANE" || continue
+          tmux send-keys -t "$LEAD_PANE" -l "@done: $rq 완료. results/ 확인 후 종합." 2>/dev/null
+          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+        done
   fi
 
   sleep 1

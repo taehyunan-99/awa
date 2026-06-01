@@ -32,6 +32,7 @@
   ```
   <갱신> > .agent-harness/.harness-state.tmp && mv .agent-harness/.harness-state.tmp .agent-harness/.harness-state
   ```
+- **종합 완료 ack (필수)**: 종합을 마쳤으면 `rm -f .agent-harness/state/pending-done/<worker>__<task>.json` 로 ack 한다. watcher 가 이 파일이 남아있는 한 @done 을 재발화하므로(네가 점유 중이라 첫 @done 을 놓쳤을 수 있다 — 회로① 침묵 차단), ack 안 하면 같은 done 이 반복 도착한다. task-id 의 `/` 는 `_` 로 치환된 파일명임에 유의(예: `sub/t-1` → `sub_t-1`).
 - **품질 게이트**: 미통과 산출물을 다음 입력으로 쓰려는 지시면 `.harness-state` 경고(차단 안 함 — push 로 결정).
 - **reviewer Write 위반 감지**: `.review-cursor.lead` 이후 events.log 에서 worker=reviewer+modify+rel 이 `review/` 아님 → 위반 기록. 커서 갱신.
 - **합의 게이트 (회로① — blocking 집계)**: 투표 리뷰어의 review 파일 — `review/<worker>-<id>.alignment-rev.md`·`.quality-rev.md`·`.security-rev.md`(이 셋만 투표 모수) — 헤더의 `blocking` 필드를 센다(`blocking: true` 개수 집계, 본문 설명문의 `blocking: true` 오집계 주의 — 헤더 한정. 비투표 alternative·메타 review-manager 파일 제외).
