@@ -210,7 +210,7 @@ vendor_source() {
 # 워커 역할 → settings 사본 산출 (5차: 2 인자).
 # $1=entry_role (settings 파일명 결정: dev/test/reviewer-*/lead/...) → echo path
 # $2=entry_name (settings 의 {{ENTRY_NAME}} 토큰 치환값 — WORKER env 통일, F22 옵션 A)
-# 매핑 없는 역할은 default 템플릿 적용 (4차 P0 의 `*) return 0` 대체, F12·§5.13).
+# 매핑 없는 역할은 readonly 템플릿 적용 — 최소권한 fail-safe (4차 P0 의 `*) return 0` 대체, F12·§5.13).
 generate_worker_settings() {
   local role="$1" entry_name="${2:-}"
   local tpl_name=""

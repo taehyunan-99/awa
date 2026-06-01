@@ -43,8 +43,8 @@ assert_eq "3" "$N_WORKERS" "workers 윈도우 pane 3개 (워커2+watcher)"
 
 # workers 윈도우의 title 결정적 검증.
 TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:workers" -F '#{pane_title}' | sort | tr '\n' ',')"
-assert_contains "$TITLES" "dev" "워커 title dev 설정됨(layout 무관, pane_id 기반)"
-assert_contains "$TITLES" "test" "워커 title test 설정됨"
+assert_contains "$TITLES" "engineer" "워커 title engineer 설정됨(layout 무관, pane_id 기반)"
+assert_contains "$TITLES" "researcher" "워커 title researcher 설정됨"
 assert_contains "$TITLES" "watcher" "watcher pane title 설정됨"
 # team 윈도우 title 검증.
 TEAM_TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:team" -F '#{pane_title}' | sort | tr '\n' ',')"
@@ -54,26 +54,26 @@ assert_contains "$TEAM_TITLES" "LEAD" "lead title 설정됨"
 # title 보존 결정적 검증: 워커 페인을 실제 셸로 띄워 OSC0 escape 를 흘려도
 # allow-set-title off 덕에 select-pane -T 로 준 title 이 유지돼야 함 (spec §6 전제).
 # 주의: respawn 이 pane 을 갈아끼우므로 위 title 집합 검증보다 반드시 뒤에 둔다.
-# 14차 UX: workers 윈도우 첫 pane (워커1=dev) 으로 타겟 변경.
+# 14차 UX: workers 윈도우 첫 pane (워커1=engineer) 으로 타겟 변경.
 TGT="$SESSION_OVERRIDE:workers.1"
 tmux respawn-pane -k -t "$TGT" bash
 sleep 0.3
-tmux select-pane -t "$TGT" -T "dev"
+tmux select-pane -t "$TGT" -T "engineer"
 tmux send-keys -t "$TGT" -l 'printf "\033]0;HOSTNAME_FAKE\007"'
 tmux send-keys -t "$TGT" Enter
 sleep 0.5
 T2="$(tmux display-message -p -t "$TGT" '#{pane_title}')"
-assert_eq "dev" "$T2" "allow-set-title off: OSC title escape 후에도 pane_title 보존"
+assert_eq "engineer" "$T2" "allow-set-title off: OSC title escape 후에도 pane_title 보존"
 
 # 부트스트랩 파일이 워커별로 생성되고 치환됨
-assert_eq "0" "$([ -f "$TMP_PROJ/.agent-harness/.boot/dev.md" ] && echo 0 || echo 1)" "dev.md boot 생성"
-BOOT="$(cat "$TMP_PROJ/.agent-harness/.boot/dev.md")"
-assert_contains "$BOOT" "워커 이름: dev" "{{WORKER_NAME}} → dev 치환됨"
+assert_eq "0" "$([ -f "$TMP_PROJ/.agent-harness/.boot/engineer.md" ] && echo 0 || echo 1)" "engineer.md boot 생성"
+BOOT="$(cat "$TMP_PROJ/.agent-harness/.boot/engineer.md")"
+assert_contains "$BOOT" "워커 이름: engineer" "{{WORKER_NAME}} → engineer 치환됨"
 # P11 탈-tmux: done 채널(`done-{{SESSION}}-...`) 폐지 → {{SESSION}} 토큰이 워커 부트에서 소멸.
 #   완료 신호는 events.log done 라인. 부트에 done 라인 규약 + 워커 tmux 직접호출 금지가 주입됐는지 검증.
 assert_contains "$BOOT" "done 라인" "완료 신호=events.log done 라인 규약 주입됨"
 case "$BOOT" in *"tmux wait-for -S done-"*) assert_eq 1 0 "워커 부트에 wait-for 채널 잔존(P11 위반)";; *) assert_eq 0 0 "워커 부트 wait-for 채널 제거 확인(P11)";; esac
-assert_contains "$BOOT" "역할: 개발자" "역할 프롬프트 합쳐짐"
+assert_contains "$BOOT" "역할: 엔지니어" "역할 프롬프트 합쳐짐"
 if printf '%s' "$BOOT" | grep -qF '{{WORKER_NAME}}'; then r=0; else r=1; fi
 assert_eq "1" "$r" "미치환 토큰 없음"
 

@@ -9,7 +9,7 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="dq_$$"
 # 더미 워커: TASK 받으면 결과 파일 + done 라인(탈-tmux 완료신호).
-export AGENT_CMD="bash $ROOT/tests/dummy-worker.sh dev $SESSION_OVERRIDE"
+export AGENT_CMD="bash $ROOT/tests/dummy-worker.sh engineer $SESSION_OVERRIDE"
 
 TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
 export HARNESS_PROJECT="$TMP_PROJ"
@@ -31,7 +31,7 @@ WS="$TMP_PROJ/.agent-harness"
 #    (tmux 명령 전혀 안 씀 — sandbox 안 lead 와 동일 조건.)
 echo "# Q1: dispatch-queue E2E 더미 작업" > "$WS/tasks/Q1.md"
 mkdir -p "$WS/state/dispatch-queue"
-printf '{"worker":"dev","task_id":"Q1"}' > "$WS/state/dispatch-queue/Q1.json.tmp"
+printf '{"worker":"engineer","task_id":"Q1"}' > "$WS/state/dispatch-queue/Q1.json.tmp"
 mv "$WS/state/dispatch-queue/Q1.json.tmp" "$WS/state/dispatch-queue/Q1.json"
 
 # 2) watcher 가 큐를 폴링해 dispatch.sh 를 대행 → 워커 결과 파일 생성까지 대기(최대 ~8s).

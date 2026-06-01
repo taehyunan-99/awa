@@ -29,9 +29,9 @@ assert_eq "0" "$rc" "M1 awa-up 성공"
 # 6차: project settings.json 은 빈 {} — 토큰 치환 검증은 워커 settings 에서.
 proj_content="$(cat "$TMP/.claude/settings.json")"
 assert_eq "{}" "$(printf '%s' "$proj_content" | tr -d '[:space:]')" "M1 project settings 빈 {} (hook 이관)"
-# 워커 dev settings — PostToolUse(log-event) 토큰 치환 확인.
-worker_settings="$TMP/.agent-harness/.boot-settings/dev.json"
-[ -f "$worker_settings" ]; assert_success "$?" "M1 워커 dev settings 생성됨"
+# 워커 engineer settings — PostToolUse(log-event) 토큰 치환 확인.
+worker_settings="$TMP/.agent-harness/.boot-settings/engineer.json"
+[ -f "$worker_settings" ]; assert_success "$?" "M1 워커 engineer settings 생성됨"
 content="$(cat "$worker_settings" 2>/dev/null || true)"
 # {{...}} 토큰 잔존 검증
 assert_eq "" "$(printf '%s' "$content" | grep -oE '\{\{[A-Z_]+\}\}')" "M1 토큰 잔존 없음"

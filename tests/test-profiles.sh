@@ -10,7 +10,7 @@ source "$ROOT/profiles/default.sh"
 assert_eq "" "${SESSION:-}" "default SESSION 미정의(폴백 의존)"
 assert_eq "tiled" "$LAYOUT" "default LAYOUT"
 assert_eq "2" "${#WORKERS[@]}" "default 워커 2개(reviewer 워커 제거·일원화)"
-assert_eq "dev:dev" "${WORKERS[0]}" "default 첫 워커"
+assert_eq "engineer:engineer" "${WORKERS[0]}" "default 첫 워커"
 
 source "$ROOT/profiles/code-review.sh"
 assert_eq "1" "${#WORKERS[@]}" "code-review 워커 1개(reviewer 워커 제거·일원화)"

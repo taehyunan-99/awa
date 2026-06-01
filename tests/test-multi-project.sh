@@ -35,8 +35,8 @@ tmux has-session -t awa-projectB 2>/dev/null; assert_success "$?" "awa-projectB 
 
 # T16.3 — 두 워커 settings 각자 PROJECT_ROOT 박힘 (격리).
 # 6차: project .claude/settings.json 은 빈 {} 로 이관 — 경로는 워커 --settings 에 박힘.
-A_DEV="$TMP1/.agent-harness/.boot-settings/dev.json"
-B_DEV="$TMP2/.agent-harness/.boot-settings/dev.json"
+A_DEV="$TMP1/.agent-harness/.boot-settings/engineer.json"
+B_DEV="$TMP2/.agent-harness/.boot-settings/engineer.json"
 grep -q "$TMP1" "$A_DEV"; assert_success "$?" "A 워커 settings 에 A 경로"
 grep -q "$TMP2" "$B_DEV"; assert_success "$?" "B 워커 settings 에 B 경로"
 ! grep -q "$TMP2" "$A_DEV" 2>/dev/null; assert_success "$?" "A 워커 settings 에 B 경로 없음"
