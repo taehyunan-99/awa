@@ -75,4 +75,21 @@ assert_success "$?" "L1 가드가 TASK_FILE/페인 탐색 앞 (차단이 페인 
 grep -qE '_dq_rc.*=.*2|= "2"' "$ROOT/bin/watcher.sh"
 assert_success "$?" "L1 watcher 가 exit 2(차단)를 별도 분기로 skip"
 
+# Layer 2-g: 전체 흐름 — 차단 → 재판정 OK 해소 → 다시 차단 누적 → 격리
+clear_block "bob"; quarantine_block "bob" 2>/dev/null || true
+record_block "bob" "T1" "1차 차단"
+is_worker_blocked "bob"; assert_eq "0" "$?" "L2 흐름: 1차 차단됨"
+clear_block "bob"
+is_worker_blocked "bob"; assert_eq "1" "$?" "L2 흐름: 재판정 OK 로 해소"
+# 다시 문제 → K 도달까지 누적
+record_block "bob" "T1" "재발 1"
+record_block "bob" "T1" "재발 2"
+att="$(jq -r '.attempt' "$TMPDIR/state/blocked-workers/bob.json")"
+[ "$att" -ge "$BLOCK_RETRY_LIMIT" ]
+assert_success "$?" "L2 흐름: attempt($att) >= K($BLOCK_RETRY_LIMIT) — 격리 조건 충족"
+quarantine_block "bob"
+is_worker_blocked "bob"; assert_eq "1" "$?" "L2 흐름: 격리 후 워커는 다른 task dispatch 가능"
+test -f "$TMPDIR/state/quarantine/bob.json"
+assert_success "$?" "L2 흐름: 격리 task 는 quarantine 에 보존 (LEAD 가 사용자 push)"
+
 test_summary
