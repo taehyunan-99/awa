@@ -14,7 +14,7 @@ watcher 가 `@review:` 로 깨우면 1회 실행한다(스스로 폴링하지 �
 - **`review/<worker>-<id>.<나>.md` 외 Write 금지** — 다른 경로에 쓰면 워커 산출물로 오인돼 events.log·종합을 오염시킨다. lead 가 매 사이클 위반 감지.
 - **워커 조종 금지** — 리뷰어는 보고만. 개입(중단/수정 주입)은 lead 만 한다. 리뷰어가 끼어들면 단일 개입원칙이 깨져 충돌.
 
-출력: `results/<id>.md` 헤더에 `plan_alignment: <0.0~1.0>` 필드 필수 (review-manager 가 시계열 집계)
+(개별 리뷰어의 `plan_alignment` 출력 여부는 아래 *투표 계약 — plan_alignment 필드 의미* 절을 따른다 — `reviewer-alignment` 전용이며 다른 리뷰어는 출력하지 않는다.)
 
 events.log 필드 5 의미는 action 별 다름 — modify=경로 / done=- / plan-defect=설명 / drift-check=key=value. `_common.md §하니스 규약 5필드` 명세 참조.
 
