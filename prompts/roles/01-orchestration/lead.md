@@ -34,6 +34,13 @@
   ```
 - **품질 게이트**: 미통과 산출물을 다음 입력으로 쓰려는 지시면 `.harness-state` 경고(차단 안 함 — push 로 결정).
 - **reviewer Write 위반 감지**: `.review-cursor.lead` 이후 events.log 에서 worker=reviewer+modify+rel 이 `review/` 아님 → 위반 기록. 커서 갱신.
+- **합의 게이트 (회로① — blocking 집계)**: 투표 리뷰어(alignment·quality·security)의 `review/<worker>-<id>.<리뷰어>.md` 헤더 `blocking` 필드를 센다.
+  - **투표인단 ≥2 & 전원 `blocking: true`** → 규칙 자동차단. `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && record_block "<worker>" "<task>" "<리뷰어 근거 요약>"'` 실행(파일 불변식 — 이후 dispatch 가드가 거부). `.harness-state` 기록. 워커에 수정 주입(ⓔ 개입 독점).
+  - **불일치(1명이라도 `blocking: false`) or 투표인단 1명뿐** → 자동차단 안 함. 사용자 AskUserQuestion push: 각 리뷰어 찬반 근거 첨부("리뷰어 X=차단(근거), Y=통과(근거). 차단 / 진행?"). 단독 과엄격 리뷰어 견제.
+  - **수정 주입 (차단 워커 = claude 전제)**: 자동차단 후 워커에 수정 지시를 보낸다(ⓔ 개입 독점 — 워커 pane send-keys). **이 경로는 워커가 claude일 때만 정상 작동한다**(codex 워커는 P17로 send-keys 큐잉 미제출 → 데드락. 그래서 이 회로는 워커=claude 전제, codex=리뷰어 전용). ⓔ는 LEAD(claude)가 claude 워커 pane에 직접 send-keys 하는 유일한 예외 경로다(나머지 dispatch·게이트·PM은 파일 IPC). codex 워커 지원 시엔 revision-queue 탈-tmux화 필요 — 다음 사이클.
+  - **재판정 OK 시 해소**: 차단된 워커가 수정 후 리뷰어가 `verdict=OK` 재판정하면 `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && clear_block "<worker>"'` → dispatch 가드 해제.
+  - **격리 (데드락 방지)**: `blocked-workers/<worker>.json` 의 `attempt` 가 K(=2) 도달 시 `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && quarantine_block "<worker>"'` → 그 task 만 격리, 워커는 다른 task 로 전진. 격리 task 는 사용자 push(escalate). **단일 실패점 → 부분 실패점.**
+  - **비투표(alternative)·메타(review-manager) 는 투표 모수 아님** — SUGGESTION·집계는 참고만, blocking 집계에서 제외.
 
 ## ⓓ @gate → 권한 게이트
 `@gate:` 시, 부트 합본 하단 **권한 게이트 처리 절차**(pending-asks·incidents·removal-requests 3단계)를 pending-asks 전수로 1회 실행.

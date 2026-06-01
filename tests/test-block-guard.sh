@@ -92,4 +92,12 @@ is_worker_blocked "bob"; assert_eq "1" "$?" "L2 흐름: 격리 후 워커는 다
 test -f "$TMPDIR/state/quarantine/bob.json"
 assert_success "$?" "L2 흐름: 격리 task 는 quarantine 에 보존 (LEAD 가 사용자 push)"
 
+# Layer 1: lead.md ⓒ 가 합의 게이트(만장일치 record_block / 불일치 push)를 명시
+grep -q 'record_block' "$ROOT/prompts/roles/01-orchestration/lead.md"
+assert_success "$?" "L1 lead.md 가 record_block 호출 명시"
+grep -qE '만장일치|전원 blocking|투표인단' "$ROOT/prompts/roles/01-orchestration/lead.md"
+assert_success "$?" "L1 lead.md 가 합의 게이트(만장일치) 분기 명시"
+grep -q 'clear_block' "$ROOT/prompts/roles/01-orchestration/lead.md"
+assert_success "$?" "L1 lead.md 가 재판정 OK 해소(clear_block) 명시"
+
 test_summary
