@@ -776,6 +776,57 @@ worker_modify_count() {
   awk -F'\t' -v w="$worker" '$2==w && $4=="modify" { n++ } END { print n+0 }' "$events_log"
 }
 
+# ===== 계획 B: dispatch 차단 가드 (회로① 합의 게이트 집행) =====
+# 차단 상태 = .agent-harness/state/blocked-workers/<worker>.json (파일 불변식).
+# LEAD 가 ⓒ 종합에서 만장일치 판정 시 record_block, 재판정 OK 시 clear_block,
+# attempt>=K 시 quarantine_block. dispatch.sh 가 send 직전 is_worker_blocked 로 거부.
+# STATE_DIR 은 permission-gate.sh 와 동일 패턴 (${PROJECT_ROOT}/.agent-harness/state).
+BLOCK_RETRY_LIMIT=2   # 자동차단 task 재시도 한도. 초과 시 격리(헤드리스 데드락 방지). 운영 튜닝.
+
+# 차단 상태 디렉토리 (STATE_DIR override 가능 — 테스트 격리). 기본은 운영 state.
+_block_state_dir() {
+  echo "${STATE_DIR:-${PROJECT_ROOT:-.}/.agent-harness/state}"
+}
+
+# is_worker_blocked <worker> — 차단되어 있으면 rc 0, 아니면 rc 1 (dispatch 가드용).
+is_worker_blocked() {
+  local worker="$1"
+  [ -f "$(_block_state_dir)/blocked-workers/${worker}.json" ]
+}
+
+# record_block <worker> <task_id> <reason> — 차단 기록 (atomic). 이미 있으면 attempt++.
+record_block() {
+  local worker="$1" task_id="$2" reason="$3"
+  local dir; dir="$(_block_state_dir)/blocked-workers"
+  mkdir -p "$dir"
+  local f="$dir/${worker}.json" attempt=1
+  if [ -f "$f" ]; then
+    attempt="$(jq -r '.attempt // 1' "$f" 2>/dev/null)"
+    attempt=$((attempt + 1))
+  fi
+  # reason 에 따옴표/개행 들어가도 jq 가 안전하게 인코딩.
+  jq -n --arg w "$worker" --arg t "$task_id" --argjson a "$attempt" --arg r "$reason" \
+    '{worker:$w, task_id:$t, attempt:$a, reason:$r}' > "$f.tmp" && mv "$f.tmp" "$f"
+}
+
+# clear_block <worker> — 차단 해제 (재판정 OK). 멱등.
+clear_block() {
+  local worker="$1"
+  rm -f "$(_block_state_dir)/blocked-workers/${worker}.json" 2>/dev/null
+  return 0
+}
+
+# quarantine_block <worker> — blocked-workers → quarantine 이동 (attempt>=K).
+# 그 task 만 격리, 워커는 blocked-workers 비워져 다른 task dispatch 가능.
+quarantine_block() {
+  local worker="$1"
+  local src; src="$(_block_state_dir)/blocked-workers/${worker}.json"
+  [ -f "$src" ] || return 0
+  local qdir; qdir="$(_block_state_dir)/quarantine"
+  mkdir -p "$qdir"
+  mv "$src" "$qdir/${worker}.json"
+}
+
 # ===== Task 7: 권한 학습 영구화 (§7) =====
 # 4 함수 — bump_stats_counter / append_to_yaml / blocklist_contains / confirm_allow_yaml.
 # yq 부재 → awk fallback (Phase B/C 정확도 ↓ 인정).
