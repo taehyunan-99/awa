@@ -400,14 +400,23 @@ send_prompt() {
   tmux send-keys -t "$target" -l "$text"
   sleep "${SEND_PROMPT_ENTER_DELAY:-0.4}"   # codex 렌더링 여유 (claude 엔 무해한 짧은 지연)
   tmux send-keys -t "$target" Enter
-  # 미전송 안전망 — 입력창에 텍스트 앞 24자가 prompt 마커와 함께 잔류하면 Enter 재전송.
+  # 미전송 안전망 — 입력창 프롬프트 라인('›'/'>')에 텍스트 앞부분이 잔류하면 Enter 재전송.
+  # ★ 폴링 재시도: 느린 REPL(Opus 리뷰어 콜드스타트)은 첫 Enter 가 렌더링 전 도착해 씹힌다.
+  #   1회 재전송으론 부족 → 잔류가 사라질 때까지 최대 N회(기본 8×0.5s=4s) 재시도.
+  #   라이브 결함: Opus 리뷰어 부트 지시가 입력창에 박혀 역할 미수신 → 투표인단 N 붕괴.
   local head; head="$(printf '%s' "$text" | cut -c1-24)"
-  if tmux capture-pane -p -t "$target" 2>/dev/null | grep -Fq "$head"; then
-    # 잔류 확인 — 프롬프트 라인('›' 또는 '>')에 같이 있으면 미전송으로 보고 1회 더.
-    if tmux capture-pane -p -t "$target" 2>/dev/null | grep -E '^[[:space:]]*[›>]' | grep -Fq "$head"; then
+  local _i _max="${SEND_PROMPT_RETRY_MAX:-8}"
+  for _i in $(seq 1 "$_max"); do
+    # 프롬프트 라인 마커에 텍스트 앞부분이 같이 있으면 미전송 → Enter 1회.
+    # ★ 마커 3종: '❯'(U+276F, claude REPL 실제 입력 프롬프트)·'›'(U+203A)·'>'(ASCII).
+    #   라이브 결함: 기존엔 ❯ 누락으로 claude 입력창 잔류를 못 잡아 Enter 재전송 미발동 → 박힘.
+    if tmux capture-pane -p -t "$target" 2>/dev/null | grep -E '^[[:space:]]*[❯›>]' | grep -Fq "$head"; then
       tmux send-keys -t "$target" Enter
+      sleep "${SEND_PROMPT_RETRY_DELAY:-0.5}"
+    else
+      break   # 잔류 없음 = 전송 완료(또는 텍스트가 입력창 밖으로 사라짐).
     fi
-  fi
+  done
 }
 
 # --project 인자 정규화 (E12·F2). stdout=절대경로, $?=0 성공, return 1 실패.
