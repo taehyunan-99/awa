@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/test-block-guard.sh — dispatch 차단 가드 (회로① 합의 게이트 집행)
-# Layer 1: lead.md ⓒ 합의 분기 + dispatch.sh 가드 호출 grep
+# Layer 1: lead.md ⓒ 합의 분기 + dispatch.sh 가드 호출 grep (Task 2/4 에서 추가)
 # Layer 2: lib.sh is_worker_blocked/record_block/clear_block/quarantine_block 동작
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -29,6 +29,13 @@ assert_eq "0" "$?" "L2 차단 워커는 rc 0 (dispatch 거부)"
 record_block "dev" "T3" "재판정도 VIOLATION"
 att="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/dev.json")"
 assert_eq "2" "$att" "L2 재 record_block 시 attempt=2"
+
+# Layer 2-c2: 손상 attempt (비숫자) 회귀 — set -u 치명사 안 나고 1 로 복구 후 ++
+printf '{"worker":"carol","task_id":"T5","attempt":"corrupt","reason":"x"}' > "$STATE_DIR/blocked-workers/carol.json" 2>/dev/null || { mkdir -p "$STATE_DIR/blocked-workers"; printf '{"worker":"carol","task_id":"T5","attempt":"corrupt","reason":"x"}' > "$STATE_DIR/blocked-workers/carol.json"; }
+record_block "carol" "T5" "손상 후 재기록"
+assert_success "$?" "L2 손상 attempt 에도 record_block 성공(치명사 없음)"
+att2="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/carol.json")"
+assert_eq "2" "$att2" "L2 손상 attempt 는 1 로 복구 후 ++ → 2"
 
 # Layer 2-d: clear_block 후 비차단 복귀
 clear_block "dev"

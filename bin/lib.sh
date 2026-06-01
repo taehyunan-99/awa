@@ -795,6 +795,8 @@ is_worker_blocked() {
 }
 
 # record_block <worker> <task_id> <reason> — 차단 기록 (atomic). 이미 있으면 attempt++.
+# 호출처 = LEAD ⓒ 종합 단일 스레드 전제 (같은 워커 동시 record_block 없음). 락 불요(YAGNI).
+# 단일 스레드라 read-modify-write race 없음 — attempt 카운터는 격리(K) 판정 근거라 정확성 중요.
 record_block() {
   local worker="$1" task_id="$2" reason="$3"
   local dir; dir="$(_block_state_dir)/blocked-workers"
@@ -802,6 +804,8 @@ record_block() {
   local f="$dir/${worker}.json" attempt=1
   if [ -f "$f" ]; then
     attempt="$(jq -r '.attempt // 1' "$f" 2>/dev/null)"
+    # 손상 json 으로 attempt 가 비숫자면 1 로 복구 (set -u 산술평가 치명사 방지).
+    [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=1
     attempt=$((attempt + 1))
   fi
   # reason 에 따옴표/개행 들어가도 jq 가 안전하게 인코딩.
