@@ -5,6 +5,10 @@ source ./assert.sh
 
 ROOT="$(cd .. && pwd)"
 TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
+# ★ 정규화(pwd -P) 자격검증은 부모 디렉토리가 *존재*해야 cd 성공 → 특례 부여.
+#   events.log·.harness-state 부모 = .agent-harness/ 자체, results/* 부모 = results/.
+#   정상 케이스(1~3·10)가 정규화 후에도 통과하도록 셋업에서 부모 디렉토리를 만든다.
+mkdir -p "$TMP_PROJ/.agent-harness/results"
 cleanup() { rm -rf "$TMP_PROJ"; }
 trap cleanup EXIT
 
@@ -49,5 +53,38 @@ EV_TRICK=$(jq -nc --arg p "$TMP_PROJ/evil/.agent-harness/results/x.md" \
   '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u5"}')
 OUT5="$(run_gate "$EV_TRICK")"
 assert_not_contains "$OUT5" "common-output" "PROJECT_ROOT prefix 아닌 results 는 특례 미적용"
+
+# === 보안: 트래버설·심링크 탈출 차단 (C1/C2 회귀) ===
+
+# 6) .. 트래버설 — results/ prefix 로 시작해도 PROJECT_ROOT 탈출 시 특례 미적용
+EV_DOTDOT=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/results/../../../etc/passwd" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u6"}')
+OUT6="$(run_gate "$EV_DOTDOT")"
+assert_not_contains "$OUT6" "common-output" ".. 트래버설은 특례 미적용(탈출 차단)"
+
+# 7) 심링크 탈출 — results/link → /tmp 심링크 통한 외부 쓰기 차단
+ln -s /tmp "$TMP_PROJ/.agent-harness/results/link" 2>/dev/null || true
+EV_SYMLINK=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/results/link/evil.txt" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u7"}')
+OUT7="$(run_gate "$EV_SYMLINK")"
+assert_not_contains "$OUT7" "common-output" "심링크 탈출은 특례 미적용"
+
+# 8) prefix bleed — .harness-state-foo 는 .harness-state 정확매칭에 안 걸림
+EV_BLEED=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/.harness-state-foo" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u8"}')
+OUT8="$(run_gate "$EV_BLEED")"
+assert_not_contains "$OUT8" "common-output" ".harness-state-foo 는 정확매칭 아니라 특례 미적용"
+
+# 9) 빈 file_path — 특례 미적용 (정상 fallback)
+EV_EMPTY=$(jq -nc '{tool_name:"Write", tool_input:{content:"x"}, tool_use_id:"u9"}')
+OUT9="$(run_gate "$EV_EMPTY")"
+assert_not_contains "$OUT9" "common-output" "빈 file_path 특례 미적용"
+
+# 10) 정상 results 하위 깊은 경로는 여전히 allow (정규화가 정상 경로를 막지 않음 — 회귀)
+mkdir -p "$TMP_PROJ/.agent-harness/results/sub"
+EV_DEEP=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/results/sub/deep.md" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u10"}')
+OUT10="$(run_gate "$EV_DEEP")"
+assert_contains "$OUT10" "common-output" "정상 results 깊은 경로는 정규화 후에도 allow"
 
 test_summary

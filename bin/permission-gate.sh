@@ -86,12 +86,42 @@ main() {
   # ★ 공통산출 특례: 모든 워커/리뷰어는 하니스 규약 경로(results/·events.log·.harness-state)에
   #   결과를 써야 한다(_common.md:21). settings.allow 와 무관하게 이 경로 Write/Edit 는 무조건 allow.
   #   읽기전용 권한군(readonly/reviewer)도 자기 산출은 막히면 안 됨. 6종 템플릿 중복 선언 제거.
-  #   경로 위조 방어: PROJECT_ROOT prefix 정확 매칭(중간 삽입 차단).
+  #   경로 위조 방어(C1/C2): (a) `..` 트래버설 차단 + (b) 부모 디렉토리 pwd -P 정규화로
+  #   심링크 해소 후 _hp prefix 재검증 + (c) 문자열 prefix 정확 매칭(중간 삽입 차단).
+  #   정규화·jq 실패는 특례 미적용(fail-closed) — classify 로 진행해 안전 경로 유지.
   case "$tool" in
     Write|Edit)
       local _fp _hp
       _fp="$(printf '%s' "$input" | jq -r '.file_path // ""' 2>/dev/null || true)"
       _hp="${PROJECT_ROOT}/.agent-harness"
+
+      # (a) `..` 트래버설 차단: 경로 컴포넌트로 `..` 포함 시 특례 즉시 무효화.
+      #   `..foo`·`foo..bar` 같은 정상 파일명은 오탐 방지 — `/../`·`/..`(끝)·`../`(시작)·정확히 `..`만.
+      case "$_fp" in
+        ""|*"/../"*|*"/.."|"../"*|"..") _fp="" ;;
+      esac
+
+      # (b) 심링크·정규화 방어: file_path 는 신규 Write 라 미존재 가능 → 파일 자체가 아니라
+      #   *부모 디렉토리*를 `cd … && pwd -P` 로 물리경로화(심링크 해소). 부모가 _hp 물리경로
+      #   안에 있어야 특례 자격. events.log·.harness-state 는 _hp 직속 파일, results/* 는
+      #   _hp/results 직속/하위 → dirname 정규화가 셋 다 커버. cd 실패(부모 미존재)면 _fp="" (fail-closed).
+      if [ -n "$_fp" ]; then
+        local _dir _real_dir _real_hp
+        _dir="$(dirname "$_fp")"
+        if _real_dir="$(cd "$_dir" 2>/dev/null && pwd -P)" && \
+           _real_hp="$(cd "$_hp" 2>/dev/null && pwd -P)"; then
+          # 정규화된 부모가 _hp 직속(events.log·.harness-state) 또는 results 트리 안인지 검증.
+          case "$_real_dir" in
+            "$_real_hp"|"$_real_hp/results"|"$_real_hp/results/"*) : 자격유지 ;;
+            *) _fp="" ;;   # prefix 탈출(심링크 해소 후) → 특례 무효화
+          esac
+        else
+          _fp=""   # cd/pwd 실패(부모 미존재·권한) → fail-closed
+        fi
+      fi
+
+      # (c) 정규화 통과 + 문자열 prefix 정확 매칭. .harness-state 는 파일(lib.sh:_state_file)
+      #   이므로 .harness-state/* 패턴은 형식상 보존만(실사용 없음).
       case "$_fp" in
         "${_hp}/results/"*|"${_hp}/events.log"|"${_hp}/.harness-state"|"${_hp}/.harness-state/"*)
           emit_allow "common-output"
