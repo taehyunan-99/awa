@@ -12,9 +12,21 @@ _realpath_field() {
   d="$(dirname "$p")"; b="$(basename "$p")"
   if rd="$(cd "$d" 2>/dev/null && pwd -P)"; then
     printf '%s/%s' "$rd" "$b"
-  else
-    printf '%s' "$p"
+    return 0
   fi
+  # leaf 의 부모가 *아직 없으면*(신규 파일 Write 의 미존재 하위경로) cd 실패 → 원본 반환 시
+  # 패턴 쪽만 정규화돼 비대칭 봉쇄. 존재하는 *최상위 조상*까지 정규화하고 미존재 tail 을 부착해
+  # 패턴(glob 앞 dir 정규화)과 같은 정규형으로 맞춘다. (R8/R9 회귀)
+  local rest="$b" anc="$d" anc_rd
+  while [ -n "$anc" ] && [ "$anc" != "/" ] && [ "$anc" != "." ]; do
+    if anc_rd="$(cd "$anc" 2>/dev/null && pwd -P)"; then
+      printf '%s/%s' "$anc_rd" "$rest"
+      return 0
+    fi
+    rest="$(basename "$anc")/$rest"
+    anc="$(dirname "$anc")"
+  done
+  printf '%s' "$p"   # 조상 어디도 존재 안 함(절대경로 아니거나 완전 미존재) → 원본 보존
 }
 
 # allow 패턴 inner(예: /var/proj/review/** 또는 /var/proj/.review-cursor.*)의
@@ -31,7 +43,10 @@ _realpath_pattern() {
       # 첫 '*' 앞까지를 head 로, 그 이후를 tail 로 분리. head 의 마지막 / 까지가 고정 dir.
       head="${pat%%\**}"; tail="${pat#"$head"}"
       local dir="${head%/*}"
-      if [ -n "$dir" ] && rd="$(cd "$dir" 2>/dev/null && pwd -P)"; then
+      if [ -n "$dir" ]; then
+        # 고정 dir 을 _realpath_field 로 정규화 — *미존재 dir 도 조상까지 정규화*해
+        # field 측(미존재 leaf 조상 정규화)과 같은 정규형으로 통일(역방향 비대칭 차단, R10).
+        rd="$(_realpath_field "$dir")"
         printf '%s/%s' "$rd" "${head#"$dir"/}$tail"
       else
         printf '%s' "$pat"

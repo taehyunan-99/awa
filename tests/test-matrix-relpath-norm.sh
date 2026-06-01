@@ -87,5 +87,34 @@ assert_success "$?" "R7 심링크 환경 상대경로 매칭 성공"
 rm -rf "$REAL"; rm -f "$SYM"
 export PROJECT_ROOT="$PT"
 
+# ── 미존재 하위경로 정규화 (R8 — test-dev-write-allow FAIL 회귀) ────────────
+# 결함: file_path 가 *아직 없는* 하위 디렉토리(.../sub/x.py, sub/ 미생성)이면 _realpath_field 의
+# dirname(.../sub) 에 cd 실패 → 원본(/var) 반환(미정규화). 그런데 패턴(/proj/**)은 glob 앞
+# dir(/proj, 존재)이 정규화돼 /private/var → 비대칭 → gray 봉쇄. 신규 파일 Write 의 정상 케이스가
+# 깨진다. 수정: _realpath_field 가 미존재 leaf 의 *존재하는 최상위 조상*까지 정규화 후 나머지 부착.
+PT2="$(mktemp -d)"
+mkdir -p "$PT2/.agent-harness/.boot-settings"
+cat > "$PT2/.agent-harness/.boot-settings/dev.json" <<JSON
+{"permissions":{"allow":["Write($PT2/**)","Edit($PT2/**)"]}}
+JSON
+export PROJECT_ROOT="$PT2"
+echo "[R8] 미존재 하위경로(.../sub/x.py, sub/ 미생성) Edit → 정규화 후 MATRIX 매칭"
+out="$(matrix_lookup dev Edit "{\"file_path\":\"$PT2/sub/x.py\"}")"
+assert_success "$?" "R8 미존재 하위경로 Edit 매칭 성공(신규 파일 Write 정상)"
+echo "[R9] 미존재 깊은 하위경로(.../a/b/c/y.py 전부 미생성) Write → 매칭"
+out="$(matrix_lookup dev Write "{\"file_path\":\"$PT2/a/b/c/y.py\"}")"
+assert_success "$?" "R9 깊은 미존재 경로 Write 매칭 성공"
+echo "[R10] 패턴의 glob 앞 dir 도 미존재 → field·pattern 양쪽 조상 정규화 통일(역비대칭 차단)"
+# allow 패턴이 .../review/** 인데 review/ 가 *아직 없으면* _realpath_pattern 의 cd 실패 →
+# 패턴만 /var(미정규화), field 는 조상 정규화로 /private/var → 역방향 비대칭 봉쇄.
+# (reviewer 가 첫 verdict 를 미생성 review/ 에 Write 하는 정상 케이스. test-reviewer-write-allow 회귀.)
+cat > "$PT2/.agent-harness/.boot-settings/rev.json" <<JSON
+{"permissions":{"allow":["Write($PT2/nope/review/**)"]}}
+JSON
+out="$(matrix_lookup rev Write "{\"file_path\":\"$PT2/nope/review/v.md\"}")"
+assert_success "$?" "R10 미존재 review/ 패턴+field 양쪽 정규화 매칭 성공"
+rm -rf "$PT2"
+export PROJECT_ROOT="$PT"
+
 rm -rf "$PT"
 test_summary
