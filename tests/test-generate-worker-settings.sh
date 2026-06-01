@@ -65,15 +65,15 @@ out="$(generate_worker_settings LEAD LEAD)"
 assert_eq "$TMP/.agent-harness/.boot-settings/LEAD.json" "$out" "G5b LEAD 경로"
 [ -f "$out" ]; assert_success "$?" "G5b LEAD.json 생성"
 
-echo "[G5c] unknown 역할 → settings.default.json.tpl (2인자)"
+echo "[G5c] unknown 역할 → settings.readonly.json.tpl (2인자, fallback=readonly)"
 out="$(generate_worker_settings unknown_role somebot)"
 rc=$?
 assert_eq "0" "$rc" "G5c unknown rc=0"
 assert_eq "$TMP/.agent-harness/.boot-settings/unknown_role.json" "$out" "G5c unknown 경로"
-[ -f "$out" ]; assert_success "$?" "G5c unknown_role.json 생성 (default 템플릿)"
+[ -f "$out" ]; assert_success "$?" "G5c unknown_role.json 생성 (readonly 템플릿)"
 content="$(cat "$out")"
-assert_contains "$content" "Bash(ls:*)" "G5c default allow ls"
-assert_contains "$content" 'WORKER=\"somebot\"' "G5c default ENTRY_NAME 토큰"
+assert_contains "$content" "Bash(ls:*)" "G5c readonly allow ls"
+assert_contains "$content" 'WORKER=\"somebot\"' "G5c readonly ENTRY_NAME 토큰"
 
 echo "[G6] 템플릿 부재 — return 1 + stderr (2인자)"
 mv "$ROOT/templates/settings.dev.json.tpl" "$ROOT/templates/settings.dev.json.tpl.bak"
@@ -127,5 +127,40 @@ echo "[G12] lead 는 PostToolUse 없음 (감시 대상 아님)"
 outl="$(generate_worker_settings lead LEAD)"
 ! grep -q 'PostToolUse' "$outl"; assert_success "$?" "G12 lead PostToolUse 부재"
 ! grep -q 'PreToolUse' "$outl"; assert_success "$?" "G12 lead PreToolUse 부재 (게이트 대상 아님)"
+
+# === 역할 카탈로그 매핑 (2026-06-01 재배선) ===
+TMP_PROJ="$TMP"
+# engineer → dev 군 (코드 쓰기 권한)
+ENG="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  generate_worker_settings engineer engineer
+')"
+assert_success "$?" "engineer settings 생성"
+assert_contains "$(cat "$ENG")" "Write($TMP_PROJ/**)" "engineer 는 dev 군(코드 전역 쓰기)"
+
+# researcher → readonly 군 (코드 쓰기 없음)
+RES="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  generate_worker_settings researcher researcher
+')"
+assert_success "$?" "researcher settings 생성"
+assert_not_contains "$(cat "$RES")" "Write($TMP_PROJ/**)" "researcher 는 코드 전역 쓰기 없음(읽기전용)"
+assert_contains "$(cat "$RES")" '"Read"' "researcher 읽기 권한 보유"
+
+# review-manager → readonly 군
+RVM="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  generate_worker_settings review-manager review-mgr
+')"
+assert_success "$?" "review-manager settings 생성"
+assert_not_contains "$(cat "$RVM")" "Write($TMP_PROJ/**)" "review-manager 읽기전용(공통산출은 gate 특례)"
+
+# 미지정 역할 → readonly fallback (최소권한, deny-bounded)
+UNK="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
+  source '"$ROOT"'/bin/lib.sh
+  generate_worker_settings some-unknown-role x
+')"
+assert_success "$?" "미지정 역할도 settings 생성(fail-safe)"
+assert_not_contains "$(cat "$UNK")" "Write($TMP_PROJ/**)" "미지정 역할 fallback=readonly(최소권한)"
 
 test_summary

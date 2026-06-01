@@ -12,8 +12,8 @@
 
 ## 2. CONTENTS
 
-- `settings.default.json.tpl` — 기본 권한
-- `settings.dev.json.tpl` — dev 워커
+- `settings.readonly.json.tpl` — 읽기전용 군 (researcher/review-manager/미지정 fallback) + 미지정 역할 fallback
+- `settings.dev.json.tpl` — dev 워커 (engineer/dev/security)
 - `settings.lead.json.tpl` — lead (게이트 + 허용 폭 넓음)
 - `settings.pm.json.tpl` — pm
 - `settings.reviewer.json.tpl` — reviewer-* (글롭으로 자동 매칭)

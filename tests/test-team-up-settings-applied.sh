@@ -32,14 +32,15 @@ BOOTSET="$TMP/.agent-harness/.boot-settings"
 [ -d "$BOOTSET" ]; assert_success "$?" ".boot-settings 디렉터리 생성"
 
 # feature-team WORKERS=(dev:dev tester:test arch:researcher), REVIEWERS=(spec-rev:reviewer-spec ...).
-# generate_worker_settings 매핑:
-#  - dev/researcher → dev 템플릿 → dev.json, researcher.json
+# generate_worker_settings 매핑 (2026-06-01 역할 재배선):
+#  - dev → dev 템플릿 → dev.json (코드 쓰기)
+#  - researcher → readonly 템플릿 → researcher.json (읽기전용, 코드 쓰기 없음)
 #  - tester → test 템플릿 → tester.json
 #  - reviewer-* → reviewer 템플릿 → reviewer-{spec,quality,arch}.json
 # 6 파일 모두 *필수* 검증 — 매핑 회귀 신호 강하게.
 [ -f "$BOOTSET/dev.json" ]; assert_success "$?" "dev.json 존재"
 [ -f "$BOOTSET/tester.json" ]; assert_success "$?" "tester.json 존재"
-[ -f "$BOOTSET/researcher.json" ]; assert_success "$?" "researcher.json 존재 (dev 템플릿)"
+[ -f "$BOOTSET/researcher.json" ]; assert_success "$?" "researcher.json 존재 (readonly 템플릿)"
 [ -f "$BOOTSET/reviewer-quality.json" ]; assert_success "$?" "reviewer-quality.json 존재"
 [ -f "$BOOTSET/reviewer-spec.json" ]; assert_success "$?" "reviewer-spec.json 존재"
 [ -f "$BOOTSET/reviewer-arch.json" ]; assert_success "$?" "reviewer-arch.json 존재"
@@ -54,9 +55,11 @@ if printf '%s' "$content" | grep -qE '\{\{[A-Z_]+\}\}'; then
   assert_eq "no" "yes" "dev.json 토큰 잔존 부재"
 fi
 
-# researcher 검증 — dev 와 동일 매핑이므로 deny 동일해야.
+# researcher 검증 — readonly 매핑 (코드 전역 쓰기 없음, 공통산출은 gate 특례가 보장).
 content="$(cat "$BOOTSET/researcher.json")"
-assert_contains "$content" "Bash(git push *)" "researcher.json dev 템플릿 매핑 (git push deny)"
+assert_not_contains "$content" "Write($TMP/**)" "researcher.json 코드 전역 쓰기 없음 (readonly)"
+assert_contains "$content" '"Read"' "researcher.json Read allow (readonly)"
+assert_contains "$content" "permission-gate.sh" "researcher.json PreToolUse 게이트 보존"
 assert_contains "$content" 'WORKER=\"arch\"' "researcher.json WORKER=entry_name(arch)"
 
 # tester 검증

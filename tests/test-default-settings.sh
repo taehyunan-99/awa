@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# settings.default.json.tpl 의 allow/deny + PreToolUse permission-gate 전수 matcher 검증.
+# settings.readonly.json.tpl 의 allow/deny + PreToolUse permission-gate 전수 matcher 검증.
+# (구 settings.default.json.tpl → readonly 로 의미 정정, 2026-06-01 역할 재배선)
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
-tpl="$ROOT/templates/settings.default.json.tpl"
+tpl="$ROOT/templates/settings.readonly.json.tpl"
 
-[ -f "$tpl" ]; assert_success "$?" "default 템플릿 존재"
+[ -f "$tpl" ]; assert_success "$?" "readonly 템플릿 존재"
 content="$(cat "$tpl")"
 
 assert_contains "$content" '"Read"' "default allow Read"

@@ -215,12 +215,13 @@ generate_worker_settings() {
   local role="$1" entry_name="${2:-}"
   local tpl_name=""
   case "$role" in
-    dev|security|researcher) tpl_name="dev" ;;
+    engineer|dev|security) tpl_name="dev" ;;
+    researcher|review-manager) tpl_name="readonly" ;;
     tester) tpl_name="test" ;;
     reviewer-*) tpl_name="reviewer" ;;
     lead|LEAD) tpl_name="lead" ;;
     pm|PM) tpl_name="pm" ;;
-    *) tpl_name="default" ;;
+    *) tpl_name="readonly" ;;
   esac
   local tpl="$HARNESS_ROOT/templates/settings.${tpl_name}.json.tpl"
   local out_dir="$PROJECT_ROOT/.agent-harness/.boot-settings"
