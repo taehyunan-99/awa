@@ -12,7 +12,7 @@
 
 ## 2. CONTENTS
 
-- `default.sh` — 워커 dev/test, 리뷰어 quality-rev
+- `default.sh` — 워커 engineer/researcher, 투표 리뷰어 alignment-rev/quality-rev(N=2) + 집계 review-mgr
 - `code-review.sh` — 워커 security, 리뷰어 spec-rev/quality-rev/arch-rev
 - `research.sh` — 워커 researcher×3, 리뷰어 quality-rev
 - `feature-team.sh` — 워커 dev/test/arch, 리뷰어 spec-rev/quality-rev/arch-rev (모델 차등)
