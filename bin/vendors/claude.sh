@@ -60,7 +60,8 @@ vendor_default_model() {
   case "$1" in
     lead|LEAD) echo "opus" ;;
     reviewer-*|review-manager) echo "opus" ;;   # 리뷰어/리뷰 총괄 — 품질 우선 최고 모델
+    researcher) echo "opus" ;;   # 조사 워커 — 대량 정보를 컨텍스트에 담아 종합하므로 최고 모델
     pm|PM) echo "sonnet" ;;
-    *) echo "sonnet" ;;
+    *) echo "sonnet" ;;   # engineer 포함 — 명세된 코드 구현은 sonnet 으로 충분
   esac
 }

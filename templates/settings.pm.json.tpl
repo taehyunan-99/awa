@@ -14,7 +14,9 @@
       "Bash(wc:*)",
       "Bash(jq:*)",
       "Bash(date:*)",
-      "Bash(tmux:*)"
+      "Bash(tmux:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)"
     ],
     "deny": [
       "Write",
