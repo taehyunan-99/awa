@@ -820,10 +820,15 @@ record_block() {
     [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=1
     attempt=$((attempt + 1))
   elif [ -f "$qf" ]; then
-    # 격리 이력 있는 워커가 재차단 — 이전 attempt 누적(무한 차단↔격리 방지).
-    attempt="$(jq -r '.attempt // 1' "$qf" 2>/dev/null)"
-    [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=1
-    attempt=$((attempt + 1))
+    # 격리 이력 워커 재차단: *같은 task* 면 이전 attempt 누적(무한 차단↔격리 방지),
+    # *다른 task* 면 attempt=1 리셋(영속 낙인 방지 — 무관 task 의 1회 차단을 즉시 격리하지 않음).
+    local q_task; q_task="$(jq -r '.task_id // empty' "$qf" 2>/dev/null)"
+    if [ "$q_task" = "$task_id" ]; then
+      attempt="$(jq -r '.attempt // 1' "$qf" 2>/dev/null)"
+      [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=1
+      attempt=$((attempt + 1))
+    fi
+    # 다른 task 면 attempt=1 유지(초기값) — 리셋.
   fi
   # reason 에 따옴표/개행 들어가도 jq 가 안전하게 인코딩.
   if jq -n --arg w "$worker" --arg t "$task_id" --argjson a "$attempt" --arg r "$reason" \
@@ -837,10 +842,12 @@ record_block() {
 }
 
 # clear_block <worker> — 차단 해제 (재판정 OK). 멱등.
+# blocked-workers 와 quarantine 둘 다 청산 — 정상 복귀 시 격리 이력도 비워 영속 낙인 방지.
 clear_block() {
   local worker="$1"
   _valid_worker "$worker" || return 0
   rm -f "$(_block_state_dir)/blocked-workers/${worker}.json" 2>/dev/null
+  rm -f "$(_block_state_dir)/quarantine/${worker}.json" 2>/dev/null
   return 0
 }
 

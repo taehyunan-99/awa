@@ -101,14 +101,14 @@ grep -q 'clear_block' "$ROOT/prompts/roles/01-orchestration/lead.md"
 assert_success "$?" "L1 lead.md 가 재판정 OK 해소(clear_block) 명시"
 
 
-# Layer 2-h: quarantine 후 재차단 시 attempt 누적 (무한 차단↔격리 방지)
+# Layer 2-h: quarantine 후 *같은 task* 재차단 시 attempt 누적 (무한 차단↔격리 방지)
 clear_block "qw"; rm -f "$STATE_DIR/quarantine/qw.json" 2>/dev/null
 record_block "qw" "T1" "1차"; record_block "qw" "T1" "2차"
 quarantine_block "qw"
-record_block "qw" "T2" "격리 후 재차단"
+record_block "qw" "T1" "격리 후 같은 task 재차단"
 att_q="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/qw.json")"
 [ "$att_q" -ge 3 ]
-assert_success "$?" "L2 격리 후 재차단은 attempt 누적($att_q>=3) — 무한반복 방지"
+assert_success "$?" "L2 격리 후 같은 task 재차단은 attempt 누적($att_q>=3) — 무한반복 방지"
 
 # Layer 2-i: worker명 경로주입 차단
 record_block "../pwn" "T1" "공격" 2>/dev/null
@@ -155,5 +155,30 @@ if command -v tmux >/dev/null 2>&1; then
   fi
   rm -rf "$DT"
 fi
+
+
+# Layer 2-k: clear_block 이 quarantine 도 청산 (영속 낙인 방지)
+clear_block "qc"; rm -f "$STATE_DIR/quarantine/qc.json" 2>/dev/null
+record_block "qc" "T1" "1차"; record_block "qc" "T1" "2차"; quarantine_block "qc"
+test -f "$STATE_DIR/quarantine/qc.json"
+assert_success "$?" "L2 격리 파일 생성됨(전제)"
+clear_block "qc"
+test ! -f "$STATE_DIR/quarantine/qc.json"
+assert_success "$?" "L2 clear_block 이 quarantine 도 청산(영속 낙인 방지)"
+
+# Layer 2-l: 격리 후 *다른 task* 재차단은 attempt 리셋(낙인 안 찍힘)
+clear_block "qd"; rm -f "$STATE_DIR/quarantine/qd.json" 2>/dev/null
+record_block "qd" "TA" "1차"; record_block "qd" "TA" "2차"; quarantine_block "qd"
+record_block "qd" "TB" "다른 task 1회 차단"
+att_d="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/qd.json")"
+assert_eq "1" "$att_d" "L2 격리 후 다른 task(TB) 재차단은 attempt=1 리셋(영속 낙인 방지)"
+
+# Layer 2-m: 격리 후 *같은 task* 재차단은 attempt 누적(무한반복 방지 — 기존 동작 유지)
+clear_block "qe"; rm -f "$STATE_DIR/quarantine/qe.json" 2>/dev/null
+record_block "qe" "TX" "1차"; record_block "qe" "TX" "2차"; quarantine_block "qe"
+record_block "qe" "TX" "같은 task 재차단"
+att_e="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/qe.json")"
+[ "$att_e" -ge 3 ]
+assert_success "$?" "L2 격리 후 같은 task(TX) 재차단은 attempt 누적($att_e>=3) — 무한반복 방지 유지"
 
 test_summary
