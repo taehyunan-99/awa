@@ -66,6 +66,10 @@ guard_ln="$(grep -n 'is_worker_blocked' "$ROOT/bin/dispatch.sh" | head -1 | cut 
 send_ln="$(grep -n 'send_prompt' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
 [ -n "$guard_ln" ] && [ -n "$send_ln" ] && [ "$guard_ln" -lt "$send_ln" ]
 assert_success "$?" "L1 가드가 send_prompt 앞에 위치 (차단이 송신을 막음)"
+# 가드가 TARGET 페인 탐색(TASK_FILE 확인 포함) *앞* 이어야 차단이 페인 존재와 독립 (통지 루프 방지)
+taskfile_ln="$(grep -n 'TASK_FILE=' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
+[ -n "$guard_ln" ] && [ -n "$taskfile_ln" ] && [ "$guard_ln" -lt "$taskfile_ln" ]
+assert_success "$?" "L1 가드가 TASK_FILE/페인 탐색 앞 (차단이 페인 존재와 독립)"
 
 # Layer 1: watcher.sh 가 dispatch exit 2(차단)를 @dispatch-fail 로 오인하지 않는가
 grep -qE '_dq_rc.*=.*2|= "2"' "$ROOT/bin/watcher.sh"

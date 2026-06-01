@@ -48,6 +48,15 @@ if ! tmux has-session -t "$SESSION" 2>/dev/null; then
   exit 1
 fi
 
+# 계획 B: 차단 가드 — 합의 게이트로 자동차단된 워커는 dispatch 거부 (파일 불변식 집행).
+# 페인·task 파일 존재와 독립(파일 불변식)이라 페인 탐색보다 *앞*에 둔다 — 차단 워커의 페인이
+# 죽어도 exit 1(진짜 실패) 아닌 exit 2(차단)가 나와 watcher 통지 루프를 막는다.
+# 해소는 LEAD 가 재판정 OK 후 clear_block 호출 시. watcher 대행 경로도 dispatch.sh 경유라 자동 적용.
+if is_worker_blocked "$WORKER"; then
+  echo "차단됨: 워커 '$WORKER' 는 합의 게이트로 자동차단 상태 (.agent-harness/state/blocked-workers/$WORKER.json). 재판정 OK(clear_block) 또는 격리 전까지 dispatch 거부." >&2
+  exit 2
+fi
+
 # 작업 파일 확인
 TASK_FILE="$WORKSPACE/tasks/$TASK_ID.md"
 if [ ! -f "$TASK_FILE" ]; then
@@ -74,14 +83,6 @@ done
 if [ -z "$TARGET" ]; then
   echo "오류: 워커/리뷰어 '$WORKER' 페인을 찾을 수 없음 (window 0·1 조회)." >&2
   exit 1
-fi
-
-# 계획 B: 차단 가드 — 합의 게이트로 자동차단된 워커는 dispatch 거부 (파일 불변식 집행).
-# LEAD 가 ⓒ 종합에서 record_block 한 상태면, LEAD 가 실수/고의로 재배정해도 여기서 막힌다.
-# 해소는 LEAD 가 재판정 OK 후 clear_block 호출 시. watcher 대행 경로도 dispatch.sh 경유라 자동 적용.
-if is_worker_blocked "$WORKER"; then
-  echo "차단됨: 워커 '$WORKER' 는 합의 게이트로 자동차단 상태 (.agent-harness/state/blocked-workers/$WORKER.json). 재판정 OK(clear_block) 또는 격리 전까지 dispatch 거부." >&2
-  exit 2
 fi
 
 write_harness_task "$WORKER" "$TASK_ID"
