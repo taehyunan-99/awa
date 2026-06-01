@@ -34,7 +34,7 @@
   ```
 - **품질 게이트**: 미통과 산출물을 다음 입력으로 쓰려는 지시면 `.harness-state` 경고(차단 안 함 — push 로 결정).
 - **reviewer Write 위반 감지**: `.review-cursor.lead` 이후 events.log 에서 worker=reviewer+modify+rel 이 `review/` 아님 → 위반 기록. 커서 갱신.
-- **합의 게이트 (회로① — blocking 집계)**: 투표 리뷰어(alignment·quality·security)의 `review/<worker>-<id>.<리뷰어>.md` 헤더 `blocking` 필드를 센다.
+- **합의 게이트 (회로① — blocking 집계)**: 투표 리뷰어의 review 파일 — `review/<worker>-<id>.alignment-rev.md`·`.quality-rev.md`·`.security-rev.md`(이 셋만 투표 모수) — 헤더의 `blocking` 필드를 센다(`blocking: true` 개수 집계, 비투표 alternative·메타 review-manager 파일 제외).
   - **투표인단 ≥2 & 전원 `blocking: true`** → 규칙 자동차단. `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && record_block "<worker>" "<task>" "<리뷰어 근거 요약>"'` 실행(파일 불변식 — 이후 dispatch 가드가 거부). `.harness-state` 기록. 워커에 수정 주입(ⓔ 개입 독점).
   - **불일치(1명이라도 `blocking: false`) or 투표인단 1명뿐** → 자동차단 안 함. 사용자 AskUserQuestion push: 각 리뷰어 찬반 근거 첨부("리뷰어 X=차단(근거), Y=통과(근거). 차단 / 진행?"). 단독 과엄격 리뷰어 견제.
   - **수정 주입 (차단 워커 = claude 전제)**: 자동차단 후 워커에 수정 지시를 보낸다(ⓔ 개입 독점 — 워커 pane send-keys). **이 경로는 워커가 claude일 때만 정상 작동한다**(codex 워커는 P17로 send-keys 큐잉 미제출 → 데드락. 그래서 이 회로는 워커=claude 전제, codex=리뷰어 전용). ⓔ는 LEAD(claude)가 claude 워커 pane에 직접 send-keys 하는 유일한 예외 경로다(나머지 dispatch·게이트·PM은 파일 IPC). codex 워커 지원 시엔 revision-queue 탈-tmux화 필요 — 다음 사이클.
