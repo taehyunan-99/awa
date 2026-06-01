@@ -100,4 +100,28 @@ assert_success "$?" "L1 lead.md 가 합의 게이트(만장일치) 분기 명시
 grep -q 'clear_block' "$ROOT/prompts/roles/01-orchestration/lead.md"
 assert_success "$?" "L1 lead.md 가 재판정 OK 해소(clear_block) 명시"
 
+
+# Layer 2-h: quarantine 후 재차단 시 attempt 누적 (무한 차단↔격리 방지)
+clear_block "qw"; rm -f "$STATE_DIR/quarantine/qw.json" 2>/dev/null
+record_block "qw" "T1" "1차"; record_block "qw" "T1" "2차"
+quarantine_block "qw"
+record_block "qw" "T2" "격리 후 재차단"
+att_q="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/qw.json")"
+[ "$att_q" -ge 3 ]
+assert_success "$?" "L2 격리 후 재차단은 attempt 누적($att_q>=3) — 무한반복 방지"
+
+# Layer 2-i: worker명 경로주입 차단
+record_block "../pwn" "T1" "공격" 2>/dev/null
+assert_eq "1" "$?" "L2 ../ 포함 worker명은 record_block 거부(rc 1)"
+test ! -f "$STATE_DIR/pwn.json"
+assert_success "$?" "L2 경로주입 파일이 state 밖에 안 생김"
+is_worker_blocked "../etc"
+assert_eq "1" "$?" "L2 경로주입 worker명은 비차단 취급(안전)"
+
+# Layer 2-j: 운영 state 비오염 단언 (테스트가 TMPDIR 격리됐는지)
+case "$(_block_state_dir)" in
+  "$TMPDIR"*) assert_success "0" "L2 _block_state_dir 가 TMPDIR 하위(운영 state 비오염)" ;;
+  *) assert_success "1" "L2 격리 실패 — _block_state_dir 가 TMPDIR 밖: $(_block_state_dir)" ;;
+esac
+
 test_summary

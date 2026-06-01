@@ -788,9 +788,19 @@ _block_state_dir() {
   echo "${STATE_DIR:-${PROJECT_ROOT:-.}/.agent-harness/state}"
 }
 
+# _valid_worker <worker> — worker명 위생 검사(경로주입 차단). 유효=rc0, 무효=rc1.
+# 영숫자·하이픈·언더스코어만 허용 (profiles 식별자 규약). / 나 .. 거부.
+_valid_worker() {
+  case "$1" in
+    ""|*/*|*..*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 # is_worker_blocked <worker> — 차단되어 있으면 rc 0, 아니면 rc 1 (dispatch 가드용).
 is_worker_blocked() {
   local worker="$1"
+  _valid_worker "$worker" || return 1
   [ -f "$(_block_state_dir)/blocked-workers/${worker}.json" ]
 }
 
@@ -799,23 +809,37 @@ is_worker_blocked() {
 # 단일 스레드라 read-modify-write race 없음 — attempt 카운터는 격리(K) 판정 근거라 정확성 중요.
 record_block() {
   local worker="$1" task_id="$2" reason="$3"
+  _valid_worker "$worker" || { echo "record_block: 잘못된 worker명 '$worker'" >&2; return 1; }
   local dir; dir="$(_block_state_dir)/blocked-workers"
   mkdir -p "$dir"
   local f="$dir/${worker}.json" attempt=1
+  local qf; qf="$(_block_state_dir)/quarantine/${worker}.json"
   if [ -f "$f" ]; then
     attempt="$(jq -r '.attempt // 1' "$f" 2>/dev/null)"
     # 손상 json 으로 attempt 가 비숫자면 1 로 복구 (set -u 산술평가 치명사 방지).
     [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=1
     attempt=$((attempt + 1))
+  elif [ -f "$qf" ]; then
+    # 격리 이력 있는 워커가 재차단 — 이전 attempt 누적(무한 차단↔격리 방지).
+    attempt="$(jq -r '.attempt // 1' "$qf" 2>/dev/null)"
+    [[ "$attempt" =~ ^[0-9]+$ ]] || attempt=1
+    attempt=$((attempt + 1))
   fi
   # reason 에 따옴표/개행 들어가도 jq 가 안전하게 인코딩.
-  jq -n --arg w "$worker" --arg t "$task_id" --argjson a "$attempt" --arg r "$reason" \
-    '{worker:$w, task_id:$t, attempt:$a, reason:$r}' > "$f.tmp" && mv "$f.tmp" "$f"
+  if jq -n --arg w "$worker" --arg t "$task_id" --argjson a "$attempt" --arg r "$reason" \
+    '{worker:$w, task_id:$t, attempt:$a, reason:$r}' > "$f.tmp" 2>/dev/null; then
+    mv "$f.tmp" "$f"
+  else
+    rm -f "$f.tmp" 2>/dev/null   # jq 실패(부재 등) — 쓰레기 .tmp 정리. 차단 기록 실패는 호출처가 인지.
+    echo "record_block: jq 실패 — 차단 기록 못 함 (worker=$worker)" >&2
+    return 1
+  fi
 }
 
 # clear_block <worker> — 차단 해제 (재판정 OK). 멱등.
 clear_block() {
   local worker="$1"
+  _valid_worker "$worker" || return 0
   rm -f "$(_block_state_dir)/blocked-workers/${worker}.json" 2>/dev/null
   return 0
 }
@@ -824,6 +848,7 @@ clear_block() {
 # 그 task 만 격리, 워커는 blocked-workers 비워져 다른 task dispatch 가능.
 quarantine_block() {
   local worker="$1"
+  _valid_worker "$worker" || return 1
   local src; src="$(_block_state_dir)/blocked-workers/${worker}.json"
   [ -f "$src" ] || return 0
   local qdir; qdir="$(_block_state_dir)/quarantine"
