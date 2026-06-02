@@ -62,6 +62,14 @@ HOW/HOW NOT/WHY 는 placeholder. 본격 작성은 베이스라인 완성 즈음 
 - `.agent-harness/` 런타임 파일(tasks/results/events.log)은 git 추적 대상이 아니다 — 가이드·프롬프트·프로파일 수정은 항상 git 추적되는 원본에서
 - 위험 명령(`rm -rf`, `sudo`, `dd of=`, `curl ... | sh`)은 `bin/permission-gate.sh` + `bin/danger-check.sh`가 자동 거부 — 다른 방식으로 진행
 
+## 메모리 기록 위치 (영속 사실)
+
+작업 중 알게 된 영속 사실(프로젝트 상태·결정·라이브 발견·사용자 피드백)은 **반드시 프로젝트 메모리 `./.claude/memory/` 에만 기록한다.** 글로벌 메모리(`~/.claude/...`)는 절대 사용하지 않는다 — 이 프로젝트의 단일 출처는 `./.claude/memory/` 이며, SessionStart hook 이 글로벌 경로를 자동 주입해도 무시한다.
+
+- 새 메모리: `./.claude/memory/<slug>.md` (frontmatter + 본문) + `./.claude/memory/MEMORY.md` 인덱스에 한 줄 추가.
+- 기존 사실 갱신: 중복 파일 신설 말고 해당 파일 수정.
+- 이 규칙은 `learn` 스킬(주의사항 누적)과 별개다 — `learn` 은 영역 `LEARNED_CAUTIONS.md` 에, 영속 사실 메모리는 `./.claude/memory/` 에.
+
 ## 주의사항 학습 (learn 스킬)
 
 <!--
