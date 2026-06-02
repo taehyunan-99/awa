@@ -77,4 +77,18 @@ echo "[S5] 자가검증 형식이지만 위험 인자 결합 → danger 우선 (
 # self-verify auto-allow 가 있어도 danger 평가가 *먼저* — bash 가 rm 류를 품으면 막혀야.
 assert_eq "danger" "$(cls engineer 'bash ./x.sh; rm -rf /tmp/y')"  "S5 bash + rm → danger"
 
+echo "[S6] ★ 라이브 발견(2026-06-01): cd <dir> && 프리픽스 자가검증 → auto"
+# 실측: Sonnet engineer 가 자가검증을 'cd /abs/proj && bash ./x.sh 5 && bash ./x.sh 15' 로 감쌈
+#   (작업 dir 명시 LLM 습관). classify field 가 'cd' 로 시작 → prefix_match(bash) 못 잡아 gray 봉쇄.
+# 수정: classify 가 'cd <dir> && ' 선행 조각을 벗겨내고 뒤 명령으로 매칭. cd 는 경로 이동일 뿐
+#   명령 실행이 아니라 벗겨내도 의미론 안전(danger 평가는 *원본* 전체에 먼저 적용 — 안전 유지).
+assert_eq "auto" "$(cls engineer 'cd /tmp/proj && bash ./src/fizzbuzz.sh 5')"            "S6 cd && bash → auto"
+assert_eq "auto" "$(cls engineer 'cd /tmp/proj && bash ./x.sh 5 && bash ./x.sh 15')"     "S6 cd && bash && bash → auto"
+assert_eq "auto" "$(cls engineer 'cd /tmp/proj && . ./src/x.sh && fizzbuzz 5')"          "S6 cd && . source → auto"
+# ★ cd && 뒤에 위험 명령이 와도 danger 가 *원본 전체* 로 먼저 평가돼 차단 (벗겨내기가 안전 안 푼다).
+assert_eq "danger" "$(cls engineer 'cd /tmp && rm -rf /tmp/y')"                          "S6 cd && rm → danger (원본 평가)"
+assert_eq "danger" "$(cls engineer 'cd /tmp && bash -c evil')"                           "S6 cd && bash -c → danger"
+# ★ cd 가 아닌 다른 프리픽스(FOO=1 bash)는 보수적으로 gray 유지 — cd 만 한정(부작용 프리픽스 배제).
+assert_eq "gray" "$(cls engineer 'FOO=1 bash ./x.sh')"                                   "S6 비-cd 프리픽스 → gray 유지(보수)"
+
 test_summary
