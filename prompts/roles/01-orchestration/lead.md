@@ -6,7 +6,7 @@
 ## ⓐ 동작 모델 (이벤트 반응형)
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
-- 신호 8종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@review:`(reviewer 용 — 무시).
+- 신호 9종: `@pm: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@verdict-arrived: <worker>-<id>`(→ⓒ 재집계) · `@review:`(reviewer 용 — 무시).
 - 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
 - boot 직후 1회: `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 stale 판별 — 완료 task 새 배정 마라. 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
@@ -33,10 +33,11 @@
   <갱신> > .agent-harness/.harness-state.tmp && mv .agent-harness/.harness-state.tmp .agent-harness/.harness-state
   ```
 - **종합 완료 ack (필수)**: 종합을 마쳤으면 `rm -f .agent-harness/state/pending-done/<worker>__<task>.json` 로 ack 한다. watcher 가 이 파일이 남아있는 한 @done 을 재발화하므로(네가 점유 중이라 첫 @done 을 놓쳤을 수 있다 — 회로① 침묵 차단), ack 안 하면 같은 done 이 반복 도착한다. task-id 의 `/` 는 `_` 로 치환된 파일명임에 유의(예: `sub/t-1` → `sub_t-1`).
+- **@verdict-arrived 재집계**: `@verdict-arrived: <worker>-<id>` 에 깨면 `review/<worker>-<id>.*-rev.md` 를 다시 읽어 합의 게이트(아래)를 재실행한다(단발 task 라 첫 종합 때 verdict 미도착이었을 수 있음 — 이게 그 재종합 트리거다). 재종합 ack 시 `rm -f .agent-harness/state/.verdict-fired.<worker>-<id>` 도 함께(task `/`→`_` 치환). 마커를 지워야 같은 wid 의 *다음* verdict 라운드(재판정)가 또 깨울 수 있다.
 - **품질 게이트**: 미통과 산출물을 다음 입력으로 쓰려는 지시면 `.harness-state` 경고(차단 안 함 — push 로 결정).
 - **reviewer Write 위반 감지**: `.review-cursor.lead` 이후 events.log 에서 worker=reviewer+modify+rel 이 `review/` 아님 → 위반 기록. 커서 갱신.
 - **합의 게이트 (회로① — blocking 집계)**: 투표 리뷰어의 review 파일 — `review/<worker>-<id>.alignment-rev.md`·`.quality-rev.md`·`.security-rev.md`(이 셋만 투표 모수) — 헤더의 `blocking` 필드를 센다(`blocking: true` 개수 집계, 본문 설명문의 `blocking: true` 오집계 주의 — 헤더 한정. 비투표 alternative·메타 review-manager 파일 제외).
-  - **집계 시점 (race 방지)**: 투표 리뷰어는 비동기로 깨어 review 를 쓰므로 @done 시점에 다 도착했단 보장이 없다. 기준은 **이 프로파일에 배선된 투표 리뷰어 수 N**(고정 3종 아님 — REVIEWERS 의 alignment/quality/security 중 실제 배선분, 1~3). **N 명 전원 도착**하면 집계: N≥2 면 만장일치 판정(아래), **N=1 이면 단일 투표라 자동차단 불가 → 불일치 분기(사용자 push)** 로 간다. **일부만 도착**(M<N)했으면 늦게 blocking 낼 결측분 때문에 **즉시 자동차단하지 말고** 대기, 다음 @done 까지 지속되면 "투표 리뷰어 N종 중 M종 도착" 명시해 사용자 push(자동차단 보류). 부분 집계로 단독 견제 무력화 금지.
+  - **집계 시점 (race 방지)**: 투표 리뷰어는 비동기로 깨어 review 를 쓰므로 @done 시점에 다 도착했단 보장이 없다. 기준은 **이 프로파일에 배선된 투표 리뷰어 수 N**(고정 3종 아님 — REVIEWERS 의 alignment/quality/security 중 실제 배선분, 1~3). **N 명 전원 도착**하면 집계: N≥2 면 만장일치 판정(아래), **N=1 이면 단일 투표라 자동차단 불가 → 불일치 분기(사용자 push)** 로 간다. **일부만 도착**(M<N)했으면 늦게 blocking 낼 결측분 때문에 **즉시 자동차단하지 말고** 대기, 다음 @done 또는 @verdict-arrived 까지 지속되면 "투표 리뷰어 N종 중 M종 도착" 명시해 사용자 push(자동차단 보류). 부분 집계로 단독 견제 무력화 금지.
   - **blocking 필드 누락 review**: 투표 리뷰어가 `blocking` 필드를 안 적었으면 그 리뷰어는 *투표 불참*(보수적 비차단)으로 세되, `.harness-state` 에 "리뷰어 X blocking 누락" 경고 기록(계약 위반 추적). 암묵 통과로 조용히 넘기지 않는다.
   - **투표인단 ≥2 & 전원 `blocking: true`** → 규칙 자동차단. `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && record_block "<worker>" "<task>" "<리뷰어 근거 요약>"'` 실행(파일 불변식 — 이후 dispatch 가드가 거부). `.harness-state` 기록. 워커에 수정 주입(ⓔ 개입 독점).
   - **불일치(1명이라도 `blocking: false`) or 투표인단 N=1(단일 투표)** → 자동차단 안 함. 사용자 AskUserQuestion push: 각 리뷰어 찬반 근거 첨부("리뷰어 X=차단(근거), Y=통과(근거). 차단 / 진행?"). 단독 과엄격 리뷰어 견제. (현재 기본 프로파일은 투표 리뷰어 1종이라 사실상 이 경로 — 자동차단은 투표 리뷰어 ≥2 배선 시 발동, 다음 사이클.)
