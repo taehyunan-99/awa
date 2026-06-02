@@ -77,4 +77,11 @@ assert_eq "review-mgr-x-001" "$out" "S8: 하이픈 포함 worker wid 정확 추�
 out="$(scan_verdict_quorum "$WORK/nonexistent" "$STATE" 2)"
 assert_eq "" "$out" "S9: review/ 없으면 무해 빈 emit"
 
+# ── L1: watcher.sh 배선 (grep 구조) ──────────────────────────────────────────
+WSH="$(cat "$ROOT/bin/watcher.sh")"
+assert_contains "$WSH" "scan_verdict_quorum" "L1-watcher: scan_verdict_quorum 호출"
+assert_contains "$WSH" "@verdict-arrived:" "L1-watcher: @verdict-arrived 발화"
+assert_contains "$WSH" 'EXPECTED_VOTERS' "L1-watcher: EXPECTED_VOTERS env 수신"
+assert_contains "$WSH" 'dirname "$EVENTS"' "L1-watcher: review_dir 를 EVENTS 에서 도출"
+
 test_summary

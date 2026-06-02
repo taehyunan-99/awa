@@ -21,6 +21,7 @@ STATE_DIR="${STATE_DIR:-}"
 EVENTS="${EVENTS:-}"
 SEEN="${SEEN:-$STATE_DIR/.watcher-seen}"
 REV_DEBOUNCE="${REV_DEBOUNCE:-3}"
+EXPECTED_VOTERS="${EXPECTED_VOTERS:-0}"
 
 # §5.7 drift-check 용 worker_turn_count 함수 — lib.sh 에서 끌어온다 (없으면 무해 진행).
 # shellcheck source=lib.sh
@@ -33,6 +34,8 @@ REQUEUE_AGE="${REQUEUE_AGE:-20}"
 case "$REQUEUE_AGE" in ''|*[!0-9]*) REQUEUE_AGE=20 ;; esac
 # REV_DEBOUNCE 가 비정수로 주입되면 산술 비교에서 데몬이 즉사 → 정수 아니면 기본값으로.
 case "$REV_DEBOUNCE" in ''|*[!0-9]*) REV_DEBOUNCE=3 ;; esac
+# EXPECTED_VOTERS 비정수 주입 시 산술 비교 즉사 방지 → 정수 아니면 0(무력화).
+case "$EXPECTED_VOTERS" in ''|*[!0-9]*) EXPECTED_VOTERS=0 ;; esac
 
 # 대상 pane 생존 확인 (M2 — 죽은 pane 조용한 깨움 유실 방지).
 pane_alive() {
@@ -194,6 +197,20 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           [ -n "$rq" ] || continue
           pane_alive "$LEAD_PANE" || continue
           tmux send-keys -t "$LEAD_PANE" -l "@done: $rq 완료. results/ 확인 후 종합." 2>/dev/null
+          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+        done
+  fi
+
+  # 3b) verdict glob — 투표 리뷰어 N 전원 도착 시 LEAD 재종합 깨움(단발 task 재종합 누락 차단).
+  #     review/ Write 는 events.log 에 안 남으므로(log-event.sh:39 skip) 디렉토리를 직접 스캔.
+  #     매 사이클 도되 .verdict-fired.<wid> 마커로 wid 당 1회만 발화. events 증가 무관(§2 아님).
+  if [ -n "$STATE_DIR" ] && [ "$EXPECTED_VOTERS" -gt 0 ]; then
+    _review_dir="$(dirname "$EVENTS")/review"
+    scan_verdict_quorum "$_review_dir" "$STATE_DIR" "$EXPECTED_VOTERS" 2>/dev/null \
+      | while IFS= read -r wid; do
+          [ -n "$wid" ] || continue
+          pane_alive "$LEAD_PANE" || continue
+          tmux send-keys -t "$LEAD_PANE" -l "@verdict-arrived: $wid 투표 $EXPECTED_VOTERS종 전원 도착. review/ 재종합." 2>/dev/null
           tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
         done
   fi
