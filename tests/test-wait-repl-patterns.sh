@@ -15,7 +15,7 @@ HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # vendor_wait_ready 의 ready/negative 패턴 (bin/vendors/claude.sh 와 동일 — 단일 진실원).
 # 변경 시 claude.sh 와 동시 갱신 필요. (ready 폴링은 wait_repl → vendor_wait_ready 로 이관됨.)
-READY_PAT='Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'
+READY_PAT='Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on|of [0-9]+k tokens'
 NEG_PAT='Error:|Could not authenticate|not logged in|failed to start'
 
 # T1: ready 패턴 매치 (4 fixture).
@@ -30,6 +30,10 @@ assert_success "$?" "T1.3: ready — 옛 bypass permissions on (역호환)"
 
 printf '%s' "accept edits on | model: opus" | grep -qE "$READY_PAT"
 assert_success "$?" "T1.4: ready — 옛 accept edits on (역호환)"
+
+# T1.5: 2.1.160 토큰 게이지 (좁은 pane 에서 스플래시 스크롤돼도 상태줄에 남는 ready 앵커).
+printf '%s' "  ▄░░░░░░░░░ 3% of 1000k tokens | \$0.1168" | grep -qE "$READY_PAT"
+assert_success "$?" "T1.5: ready — 2.1.160 토큰 게이지 'of N k tokens'"
 
 # T2: negative 패턴 — 즉시 fail 트리거.
 printf '%s' "Error: connection refused" | grep -qE "$NEG_PAT"
@@ -73,6 +77,10 @@ assert_fail "$?" "T5: vendor_wait_ready 안 옛 단일 패턴 잔존 없음"
 # T6: 새 ready 다중 OR 패턴이 vendor_wait_ready 안에 있음.
 printf '%s' "$WAIT_REPL_BODY" | grep -qE "Claude Code v\\[0-9\\].*Welcome back|Welcome back.*Claude Code v\\[0-9\\]"
 assert_success "$?" "T6: 새 ready 다중 패턴 존재"
+
+# T6.1: 2.1.160 토큰 게이지 패턴이 vendor_wait_ready 안에 있음 (라이브 발견 회귀 가드).
+printf '%s' "$WAIT_REPL_BODY" | grep -qE 'of \[0-9\]\+k tokens'
+assert_success "$?" "T6.1: 2.1.160 토큰 게이지 ready 패턴 존재"
 
 # T7: negative 패턴이 vendor_wait_ready 안에 있음.
 printf '%s' "$WAIT_REPL_BODY" | grep -qE 'Could not authenticate|not logged in'

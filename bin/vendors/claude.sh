@@ -31,7 +31,13 @@ vendor_wait_ready() {
       return 1
     fi
     # ready 신호 — 다중 OR 매치. 하나라도 떴으면 REPL 준비됨.
-    if printf '%s' "$dump" | grep -qE 'Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'; then
+    # ★ 2.1.160 라이브 발견(2026-06-02): 좁은 pane(4분할 220x12)에선 스플래시
+    #   (Claude Code v·Welcome back)가 위로 스크롤돼 사라지고 'bypass permissions on'
+    #   도 상태줄에서 빠져, 옛 4패턴 다 매칭 실패 → pane당 120s 풀 폴링(리뷰어 3개=8분).
+    #   해소: REPL 기동 후에만 뜨는 토큰 게이지 'of N k tokens' 추가(명령 echo·일반
+    #   출력엔 안 잡혀 false positive 무관 — test-wait-repl-patterns T3 가드 유지).
+    #   2026-05-21 P2(v2.1.145 동종 사건)의 연장 — claude 버전 업마다 재발(wait_repl 취약성).
+    if printf '%s' "$dump" | grep -qE 'Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on|of [0-9]+k tokens'; then
       return 0
     fi
   done
