@@ -63,3 +63,48 @@ requeue_pending_done() {
     touch "$f" 2>/dev/null || true
   done
 }
+
+# ── @verdict-arrived: review/ glob quorum 스캔 ──────────────────────────────
+# review/ Write 는 events.log 에 안 남으므로(log-event.sh:39 메타 skip) 파일시스템이 유일한
+# 진실 원천. review/ 를 직접 glob 해 wid(=<worker>-<id>) 별 투표 voter 수를 세고, N 전원
+# 도착 + 미발화(.verdict-fired.<wid> 마커 없음) wid 를 stdout 으로 emit + 마커 touch(1회 차단).
+# bash 3.2(macOS) 호환 — 연관배열(declare -A) 안 씀. wid→voter 매핑은 tab 줄 sort -u | awk 집계.
+#   $1=REVIEW_DIR  $2=STATE_DIR  $3=N(기대 투표 리뷰어 수)
+scan_verdict_quorum() {
+  local review_dir="$1" sd="$2" n="$3"
+  # N 비정수/0 이면 무력화(투표 리뷰어 없는 프로파일 회귀 안전).
+  case "$n" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$n" -gt 0 ] || return 0
+  [ -d "$review_dir" ] || return 0
+
+  # 1) 투표 voter 파일 glob → "wid<TAB>voter" 줄 누적.
+  local lines=""
+  local f base voter wid
+  for f in "$review_dir"/*.alignment-rev.md "$review_dir"/*.quality-rev.md "$review_dir"/*.security-rev.md; do
+    [ -f "$f" ] || continue                 # glob 무매치 시 리터럴 패턴 스킵
+    base="${f##*/}"; base="${base%.md}"      # <wid>.<voter>-rev
+    voter="${base##*.}"; voter="${voter%-rev}"
+    case "$voter" in alignment|quality|security) : ;; *) continue ;; esac
+    wid="${base%.*}"                          # <wid> (마지막 .<voter>-rev 제거)
+    [ -n "$wid" ] || continue
+    lines="${lines}${wid}	${voter}
+"
+  done
+  [ -n "$lines" ] || return 0
+
+  # 2) wid 별 고유 voter 수 ≥ N 인 wid 추출(sort -u 로 중복 voter 제거 후 그룹 카운트).
+  local quorum_wids
+  quorum_wids="$(printf '%s' "$lines" | sort -u \
+    | awk -F'\t' -v n="$n" '{c[$1]++} END{for(k in c) if(c[k]>=n) print k}')"
+  [ -n "$quorum_wids" ] || return 0
+
+  # 3) 미발화 wid 만 emit + 마커 touch. wid 파일명 안전화는 _pd_sanitize 재사용.
+  local w marker
+  printf '%s\n' "$quorum_wids" | while IFS= read -r w; do
+    [ -n "$w" ] || continue
+    marker="$sd/.verdict-fired.$(_pd_sanitize "$w")"
+    [ -f "$marker" ] && continue              # 이미 발화 → 재발화 차단
+    : > "$marker" 2>/dev/null || true         # 마커 생성(touch)
+    printf '%s\n' "$w"
+  done
+}
