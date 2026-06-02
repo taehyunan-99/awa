@@ -108,6 +108,8 @@ matrix_lookup() {
         case "$pinner" in
           *':*')
             prefix="${pinner%:\*}"
+            prefix="${prefix% }"   # self-verify 컨벤션: Bash(. :*) 의 ':*' 앞 구분 공백 트림 →
+            #   prefix=. 정규화(lead_auto_allow_lookup 과 동일). 끝 공백 없는 기존 패턴엔 무영향.
             prefix_match "$prefix" "$field" && { printf '%s' "$pat"; return 0; }
             ;;
           *' *')
@@ -191,6 +193,9 @@ lead_auto_allow_lookup() {
         case "$pinner" in
           *':*')
             prefix="${pinner%:\*}"
+            prefix="${prefix% }"   # self-verify 컨벤션: Bash(. :*) 의 ':*' 앞 구분 공백 트림 →
+            #   prefix=. 로 정규화해 prefix_match 의 공백경계(`. ./src`)가 정상 매칭. 끝 공백 없는
+            #   기존 패턴(Bash(ls:*)→ls)엔 무영향. command 명령어와 인자 사이 공백 경계는 prefix_match 가 처리.
             prefix_match "$prefix" "$field" && { printf '%s:%s' "$catname" "$pat"; return 0; }
             ;;
           *)

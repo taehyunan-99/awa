@@ -55,6 +55,16 @@ danger_check() {
     [[ "$cmd" =~ $re ]] && { echo dotssh-write; return 0; }
     re='(^|[^a-zA-Z0-9_])(bash|sh|zsh)[[:space:]]+-c([[:space:]]|$)'
     [[ "$cmd" =~ $re ]] && { echo bash-c-wrapper; return 0; }
+    # ★ 자가검증 게이트(2026-06-01): source(. /source)·인터프리터(bash/sh/zsh/dash)로
+    #   *절대 시스템·민감 경로* 스크립트를 실행하면 거부. self-verify auto-allow(lead-auto-allow
+    #   self-verify 카테고리)가 `Bash(. :*)`·`Bash(bash :*)` 를 통째 허용하므로, 그 전에 danger 가
+    #   시스템경로 실행을 막아야 `. /etc/profile`·`bash /usr/bin/evil.sh` 권한상승을 차단(평가순서
+    #   danger→matrix→auto). 프로젝트 내부 상대경로(`. ./src/x.sh`·`bash ./x.sh`)는 SAFE → self-verify 통과.
+    #   SENS_EXEC: 절대 시스템 경로(/etc /usr/(bin|lib|sbin) /System /private/etc) + 홈 dotdir(.ssh/.aws/.gnupg).
+    #   bash-c-wrapper 동류 — exec 동작의 *대상 경로* 만 잡아 따옴표 텍스트·인자 오탐 회피.
+    local SENS_EXEC='(/etc/|/System/|/private/etc/|/usr/(bin|lib|sbin)/|(~|/(home|Users|root)/[^[:space:]]*)/\.(ssh|aws|gnupg)/)'
+    re="(^|[^a-zA-Z0-9_/.])(\.|source|bash|sh|zsh|dash)[[:space:]]+['\"]?${SENS_EXEC}"
+    [[ "$cmd" =~ $re ]] && { echo exec-sensitive; return 0; }
 
     # ★ 7차 후속(보안 회귀 차단): Bash 명령이 민감 경로에 쓰기를 시도하면 danger.
     #   danger 의 경로규칙(아래 system-config/ssh-key/cred)은 Edit/Write file_path 에만 걸려

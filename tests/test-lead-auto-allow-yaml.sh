@@ -66,16 +66,29 @@ assert_eq "harness-infra:Bash(tmux wait-for:*)" "$out" "Y12 tmux wait-for → ha
 out="$(lead_auto_allow_lookup Bash '{"command":"printf x >> .agent-harness/events.log"}')"
 assert_eq "harness-infra:Bash(printf:*)" "$out" "Y12 printf → harness-infra"
 
-echo "[Y11] 의도적 회색 유지 (안전등급 차이로 사람 1회 승인)"
-lead_auto_allow_lookup Bash '{"command":"bash ./test.sh"}' >/dev/null
-assert_fail "$?" "Y11 bash ./X 는 회색 (auto 제외)"
-lead_auto_allow_lookup Bash '{"command":"./todo.sh list"}' >/dev/null
-assert_fail "$?" "Y11 ./X 는 회색 (auto 제외)"
+echo "[Y11] 의도적 회색 유지 (데이터손실 인지 — 사람 1회 승인)"
+# ★ 정책 전환 (2026-06-01, self-verify): `bash ./X`·`./X` 는 *더이상 회색이 아니라 self-verify auto*.
+#   근거 = AWA 정체성(무인 자동 운영 — lead.md ⓐ 이벤트 반응형·격리 --project). 그 환경엔 '사람 1회
+#   승인' 주체가 없어 engineer 자가검증이 영영 봉쇄(결함 #1 실측). deny-bounded 한계선은 exec-sensitive
+#   (danger)가 지킴 — 시스템·민감 경로 실행은 여전히 무조건 차단. 안전=danger / 편의=auto 책임 분리.
+#   단 git checkout/switch 는 데이터손실 위험이라 self-verify 와 무관하게 *여전히 회색*(아래 유지).
 lead_auto_allow_lookup Bash '{"command":"git checkout -- todo.sh"}' >/dev/null
 assert_fail "$?" "Y11 git checkout 은 회색 (데이터손실 인지)"
 lead_auto_allow_lookup Bash '{"command":"git switch main"}' >/dev/null
 assert_fail "$?" "Y11 git switch 는 회색"
-lead_auto_allow_lookup Bash '{"command":"bash /etc/passwd"}' >/dev/null
-assert_fail "$?" "Y11 bash /절대경로 미매칭"
+
+echo "[Y11b] self-verify: 프로젝트 내부 스크립트 실행 → auto (결함 #1 봉쇄 해소)"
+# 무인 환경 봉쇄 해소 — engineer 자가검증(`bash ./x.sh`·`. ./x.sh`)이 auto-allow.
+out="$(lead_auto_allow_lookup Bash '{"command":"bash ./test.sh"}')"
+assert_eq "self-verify:Bash(bash :*)" "$out" "Y11b bash ./X → self-verify"
+out="$(lead_auto_allow_lookup Bash '{"command":". ./src/range.sh && range_sum 1 5"}')"
+assert_eq "self-verify:Bash(. :*)" "$out" "Y11b . ./X → self-verify"
+out="$(lead_auto_allow_lookup Bash '{"command":"source ./tests/t.sh"}')"
+assert_eq "self-verify:Bash(source :*)" "$out" "Y11b source ./X → self-verify"
+# ★ self-verify 는 lead_auto_allow_lookup 단독으론 시스템경로도 매칭(auto)하지만, classify 종단에선
+#   danger(exec-sensitive)가 *먼저* 평가돼 차단됨. 여기선 auto 단 격리 검증이라 danger 미적용 —
+#   `bash /etc/passwd` 가 self-verify 로 잡히는 건 정상(종단 안전은 classify 평가순서가 보장, test-self-verify-gate S4 검증).
+out="$(lead_auto_allow_lookup Bash '{"command":"bash /etc/passwd"}')"
+assert_eq "self-verify:Bash(bash :*)" "$out" "Y11b bash /절대 → auto단 self-verify (종단은 danger 우선)"
 
 test_summary

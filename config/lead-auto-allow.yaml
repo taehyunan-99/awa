@@ -67,6 +67,18 @@ harness-infra:
   # 둘 다 danger-check SAFE 확인필(printf=부작용없는 출력, >> 민감경로는 danger-check 가 별도 차단).
   - "Bash(tmux wait-for:*)"
   - "Bash(printf:*)"
+self-verify:
+  # 워커 자가검증 — engineer 가 자기 구현을 source-then-call 이나 스크립트 실행으로 확인
+  #   (`. ./src/x.sh && fn`, `bash ./src/x.sh args`). 게이트 봉쇄 해소(2026-06-01):
+  #   이 패턴 없으면 gray → 격리/자동 환경서 USER-ASK 응답없어 타임아웃 DENY → done 못 냄.
+  # ★ 안전: danger_check 의 exec-sensitive 가 *먼저* 평가(danger→matrix→auto)돼 절대 시스템·민감
+  #   경로 실행(`. /etc/x`·`bash /usr/bin/evil.sh`)을 차단. bash/sh -c 는 bash-c-wrapper 거부.
+  #   여기 도달 = 프로젝트 내부 스크립트 실행만. source 든 bash 든 hook 미경유는 동일 신뢰모델
+  #   (워커가 작성한 프로젝트 스크립트 — claude Bash 도구 1호출만 가로채지 자식 명령은 못 봄).
+  - "Bash(. :*)"
+  - "Bash(source :*)"
+  - "Bash(bash :*)"
+  - "Bash(sh :*)"
 
 # 학습된 패턴 — add_to_allow 가 사용자 승인 후 누적 (Phase A, §7)
 learned:
