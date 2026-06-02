@@ -181,4 +181,61 @@ att_e="$(jq -r '.attempt' "$STATE_DIR/blocked-workers/qe.json")"
 [ "$att_e" -ge 3 ]
 assert_success "$?" "L2 격리 후 같은 task(TX) 재차단은 attempt 누적($att_e>=3) — 무한반복 방지 유지"
 
+# Layer 2-n: 회로① 단계3 라이브 — watcher 가 차단 워커의 dispatch-queue 를 처리할 때
+# dispatch.sh exit 2(차단) 를 *조용히 소비* 하는가(=@dispatch-fail 미발화 + 큐 .json rm).
+# L74-76 의 grep 검증(분기 존재)을 *실 watcher 한 사이클 라이브 발동* 으로 보강한다.
+#
+# 메커니즘: watcher.sh 는 dispatch.sh 를 `--project "$HARNESS_PROJECT"` 로 대행 호출한다.
+# 이때 dispatch.sh 의 PROJECT_ROOT = 격리 projdir → STATE_DIR 미설정이라
+# is_worker_blocked 가 보는 _block_state_dir = "$projdir/.agent-harness/state".
+# 또 dispatch.sh 는 SESSION_OVERRIDE 를 못 받으므로 resolve_session 이 자동명
+# (awa-<basename(projdir)>) 으로 세션을 도출 → 우리가 그 자동명으로 tmux 세션을 만들어야
+# 세션 확인(dispatch.sh:46)을 통과해 차단 가드(dispatch.sh:55, exit 2)에 도달한다.
+if command -v tmux >/dev/null 2>&1; then
+  WDIR="$(mktemp -d)"
+  ( cd "$WDIR" && git init -q 2>/dev/null )
+  mkdir -p "$WDIR/.agent-harness/state/blocked-workers" \
+           "$WDIR/.agent-harness/state/dispatch-queue" \
+           "$WDIR/.agent-harness/tasks"
+  # 격리 projdir basename → dispatch.sh 가 도출할 세션 자동명과 일치시킨다.
+  _wsess="awa-$(basename "$WDIR" | sed 's/[^A-Za-z0-9_-]/_/g')"
+  _wevents="$WDIR/.agent-harness/events.log"
+  : > "$_wevents"
+  # watcher 좀비 방지: EXIT trap 에 세션 kill 누적(기존 TMPDIR rm 유지). 중간 실패에도 정리 보장.
+  trap 'tmux kill-session -t "'"$_wsess"'" 2>/dev/null; rm -rf "'"$WDIR"'" "$TMPDIR"' EXIT
+  if tmux new-session -d -s "$_wsess" 2>/dev/null; then
+    _wlead="$(tmux list-panes -t "$_wsess" -F '#{pane_id}' | head -1)"
+    # 차단 워커 + dispatch-queue 미리 배치. task 파일은 둬도 차단 가드(L55)가 task 확인(L60)보다
+    # 앞이라 무관 — 차단이 우선해 exit 2.
+    printf '{"worker":"blkw2","task_id":"BQ","attempt":1,"reason":"t"}' \
+      > "$WDIR/.agent-harness/state/blocked-workers/blkw2.json"
+    _qfile="$WDIR/.agent-harness/state/dispatch-queue/q1.json"
+    printf '{"worker":"blkw2","task_id":"BQ"}' > "$_qfile"
+    # watcher 한 사이클 라이브 기동(백그라운드). STATE_DIR/EVENTS/HARNESS_PROJECT 정확 주입.
+    SESSION="$_wsess" LEAD_PANE="$_wlead" \
+      STATE_DIR="$WDIR/.agent-harness/state" EVENTS="$_wevents" \
+      HARNESS_PROJECT="$WDIR" \
+      bash "$ROOT/bin/watcher.sh" >/dev/null 2>&1 &
+    _wpid=$!
+    # 큐 파일 소멸을 짧게 폴링(watcher sleep 1 주기 + 처리 여유). 무한 sleep 금지.
+    for _i in $(seq 1 20); do
+      [ -f "$_qfile" ] || break
+      sleep 0.5
+    done
+    # (a) @dispatch-fail 미발화 — LEAD pane 캡처에 해당 문자열이 없어야 조용한 소비.
+    _wcap="$(tmux capture-pane -p -t "$_wlead" 2>/dev/null || true)"
+    assert_not_contains "$_wcap" "@dispatch-fail" \
+      "L2 단계3: 차단 워커 dispatch-queue 처리 시 @dispatch-fail 미발화(조용한 소비)"
+    # (b) 큐 .json rm 소비 — watcher 가 처리 후 dispatch-queue/<id>.json 을 제거.
+    test ! -f "$_qfile"
+    assert_success "$?" "L2 단계3: watcher 가 차단 dispatch-queue .json 을 rm 소비"
+    # watcher 종료(세션 kill → while tmux has-session 탈출). trap 도 보강하지만 즉시 정리.
+    tmux kill-session -t "$_wsess" 2>/dev/null
+    wait "$_wpid" 2>/dev/null || true
+  fi
+  rm -rf "$WDIR"
+  trap 'rm -rf "$TMPDIR"' EXIT   # EXIT trap 을 원복(다른 테스트/정리 영향 없게)
+fi
+
+
 test_summary
