@@ -84,4 +84,10 @@ assert_contains "$WSH" "@verdict-arrived:" "L1-watcher: @verdict-arrived 발화"
 assert_contains "$WSH" 'EXPECTED_VOTERS' "L1-watcher: EXPECTED_VOTERS env 수신"
 assert_contains "$WSH" 'dirname "$EVENTS"' "L1-watcher: review_dir 를 EVENTS 에서 도출"
 
+# ── L1: awa-up.sh 배선 (grep 구조) ───────────────────────────────────────────
+AUP="$(cat "$ROOT/bin/awa-up.sh")"
+assert_contains "$AUP" "EXPECTED_VOTERS=0" "L1-awaup: EXPECTED_VOTERS 초기화"
+assert_contains "$AUP" "reviewer-alignment|reviewer-quality|reviewer-security" "L1-awaup: 투표 리뷰어 카운트 case"
+assert_contains "$AUP" 'EXPECTED_VOTERS=\"$EXPECTED_VOTERS\"' "L1-awaup: watcher env 주입"
+
 test_summary
