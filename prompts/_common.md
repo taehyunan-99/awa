@@ -77,6 +77,7 @@ assumptions: <ASSUMED 한 것 요약, 없으면 ->
 - **Done 조건**: 출력계약 전부 채움 + EVIDENCE 의 모든 claim 검증됨. 그 전엔 끝난 게 아니다.
 - **effort budget**: 역할 파일이 도구 호출 한도 N 을 준다. 소진해도 미달이면 무한정 헤매지 말고 `status: PARTIAL` + 남은 gap 을 RISK/NEXT 에 보고.
 - **assume-and-flag**: 사람에게 못 물으니 — 가역적·scope 내면 가장 합리적으로 가정하고 진행하되 `ASSUMED: X because Y` 를 헤더 assumptions·본문에 기록. 비가역·destructive·scope 밖이면 ④ BLOCKED 로.
+- **★ assume-and-flag 의 예외 — criteria 간 모순은 자율 해소 금지**: acceptance criteria 가 서로 *상충* 하면(특히 **결과값↔구현방식** 충돌 — 예: "합이 ==15"(결과값) vs "i<hi 로 순회"(구현방식)가 한쪽만 만족 가능) ASSUMED 로 혼자 메우지 마라. 어느 쪽이 진짜 의도인지는 사용자만 안다. 결과만 맞춰 통과하면 위반이 어디에도 안 남아 drift 가 은폐되고 회로가 침묵한다. **모순 감지까지가 네 일, 해소는 `@plan-defect` 로 올려라**. (일반 구현 선택지가 둘 이상인 단순 재량은 여기 해당 안 됨 — *criteria 끼리 모순* 일 때만.)
 
 ## 신호 토큰 (closed-set, 줄 시작 고정)
 
@@ -84,5 +85,5 @@ assumptions: <ASSUMED 한 것 요약, 없으면 ->
 - `@lead: <메시지>` — lead 에 보고 (rm 위임 등).
 - `NEEDS: <입력>` — scope 밖 필요 입력 (lead 가 cross-lane 처리).
 - `ASSUMED: <가정> because <이유>` — 가정 플래그.
-- `@plan-defect: {{WORKER_NAME}}/<task-id> <설명>` — plan 자체 결함 발견 시(acceptance criteria 모호·전제 모순 등). stdout 출력 후 events.log 보조 append: `printf '%s\t%s\t%s\tplan-defect\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "{{WORKER_NAME}}" "<task-id>" "<설명>" >> .agent-harness/events.log` — watcher 가 잡아 lead ⓖ 로 라우팅. *`<설명>` 안의 탭·개행은 공백으로 치환* (watcher awk 가 5번째 필드만 추출 — 탭 섞이면 뒤 잘림).
+- `@plan-defect: {{WORKER_NAME}}/<task-id> <설명>` — plan 자체 결함 발견 시(acceptance criteria 모호·전제 모순·**criteria 간 상충**[결과값↔구현방식처럼 한 단계 추론을 거쳐 드러나는 미묘한 충돌 포함] 등). 모순을 구현으로 조용히 메우지 말고 *여기로 올린다*(§완료·노력·가정 의 assume-and-flag 예외 참조). stdout 출력 후 events.log 보조 append: `printf '%s\t%s\t%s\tplan-defect\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "{{WORKER_NAME}}" "<task-id>" "<설명>" >> .agent-harness/events.log` — watcher 가 잡아 lead ⓖ 로 라우팅. *`<설명>` 안의 탭·개행은 공백으로 치환* (watcher awk 가 5번째 필드만 추출 — 탭 섞이면 뒤 잘림).
 (`@done:`·`@gate:`·`@review:` 는 watcher/lead 가 쓰는 토큰 — 워커는 위 4개만.)
