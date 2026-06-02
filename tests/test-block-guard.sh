@@ -185,6 +185,16 @@ assert_success "$?" "L2 격리 후 같은 task(TX) 재차단은 attempt 누적($
 # dispatch.sh exit 2(차단) 를 *조용히 소비* 하는가(=@dispatch-fail 미발화 + 큐 .json rm).
 # L74-76 의 grep 검증(분기 존재)을 *실 watcher 한 사이클 라이브 발동* 으로 보강한다.
 #
+# ⚠️ 양성신호 대조쌍(코드리뷰 Important): "차단 워커 @dispatch-fail 미발화" 만으론
+# watcher 미기동/조기사망/형식불량 폐기(watcher.sh L75-78) 시에도 빈 캡처라 항상-PASS 된다
+# (assert_not_contains "" "@dispatch-fail" 은 무조건 통과). 즉 exit 2 분기를 *실제로 탔다*는
+# 양성 보장이 없다. 따라서 같은 watcher 사이클에 *비차단 대조* 워커를 함께 넣는다:
+#   - 차단 워커(blkw2): blocked-workers 있음 → dispatch.sh exit 2 → @dispatch-fail: blkw2/ 미발화.
+#   - 비차단 워커(okw): blocked-workers 없음 + task 파일 없음 → dispatch.sh L62 exit 1
+#     → watcher 가 @dispatch-fail: okw/ *발화*. (세션은 둘 다 통과 — dispatch.sh L46 세션 확인.)
+# 통지 문구가 `@dispatch-fail: $dq_worker/$dq_task — ...`(watcher.sh:92)라 워커명으로 구분한다.
+# 비차단 발화 단언이 watcher 미기동 시 FAIL → "차단 미발화"가 빈 캡처 아닌 *차단 분기 때문*임을 입증.
+#
 # 메커니즘: watcher.sh 는 dispatch.sh 를 `--project "$HARNESS_PROJECT"` 로 대행 호출한다.
 # 이때 dispatch.sh 의 PROJECT_ROOT = 격리 projdir → STATE_DIR 미설정이라
 # is_worker_blocked 가 보는 _block_state_dir = "$projdir/.agent-harness/state".
@@ -205,30 +215,42 @@ if command -v tmux >/dev/null 2>&1; then
   trap 'tmux kill-session -t "'"$_wsess"'" 2>/dev/null; rm -rf "'"$WDIR"'" "$TMPDIR"' EXIT
   if tmux new-session -d -s "$_wsess" 2>/dev/null; then
     _wlead="$(tmux list-panes -t "$_wsess" -F '#{pane_id}' | head -1)"
-    # 차단 워커 + dispatch-queue 미리 배치. task 파일은 둬도 차단 가드(L55)가 task 확인(L60)보다
-    # 앞이라 무관 — 차단이 우선해 exit 2.
+    # 차단 워커 큐(q1): blocked-workers 있음 → exit 2. task 파일은 둬도 차단 가드(L55)가
+    # task 확인(L60)보다 앞이라 무관 — 차단이 우선해 exit 2.
     printf '{"worker":"blkw2","task_id":"BQ","attempt":1,"reason":"t"}' \
       > "$WDIR/.agent-harness/state/blocked-workers/blkw2.json"
     _qfile="$WDIR/.agent-harness/state/dispatch-queue/q1.json"
     printf '{"worker":"blkw2","task_id":"BQ"}' > "$_qfile"
+    # 비차단 대조 큐(q2): blocked-workers 없음(okw) + task 파일 없음 → dispatch.sh 가
+    # 세션 통과(L46) → 차단 안 됨 → task 파일 없음(L62) → exit 1 → watcher 가 @dispatch-fail 발화.
+    _qfile2="$WDIR/.agent-harness/state/dispatch-queue/q2.json"
+    printf '{"worker":"okw","task_id":"OQ"}' > "$_qfile2"
     # watcher 한 사이클 라이브 기동(백그라운드). STATE_DIR/EVENTS/HARNESS_PROJECT 정확 주입.
     SESSION="$_wsess" LEAD_PANE="$_wlead" \
       STATE_DIR="$WDIR/.agent-harness/state" EVENTS="$_wevents" \
       HARNESS_PROJECT="$WDIR" \
       bash "$ROOT/bin/watcher.sh" >/dev/null 2>&1 &
     _wpid=$!
-    # 큐 파일 소멸을 짧게 폴링(watcher sleep 1 주기 + 처리 여유). 무한 sleep 금지.
-    for _i in $(seq 1 20); do
-      [ -f "$_qfile" ] || break
+    # 두 큐 파일 *모두* 소멸을 폴링(watcher sleep 1 주기 + 처리 여유). 무한 sleep 금지.
+    # 비차단 대조 추가로 watcher 가 두 큐를 처리할 시간 필요 → 타임아웃 여유(20→30).
+    for _i in $(seq 1 30); do
+      [ -f "$_qfile" ] || [ -f "$_qfile2" ] || break
       sleep 0.5
     done
-    # (a) @dispatch-fail 미발화 — LEAD pane 캡처에 해당 문자열이 없어야 조용한 소비.
+    # 발화 통지가 입력창에 쌓일 시간 한 박자 확보(send-keys 직후 capture 레이스 완화).
+    sleep 0.5
     _wcap="$(tmux capture-pane -p -t "$_wlead" 2>/dev/null || true)"
-    assert_not_contains "$_wcap" "@dispatch-fail" \
-      "L2 단계3: 차단 워커 dispatch-queue 처리 시 @dispatch-fail 미발화(조용한 소비)"
-    # (b) 큐 .json rm 소비 — watcher 가 처리 후 dispatch-queue/<id>.json 을 제거.
-    test ! -f "$_qfile"
-    assert_success "$?" "L2 단계3: watcher 가 차단 dispatch-queue .json 을 rm 소비"
+    # (a) 차단 워커는 @dispatch-fail 미발화 — exit 2 를 조용히 소비. 워커명으로 정밀 구분.
+    assert_not_contains "$_wcap" "@dispatch-fail: blkw2/" \
+      "L2 단계3: 차단 워커(blkw2) dispatch-queue 처리 시 @dispatch-fail 미발화(조용한 소비)"
+    # (a') 양성신호 대조 — 비차단 워커(okw)는 exit 1 → @dispatch-fail 발화해야 한다.
+    #      watcher 미기동/조기사망이면 빈 캡처라 이 단언이 FAIL → 항상-PASS 약점 차단.
+    #      이게 발화하므로 (a)의 미발화가 빈 캡처 아닌 *차단 분기(exit 2)* 때문임이 입증된다.
+    assert_contains "$_wcap" "@dispatch-fail: okw/" \
+      "L2 단계3 양성신호: 비차단 워커(okw) exit 1 → @dispatch-fail 발화(차단 분기 실증·항상PASS 차단)"
+    # (b) 두 큐 .json 모두 rm 소비 — watcher 가 처리 후 dispatch-queue/<id>.json 을 제거.
+    test ! -f "$_qfile" && test ! -f "$_qfile2"
+    assert_success "$?" "L2 단계3: watcher 가 차단·비차단 dispatch-queue .json 을 모두 rm 소비"
     # watcher 종료(세션 kill → while tmux has-session 탈출). trap 도 보강하지만 즉시 정리.
     tmux kill-session -t "$_wsess" 2>/dev/null
     wait "$_wpid" 2>/dev/null || true
