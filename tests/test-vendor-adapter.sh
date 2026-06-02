@@ -77,12 +77,16 @@ assert_success "$([ -f "$codex_cfg" ] && grep -q 'trust_level = "trusted"' "$cod
 assert_success "$?" "A11 codex lead effort=high"
 # A12 — wait_ready 본문 회귀 가드(grep): ready 우선 + 업데이트 Skip + trust 처리 패턴 존재.
 cx="$ROOT/bin/vendors/codex.sh"
-assert_success "$(grep -q 'OpenAI Codex' "$cx"; echo $?)" "A12a wait_ready ready 패턴"
+assert_success "$(grep -q 'OpenAI Codex' "$cx"; echo $?)" "A12a wait_ready ready 패턴(구버전 헤더)"
 assert_success "$(grep -q 'Update available' "$cx"; echo $?)" "A12b wait_ready 업데이트 Skip 패턴"
 # ready 분기가 update 분기보다 앞에 있어야(잔상 경합 회피) — 줄번호 비교.
 _rl=$(grep -n 'OpenAI Codex|❯' "$cx" | head -1 | cut -d: -f1)
 _ul=$(grep -n 'Update available|Update now' "$cx" | head -1 | cut -d: -f1)
 assert_success "$([ -n "$_rl" ] && [ -n "$_ul" ] && [ "$_rl" -lt "$_ul" ]; echo $?)" "A12c ready 분기가 update 분기보다 앞"
+# A12d — codex 0.130 라이브 발견(2026-06-02): 0.130 ready 화면은 'gpt-N.N <effort> ·'
+#   상태줄만 떠 구버전 패턴(OpenAI Codex|❯)이 다 실패 → 120s 풀 폴링·부트 5분 지연.
+#   ready 분기 grep 에 'gpt-N.N <effort> ·' 상태줄 패턴이 포함돼야(회귀 차단).
+assert_success "$(grep -q 'gpt-\[0-9.\]+ (low|medium|high) ·' "$cx"; echo $?)" "A12d wait_ready 0.130 상태줄 ready 패턴"
 rm -rf "$CODEX_PR" "$FAKE_HOME"
 
 # A13 — 오케스트레이터 가드(2026-05-31): LEAD/PM 은 claude 전용. codex 등 비-claude 지정 시

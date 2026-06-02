@@ -24,7 +24,12 @@ vendor_wait_ready() {
     #   도달하면 업데이트 알림 박스가 위쪽에 잔상으로 남아도(Update available 문자열 공존)
     #   즉시 성공 반환. 아래 update 분기보다 먼저 둬야 — 안 그러면 ready 후에도 잔상이
     #   매 루프 Down+Enter 를 재송신해 입력창을 오염시키고 ready 진입을 방해(실측 행).
-    if printf '%s' "$dump" | grep -qE 'OpenAI Codex|❯'; then
+    # ★ codex 0.130 라이브 발견(2026-06-02): 0.130 ready 화면엔 'OpenAI Codex' 헤더도
+    #   '❯' 도 없고 모델 상태줄 'gpt-5.5 high · <path>' 만 뜬다(입력 프롬프트는 '›' U+203A).
+    #   기존 두 패턴 다 매칭 실패 → codex pane 마다 60×2s=120s 풀 폴링 → 부트 5분+ 지연.
+    #   해소: ready 패턴에 'gpt-N.N <effort> ·' 상태줄 추가(REPL 완전 기동 후에만 출력,
+    #   명령 echo 엔 안 잡혀 안전). 구버전 'OpenAI Codex|❯' 는 호환 유지.
+    if printf '%s' "$dump" | grep -qE 'OpenAI Codex|❯|gpt-[0-9.]+ (low|medium|high) ·'; then
       # P7 수정(2026-05-30 codex 1사이클 e2e): ready 도달했으나 Update 박스가 잔상으로
       #   공존하면, 직후 send_prompt 의 텍스트+Enter 중 Enter 가 업데이트 선택지로 새거나
       #   codex 가 입력을 무시 → 부트 프롬프트 미전송(전 pane 멈춤, 실측). send_prompt 는
