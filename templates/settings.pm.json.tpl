@@ -22,6 +22,8 @@
       "Write",
       "Edit",
       "NotebookEdit",
+      "Agent",
+      "Task",
       "Bash(sudo:*)",
       "Bash(dd:*)",
       "Bash(git push --force:*)",

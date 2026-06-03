@@ -55,4 +55,14 @@ assert_contains "$_pm_deny" "Write" "pm deny 에 Write (읽기전용 코드 강�
 assert_contains "$_pm_deny" "Edit" "pm deny 에 Edit"
 assert_contains "$_pm_deny" "NotebookEdit" "pm deny 에 NotebookEdit"
 
+# ★ 서브에이전트 우회 봉쇄 (2026-06-03 라이브 결함 2차): cat 차단 후 PM(Sonnet)이 이번엔
+#   Agent(general-purpose 서브에이전트)를 띄워 파일작성 우회. 근본원인 = PM 은 hook 이 없어
+#   (게이트 비대상 — 사용자 창구) 다른 워커/리뷰어와 달리 hook matcher(Bash|Edit|Write|Agent|*)
+#   로 Agent 를 못 잡는다. settings deny 가 PM 의 *유일한* 방어선이므로 Agent/Task 를 명시 deny.
+#   (전수조사: engineer/researcher/reviewer 는 hook matcher 에 Agent/* 포함 → 게이트 커버. PM 만
+#   무방비였다.) defaultMode:dontAsk 화이트리스트는 라이브 검증서 PM 정상 pm-queue 리다이렉션
+#   (jq -n > .tmp)까지 거부 → 부적합 판정, deny 명시 채택.
+assert_contains "$_pm_deny" "Agent" "pm deny 에 Agent (서브에이전트 우회 차단 — hook 부재 보완)"
+assert_contains "$_pm_deny" "Task" "pm deny 에 Task (Agent 별칭 안전망)"
+
 test_summary
