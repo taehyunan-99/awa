@@ -3,7 +3,8 @@
 # source 전용 (진입점 없음). 호출 전 HARNESS_ROOT/PROJECT_ROOT 가 export 되어 있어야 함.
 
 # 부트 명령 전체 (suffix 포함).
-# $1=model $2=settings_path $3=session_id $4=plan_file(opt)
+# $1=model $2=settings_path $3=session_id $4=system_prompt_file(opt — 역할/plan/합본)
+# (4번째는 --append-system-prompt-file 로 흐름. 역할 부트도 이 경로로 주입 — injection 우회.)
 vendor_boot_cmd() {
   local model="$1" settings="${2:-}" sid="${3:-}" plan="${4:-}"
   local cmd
