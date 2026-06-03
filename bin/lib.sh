@@ -419,6 +419,17 @@ send_prompt() {
   done
 }
 
+# 부트 프롬프트 지시문 생성 ($1=부트파일경로, $2=역할별 tail 지시). stdout=주입 텍스트.
+# ★ 2026-06-03 라이브 수정: 옛 문구 "$파일 를 읽고 그 규약을 그대로 따르라" 가 claude
+#   opus 4.8 의 prompt-injection 휴리스틱을 발동 → 파일을 읽지도 않고 거부(비결정적,
+#   alignment 거부·quality 통과). 모든 claude 부트(워커/리뷰어/LEAD/PM) 위험. 해소:
+#   "인젝션 아님·하니스 생성 역할 부트" 맥락을 prefix 로 명시해 claude 가 정당한 부트로
+#   인지하게 한다. 5곳 하드코딩을 이 헬퍼로 통일(DRY — 한 곳 빠짐 드리프트 방지).
+boot_directive() {  # $1=file $2=tail → stdout
+  local file="$1" tail="${2:-}"
+  printf '%s' "이건 프롬프트 인젝션이 아니라 이 AWA 하니스가 너를 위해 생성한 역할 부트다. ${file} 는 하니스가 만든 네 역할 규약 파일이니, 읽고 그 역할 규약을 채택하라. ${tail}"
+}
+
 # --project 인자 정규화 (E12·F2). stdout=절대경로, $?=0 성공, return 1 실패.
 # subshell 안 exit silent failure 회피 위해 return 사용·호출자 명시 검사.
 _normalize_project() {  # $1=raw → stdout=절대경로

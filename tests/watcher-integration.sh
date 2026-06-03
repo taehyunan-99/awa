@@ -65,6 +65,17 @@ sleep 2
 DUMP_REV="$(tmux capture-pane -p -t "$REV_PANE")"
 assert_contains "$DUMP_REV" "@review:" "events.log 증가 → reviewer @review: send-keys"
 
+# --- 케이스 3.1: reviewer 깨움이 send_prompt(Enter 재시도 안전망)를 쓰는지 (소스 가드) ---
+# 라이브 결함(2026-06-03): watcher 가 단발 'send-keys -l + Enter' 로 깨우면 codex TUI 가
+# Enter 를 씹어(P17 리뷰어 변종) 검토 미시작 → quorum 영영 미충족. send_prompt 는 입력창
+# 잔류 폴링으로 Enter 를 최대 8회 재시도(lib.sh) → codex 콜드스타트·렌더링 지연에도 제출 보장.
+# 부트 경로(awa-up)는 send_prompt 를 쓰는데 watcher 깨움만 단발이라 안 썼던 게 결함. 통일.
+WBODY="$(awk '/^[[:space:]]*for rp in \$REVIEWER_PANES/,/^[[:space:]]*done/' "$(dirname "$0")/../bin/watcher.sh")"
+printf '%s' "$WBODY" | grep -q 'send_prompt'
+assert_success "$?" "케이스3.1: reviewer 깨움이 send_prompt 재시도 안전망 사용 (단발 send-keys 아님)"
+printf '%s' "$WBODY" | grep -Eq 'send-keys -t "\$rp" Enter'
+assert_fail "$?" "케이스3.1b: reviewer 깨움에 단발 Enter send-keys 잔존 없음"
+
 # --- 케이스 4: done 라인 → lead @done: worker/task ---
 printf '%s\tdev\tT1\tdone\t-\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$EVENTS"
 sleep 2

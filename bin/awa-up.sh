@@ -543,7 +543,7 @@ for entry in "${WORKERS[@]}"; do
     SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; i=$((i + 1)); continue; }
   bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커" "$ENTRY_ROLE" "$ENTRY_MODEL" "${ENTRY_VENDOR:-}"
   splash_append_member "$ENTRY_NAME" "$ENTRY_ROLE" "$ENTRY_MODEL"
-  send_prompt "$tgt" "$bf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
+  send_prompt "$tgt" "$(boot_directive "$bf" "준비되면 다음 지시를 대기하라.")"
   i=$((i + 1))
 done
 
@@ -616,9 +616,9 @@ if [ -n "$PLAN_BOOT_FILE" ]; then
   # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
   vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null || true
   _plan_directive="$(vendor_lead_plan_directive "$PLAN_BOOT_FILE" 2>/dev/null || true)"
-  send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. ${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라."
+  send_prompt "$LEAD_PID" "$(boot_directive "$obf" "${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라.")"
 else
-  send_prompt "$LEAD_PID" "$obf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
+  send_prompt "$LEAD_PID" "$(boot_directive "$obf" "준비되면 다음 지시를 대기하라.")"
 fi
 
 # pm 부트: roles/pm.md 합본 + pm 템플릿 settings. 사용자 창구.
@@ -659,7 +659,7 @@ pm_cmd="$(agent_cmd_for "$PM_MODEL_EFF" "$settings_path" "$pm_sid" "" "${PM_VEND
   echo "오류: PM 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
 bootstrap_pane "$PM_PID" "PM" "$pm_cmd" "PM" "" "$PM_MODEL_EFF" "${PM_VENDOR:-}"
 splash_append_member "PM" "" "$PM_MODEL_EFF"
-send_prompt "$PM_PID" "$pbf 를 읽고 그 규약을 그대로 따르라. 사용자와 대화할 준비를 하라."
+send_prompt "$PM_PID" "$(boot_directive "$pbf" "사용자와 대화할 준비를 하라.")"
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
@@ -702,7 +702,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; j=$((j + 1)); continue; }
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어" "$ENTRY_ROLE" "$ENTRY_MODEL" "${ENTRY_VENDOR:-}"
     splash_append_member "$ENTRY_NAME" "$ENTRY_ROLE" "$ENTRY_MODEL"
-    send_prompt "$rtgt" "$rbf 를 읽고 그 규약을 그대로 따르라. 준비되면 다음 지시를 대기하라."
+    send_prompt "$rtgt" "$(boot_directive "$rbf" "준비되면 다음 지시를 대기하라.")"
     j=$((j + 1))
   done
 fi

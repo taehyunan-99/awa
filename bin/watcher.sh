@@ -130,8 +130,10 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
         pane_alive "$rp" || continue
         # I-3 정정: review-manager 는 일반 @review: 깨움에서 제외 — drift-check 전용으로만 깨움.
         [ "$rp" = "$REVIEW_MANAGER_PANE" ] && continue
-        tmux send-keys -t "$rp" -l "@review: done 라인 발생. cursor 부터 증분 검토." 2>/dev/null
-        tmux send-keys -t "$rp" Enter 2>/dev/null
+        # ★ 2026-06-03 라이브 수정: 단발 send-keys+Enter 는 codex TUI 가 Enter 를 씹어(P17
+        #   리뷰어 변종) 검토 미시작 → quorum 미충족. send_prompt 는 입력창 잔류 폴링으로
+        #   Enter 최대 8회 재시도 → codex 콜드스타트·렌더링 지연에도 제출 보장. 부트 경로와 통일.
+        send_prompt "$rp" "@review: done 라인 발생. cursor 부터 증분 검토." 2>/dev/null
       done
       debounced_rev="$now"
     fi
