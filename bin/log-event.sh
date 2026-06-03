@@ -27,6 +27,13 @@ else
 fi
 [ -z "$fpath" ] && exit 0   # 경로 없는 도구 호출은 무시
 
+# 결함 F: macOS 는 /tmp→/private/tmp·/var→/private/var 심볼릭링크. claude/codex 가 verdict 를
+#   /private/... 절대경로로 Write 하면 REPO_ROOT(=/tmp/...) 기준 skip 패턴과 문자열 불일치 →
+#   review/ skip 우회 → events.log 오염. fpath 의 /private prefix 를 벗겨 REPO_ROOT 와 기준 통일.
+#   (REPO_ROOT 도 /private 로 올 수 있으니 양쪽 동일 정규화 — 어느 쪽이든 /private 제거 후 비교.)
+case "$fpath" in /private/tmp/*|/private/var/*) fpath="${fpath#/private}" ;; esac
+case "$REPO_ROOT" in /private/tmp/*|/private/var/*) REPO_ROOT="${REPO_ROOT#/private}" ;; esac
+
 # 메타 산출물 화이트리스트 skip (D6·F6).
 # tasks/results 는 작업 흐름이라 기록 대상. 메타(events.log 자체·커서·상태·boot·review/) 만 skip.
 # repo-relative 변환 전, 절대경로 기준으로 점검 (F6: 절대경로 Write 도 잡힘).
