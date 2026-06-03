@@ -628,18 +628,29 @@ splash_append_member "LEAD" "" "$LEAD_MODEL_EFF"
 # LEAD 역할/plan 은 시스템프롬프트로 주입됨(injection 우회). send_prompt 는 *착수 트리거*만 —
 # 시스템프롬프트는 "어떻게"(맥락)이지 "지금 시작"(트리거)이 아니라, 능동 착수엔 send_prompt 필요.
 _lv="${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}"
+# LEAD 주입 방식 = INJECT_MODE (PM 과 일관성). LEAD 역할/plan 은 vendor_boot_cmd 가 이미
+#   시스템프롬프트(LEAD_SYSPROMPT_FILE)로 주입 — INJECT_MODE 는 *plan 없는 부트의 화면/촉구*만 제어.
+#   ★ PM 과 동일 결함: 시스템프롬프트만으론 역할 준수 약함(claude no-op 빈화면). 안정성>빈화면.
+#   - system : send_prompt 생략(빈 화면 idle). 역할은 시스템프롬프트에만.
+#   - stdin/hybrid : 짧은 역할 인지 촉구를 send_prompt 로 → 화면에 보이고 준수율↑. PM 과 통일.
+_lead_inject="${LEAD_INJECT_MODE:-${INJECT_MODE:-system}}"
+[ "$_lv" = "claude" ] || _lead_inject="stdin"   # 비-claude 는 시스템프롬프트 없음 → 항상 send_prompt
 if [ -n "$PLAN_BOOT_FILE" ]; then
   # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
   vendor_source "$_lv" 2>/dev/null || true
   _plan_directive="$(vendor_lead_plan_directive "$PLAN_BOOT_FILE" 2>/dev/null || true)"
   send_prompt "$LEAD_PID" "${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라."
 else
-  # plan 없는 부트: claude 는 lead.md ⓑ("plan 없으면 @pm: 대기")가 시스템프롬프트에 있어
-  #   착수 트리거 불요 → send_prompt 생략(PM 과 동일, 빈 화면 대기로 통일). codex 는
-  #   시스템프롬프트 미지원이라 대기 지시를 send_prompt 로 줘야 idle 진입(트리거 유지).
-  case "$_lv" in
-    claude) : ;;  # no-op — 시스템프롬프트 lead.md ⓑ 가 @pm 대기 지시. 빈 화면 idle.
-    *) send_prompt "$LEAD_PID" "준비되면 다음 지시를 대기하라." ;;
+  # plan 없는 부트. system=빈화면 idle, stdin/hybrid=역할 인지 촉구(준수율↑).
+  case "$_lead_inject" in
+    system)
+      case "$_lv" in
+        claude) : ;;  # no-op — 시스템프롬프트 lead.md ⓑ 가 @pm 대기. 빈 화면 idle.
+        *) send_prompt "$LEAD_PID" "준비되면 다음 지시를 대기하라." ;;
+      esac ;;
+    *)
+      # 역할은 시스템프롬프트에 있고, 여기선 짧은 인지 촉구만 — 작업은 직접 안 하고 @pm/플랜 대기.
+      send_prompt "$LEAD_PID" "너는 lead(순수 오케스트레이터)다. 직접 코딩하지 말고 워커 dispatch·권한 판단·리뷰 종합만 한다. 확정 plan 이나 @pm 지시가 오면 ⓑ 절차로 진행, 없으면 대기하라." ;;
   esac
 fi
 
@@ -677,14 +688,36 @@ if [ -z "$PM_MODEL_EFF" ]; then
     && PM_MODEL_EFF="$(vendor_default_model pm)"
   [ -n "$PM_MODEL_EFF" ] || PM_MODEL_EFF="sonnet"
 fi
-# PM 은 claude 고정(벤더 정책). 역할을 시스템 주입, send_prompt 스킵(헬퍼 일관성).
+# PM 은 claude 고정(벤더 정책). 역할 주입 방식 = PM_INJECT_MODE (기본 system).
+#   ★ 2026-06-03 결함: 시스템프롬프트 주입(a8ef4ae 빈화면 전환)이 PM 역할 준수를 약화 —
+#     Sonnet 이 시스템프롬프트의 읽기전용·pm-queue 경계를 대화 메시지보다 약하게 따라 작은
+#     작업을 직접 실행 시도(cat>file). 안정성>빈화면 → 주입 방식을 토글로 비교 가능하게.
+#   - system : 시스템프롬프트만 (--append-system-prompt-file). 빈 화면. 준수율 약함(실측).
+#   - stdin  : send_prompt 로 역할을 대화 첫 메시지 주입. 화면에 역할 보임. 준수율 강함(a8ef4ae 이전 입증).
+#   - hybrid : 시스템프롬프트 + 짧은 촉구 send_prompt('직접작업 금지·pm-queue 전달'). LEAD 패턴.
 _pv="${PM_VENDOR:-${HARNESS_VENDOR:-claude}}"
-_psysprompt=""; [ "$_pv" = "claude" ] && _psysprompt="$pbf"
+# INJECT_MODE 는 PM·LEAD 공통(일관성). PM_INJECT_MODE 는 PM 단독 override(하위호환).
+_pm_inject="${PM_INJECT_MODE:-${INJECT_MODE:-system}}"
+[ "$_pv" = "claude" ] || _pm_inject="stdin"   # 비-claude 는 시스템프롬프트 경로 없음 → stdin 고정
+case "$_pm_inject" in
+  system) _psysprompt="$pbf" ;;   # 역할=시스템, 대화 주입 없음 (빈 화면)
+  hybrid) _psysprompt="$pbf" ;;   # 역할=시스템 + 아래서 짧은 촉구 send_prompt 추가
+  *)      _psysprompt="" ;;       # stdin 은 역할 전문을 send_prompt 로 주입(시스템 비움)
+esac
 pm_cmd="$(agent_cmd_for "$PM_MODEL_EFF" "$settings_path" "$pm_sid" "$_psysprompt" "${PM_VENDOR:-}")" || {
   echo "오류: PM 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
 bootstrap_pane "$PM_PID" "PM" "$pm_cmd" "PM" "" "$PM_MODEL_EFF" "${PM_VENDOR:-}"
 splash_append_member "PM" "" "$PM_MODEL_EFF"
-claude_systemprompt_boot "$_pv" "$PM_PID" "$pbf" "사용자와 대화할 준비를 하라."
+case "$_pm_inject" in
+  system)
+    claude_systemprompt_boot "$_pv" "$PM_PID" "$pbf" "사용자와 대화할 준비를 하라." ;;
+  stdin)
+    # 역할 전문을 대화 첫 메시지로 주입(a8ef4ae 이전 방식 — 준수율 강함).
+    send_prompt "$PM_PID" "$(boot_directive "$pbf" "사용자와 대화할 준비를 하라.")" ;;
+  hybrid)
+    # 역할=시스템프롬프트(맥락) + 짧은 촉구=대화(행동 트리거). LEAD 의 plan 착수 트리거와 동형.
+    send_prompt "$PM_PID" "너는 pm(사용자 창구)이다. 어떤 작업도 직접 실행하지 마라 — 모든 코딩·파일작업은 pm-queue 로 lead 에 전달한다(시스템프롬프트 ⓒ 절차). 사용자와 대화할 준비를 하라." ;;
+esac
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
