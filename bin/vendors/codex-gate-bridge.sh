@@ -37,13 +37,58 @@ if [ -z "${HARNESS_ROOT:-}" ] || [ -z "${PROJECT_ROOT:-}" ]; then
   exit 1   # trap → deny JSON
 fi
 
+_TOOL="$(printf '%s' "$EVENT" | jq -r '.tool_name // ""' 2>/dev/null || true)"
+
+# ★★ apply_patch 다중파일 경로 추출 (2026-06-03 라이브 결함): codex 의 주력 파일쓰기
+#   도구 apply_patch 는 hook payload 의 tool_input.command(또는 .input) 에 *patch 본문*
+#   (`*** Begin Patch` / `*** Add File: <path>` / `*** Update File: <path>` …) 을 통째로
+#   담아 보낸다 — claude 의 `tool_input.file_path` 와 스키마가 다르다. 기존 bridge 는
+#   tool_name 만 Edit 로 바꾸고 file_path 없는 채 위임 → permission-gate 가 빈 file_path →
+#   gray → USER-ASK → 타임아웃 DENY → codex verdict 영구 소실(실측: review/ verdict 가
+#   apply_patch 로는 절대 안 써지고 codex 가 Bash printf 폴백으로만 우회).
+#   → apply_patch 면 patch 본문에서 모든 대상 경로를 뽑아 *각각* file_path 인 Edit 이벤트로
+#   permission-gate 를 호출. 하나라도 deny 면 전체 deny(fail-safe, 패치는 원자적이므로
+#   일부만 허용 불가). 경로 추출 0건이면 빈 file_path 로 위임 → 기존 gray 차단 보존
+#   (보안 약화 없음: 못 읽으면 막는다).
+if [ "$_TOOL" = "apply_patch" ]; then
+  _PATCH="$(printf '%s' "$EVENT" | jq -r '.tool_input.command // .tool_input.input // .tool_input.patch // ""' 2>/dev/null || true)"
+  # `*** Add/Update/Delete/Move File: <path>` 의 <path> 추출 ('Move' 는 출발지 기준 검사).
+  _PATHS="$(printf '%s' "$_PATCH" | sed -E -n 's/^\*\*\* (Add|Update|Delete|Move) File: //p')"
+  if [ -n "$_PATHS" ]; then
+    OUT=""   # 빈 = 통과 누적. deny 발견 시 그 JSON 으로 채워 즉시 종료.
+    while IFS= read -r _p; do
+      [ -z "$_p" ] && continue
+      _EV1="$(jq -nc --arg p "$_p" '{tool_name:"Edit", tool_input:{file_path:$p}}' 2>/dev/null || true)"
+      [ -z "$_EV1" ] && { OUT='{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apply_patch:path-encode-fail"}}'; break; }
+      _O1="$(printf '%s' "$_EV1" | \
+        PROJECT_ROOT="$PROJECT_ROOT" HARNESS_PROJECT="$PROJECT_ROOT" HARNESS_ROOT="$HARNESS_ROOT" \
+        WORKER="${WORKER:-codex}" ENTRY_ROLE="${ENTRY_ROLE:-dev}" \
+        bash "$HARNESS_ROOT/bin/permission-gate.sh")"
+      _d1="$(printf '%s' "$_O1" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null || true)"
+      if [ "$_d1" = "deny" ]; then OUT="$_O1"; break; fi   # 한 경로라도 deny → 전체 deny
+      if [ -z "$_O1" ] || [ "$_d1" != "allow" ]; then       # 무출력/미지결정 → fail-closed
+        OUT='{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apply_patch:gate-indeterminate"}}'; break
+      fi
+      # allow 면 OUT 빈 채 유지(이 경로 통과). 다음 경로 검사.
+    done <<EOF2
+$_PATHS
+EOF2
+    # 루프 정상 종료(모든 경로 allow)면 OUT="" → 빈출력=통과. deny 면 OUT 에 JSON.
+    if [ -z "$OUT" ]; then _EMITTED=1; exit 0; fi          # 전 경로 allow → 빈출력 통과
+    _decision="$(printf '%s' "$OUT" | jq -r '.hookSpecificOutput.permissionDecision // empty' 2>/dev/null || true)"
+    if [ "$_decision" = "deny" ]; then _EMITTED=1; printf '%s\n' "$OUT"; exit 0; fi
+    exit 1   # 도달 불가(방어)
+  fi
+  # 경로 추출 0건 → 아래 일반 경로로 떨어져 빈 file_path Edit 위임 → gray 차단(보존).
+fi
+
 NORMALIZED="$(printf '%s' "$EVENT" | jq -c '
   if (.tool_name // "") == "apply_patch" then .tool_name = "Edit" else . end
 ' 2>/dev/null || true)"
 [ -z "$NORMALIZED" ] && NORMALIZED="$EVENT"   # jq 실패 시 원본 (permission-gate 가 fail-closed)
 
 OUT="$(printf '%s' "$NORMALIZED" | \
-  PROJECT_ROOT="$PROJECT_ROOT" HARNESS_ROOT="$HARNESS_ROOT" \
+  PROJECT_ROOT="$PROJECT_ROOT" HARNESS_PROJECT="$PROJECT_ROOT" HARNESS_ROOT="$HARNESS_ROOT" \
   WORKER="${WORKER:-codex}" ENTRY_ROLE="${ENTRY_ROLE:-dev}" \
   bash "$HARNESS_ROOT/bin/permission-gate.sh")"
 
