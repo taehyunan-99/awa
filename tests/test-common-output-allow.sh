@@ -106,6 +106,31 @@ EV_DEEP=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/results/sub/deep.md" \
 OUT10="$(run_gate "$EV_DEEP")"
 assert_contains "$OUT10" "common-output" "정상 results 깊은 경로는 정규화 후에도 allow"
 
+# === 상대경로 정규화 (벤더 비대칭 봉쇄 — codex 리뷰어 verdict 상대경로 Edit) ===
+
+# 11r) 상대경로 review/ Edit → allow (codex 가 cwd 기준 상대경로로 verdict 씀)
+#   라이브(2026-06-03): codex security-rev 가 .agent-harness/review/*.md 를 상대경로로
+#   Edit → 기존 cd "$_dir" 가 gate cwd 기준이라 정규화 실패 → deny → USER-ASK → DENY
+#   (verdict 소실, 23분+ 정체). claude·engineer 는 절대경로라 안 걸린 비대칭.
+EV_REL_RV=$(jq -nc '{tool_name:"Edit", tool_input:{file_path:".agent-harness/review/engineer-t-add.security-rev.md"}, tool_use_id:"u11r"}')
+OUT11R="$(run_gate "$EV_REL_RV")"
+assert_contains "$OUT11R" "common-output" "상대경로 review/ Edit 도 PROJECT_ROOT 정규화 후 특례 allow"
+
+# 11r2) 상대경로 .review-cursor Write → allow
+EV_REL_RC=$(jq -nc '{tool_name:"Write", tool_input:{file_path:".agent-harness/.review-cursor.security-rev", content:"9"}, tool_use_id:"u11r2"}')
+OUT11R2="$(run_gate "$EV_REL_RC")"
+assert_contains "$OUT11R2" "common-output" "상대경로 .review-cursor Write 도 특례 allow"
+
+# 11r3) 상대경로 results/ Write → allow (engineer 도 상대경로 가능 — 대칭 보강)
+EV_REL_RS=$(jq -nc '{tool_name:"Write", tool_input:{file_path:".agent-harness/results/t-add.md", content:"x"}, tool_use_id:"u11r3"}')
+OUT11R3="$(run_gate "$EV_REL_RS")"
+assert_contains "$OUT11R3" "common-output" "상대경로 results/ Write 도 특례 allow"
+
+# 11r4) 상대경로 트래버설 탈출 → 특례 미적용 (PROJECT_ROOT prefix 후에도 .. 차단 유지)
+EV_REL_TRAV=$(jq -nc '{tool_name:"Write", tool_input:{file_path:".agent-harness/review/../../../etc/passwd", content:"x"}, tool_use_id:"u11r4"}')
+OUT11R4="$(run_gate "$EV_REL_TRAV")"
+assert_not_contains "$OUT11R4" "common-output" "상대경로 트래버설은 prefix 후에도 특례 미적용(탈출 차단)"
+
 # === review/ 특례도 동일 위조 방어 (C1/C2 회귀, review/ 추가분) ===
 
 # 11) review/ .. 트래버설 — review/ prefix 로 시작해도 PROJECT_ROOT 탈출 시 특례 미적용

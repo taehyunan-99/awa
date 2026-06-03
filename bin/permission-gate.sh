@@ -101,6 +101,18 @@ main() {
         ""|*"/../"*|*"/.."|"../"*|"..") _fp="" ;;
       esac
 
+      # (a2) 상대경로 정규화 (벤더 비대칭 봉쇄 2026-06-03): codex 리뷰어는 verdict 를
+      #   cwd(=PROJECT_ROOT) 기준 *상대경로*(`.agent-harness/review/...`)로 Edit/Write 한다.
+      #   기존 (b)의 `cd "$_dir"` 는 gate 프로세스 cwd 기준이라 상대경로면 정규화 실패 →
+      #   특례 무효 → classify(reviewer=read-only) → deny → USER-ASK → DENY(verdict 소실).
+      #   claude 리뷰어·engineer 는 절대경로라 안 걸렸던 비대칭. → `/` 로 시작 안 하면
+      #   PROJECT_ROOT prefix 부여(matrix-relpath-norm R2/R3 와 동일 정책). (a) 트래버설
+      #   차단이 선행하므로 prefix 후에도 `..` 탈출 불가.
+      case "$_fp" in
+        ""|/*) : ;;                              # 빈값/절대경로는 그대로
+        *) _fp="${PROJECT_ROOT}/${_fp}" ;;       # 상대경로 → PROJECT_ROOT 기준 절대화
+      esac
+
       # (b) 심링크·정규화 방어: file_path 는 신규 Write 라 미존재 가능 → 파일 자체가 아니라
       #   *부모 디렉토리*를 `cd … && pwd -P` 로 물리경로화(심링크 해소). 부모가 _hp 물리경로
       #   안에 있어야 특례 자격. events.log·.harness-state 는 _hp 직속 파일, results/* 는
