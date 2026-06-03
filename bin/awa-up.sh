@@ -627,13 +627,20 @@ splash_append_member "LEAD" "" "$LEAD_MODEL_EFF"
 # 부트 입력이 부정하던 결함 해결(13차 D 실험 발견). 워커·reviewer 는 대기형 유지.
 # LEAD 역할/plan 은 시스템프롬프트로 주입됨(injection 우회). send_prompt 는 *착수 트리거*만 —
 # 시스템프롬프트는 "어떻게"(맥락)이지 "지금 시작"(트리거)이 아니라, 능동 착수엔 send_prompt 필요.
+_lv="${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}"
 if [ -n "$PLAN_BOOT_FILE" ]; then
   # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
-  vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null || true
+  vendor_source "$_lv" 2>/dev/null || true
   _plan_directive="$(vendor_lead_plan_directive "$PLAN_BOOT_FILE" 2>/dev/null || true)"
   send_prompt "$LEAD_PID" "${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라."
 else
-  send_prompt "$LEAD_PID" "준비되면 다음 지시를 대기하라."
+  # plan 없는 부트: claude 는 lead.md ⓑ("plan 없으면 @pm: 대기")가 시스템프롬프트에 있어
+  #   착수 트리거 불요 → send_prompt 생략(PM 과 동일, 빈 화면 대기로 통일). codex 는
+  #   시스템프롬프트 미지원이라 대기 지시를 send_prompt 로 줘야 idle 진입(트리거 유지).
+  case "$_lv" in
+    claude) : ;;  # no-op — 시스템프롬프트 lead.md ⓑ 가 @pm 대기 지시. 빈 화면 idle.
+    *) send_prompt "$LEAD_PID" "준비되면 다음 지시를 대기하라." ;;
+  esac
 fi
 
 # pm 부트: roles/pm.md 합본 + pm 템플릿 settings. 사용자 창구.
