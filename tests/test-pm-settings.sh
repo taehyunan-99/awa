@@ -33,10 +33,20 @@ assert_not_contains "$PMSET" "bypassPermissions" "pm 은 bypassPermissions 아�
 assert_contains "$PMSET" "Read" "pm Read allow"
 assert_contains "$PMSET" "Grep" "pm Grep allow"
 assert_contains "$PMSET" "Bash(tmux:*)" "pm tmux allow (lead 전달용)"
-assert_contains "$PMSET" "Bash(cat:*)" "pm cat allow (pull-read)"
 # pm 은 Write/rm allow 없음 (읽기전용)
 assert_not_contains "$PMSET" '"Write(' "pm 은 Write allow 없음"
 assert_not_contains "$PMSET" "Bash(rm" "pm 은 rm allow 없음"
+
+# ★ 쓰기 우회 통로 봉쇄 (2026-06-03 라이브 결함): PM(Sonnet)이 시스템프롬프트(읽기전용)를
+#   무시하고 `cat << EOF > file` 리다이렉션으로 직접 파일 작성 시도 → Write/Edit deny 로는
+#   Bash 리다이렉션을 못 막는다. 근본수정: cat 을 allow 에서 제거(PM 은 cat 사용 0건 — 파일
+#   읽기는 Read 도구로). cat 없으면 `cat>file` 우회 통로 차단. pull-read 는 Read 가 담당(L33).
+#   리다이렉션 일반 차단은 danger-check(B안)의 몫 — 여기선 불필요 명령 제거로 통로 축소.
+assert_not_contains "$PMSET" "Bash(cat:*)" "pm 은 cat allow 없음 (cat>file 우회 통로 제거)"
+# pm-queue 작성에 필요한 명령은 유지 (jq -n > .tmp + mv — pm.md ⓒ 규약)
+assert_contains "$PMSET" "Bash(jq:*)" "pm jq allow (pm-queue jq -n 작성)"
+assert_contains "$PMSET" "Bash(mkdir:*)" "pm mkdir allow (pm-queue 디렉토리)"
+assert_contains "$PMSET" "Bash(mv:*)" "pm mv allow (pm-queue atomic tmp→mv)"
 
 # I1: 읽기전용을 deny 로 코드 강제 (allow 부재만으론 default mode 에서 사용자 프롬프트 — pm 이
 # 사용자 창구라 자기참조. deny 는 default mode 에서 확정 차단이라 불변식을 settings 로 보장).

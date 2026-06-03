@@ -5,7 +5,6 @@
       "Grep",
       "Glob",
       "Bash(ls:*)",
-      "Bash(cat:*)",
       "Bash(grep:*)",
       "Bash(rg:*)",
       "Bash(find:*)",
