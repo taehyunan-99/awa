@@ -538,12 +538,15 @@ for entry in "${WORKERS[@]}"; do
       && ENTRY_MODEL="$(vendor_default_model "$ENTRY_ROLE")"
     [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
   fi
-  cmd="$(agent_cmd_for "$ENTRY_MODEL" "$settings_path" "$worker_sid" "" "${ENTRY_VENDOR:-}")" || {
+  # claude 면 역할을 --append-system-prompt-file 로 시스템 주입(injection 우회), codex 면 빈값(send_prompt 경로).
+  _wv="${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}"
+  _sysprompt=""; [ "$_wv" = "claude" ] && _sysprompt="$bf"
+  cmd="$(agent_cmd_for "$ENTRY_MODEL" "$settings_path" "$worker_sid" "$_sysprompt" "${ENTRY_VENDOR:-}")" || {
     echo "오류: '$ENTRY_NAME' 벤더 명령 조립 실패 — 부트 skip" >&2
     SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; i=$((i + 1)); continue; }
   bootstrap_pane "$tgt" "$ENTRY_NAME" "$cmd" "워커" "$ENTRY_ROLE" "$ENTRY_MODEL" "${ENTRY_VENDOR:-}"
   splash_append_member "$ENTRY_NAME" "$ENTRY_ROLE" "$ENTRY_MODEL"
-  send_prompt "$tgt" "$(boot_directive "$bf" "준비되면 다음 지시를 대기하라.")"
+  claude_systemprompt_boot "$_wv" "$tgt" "$bf" "준비되면 다음 지시를 대기하라."
   i=$((i + 1))
 done
 
@@ -572,6 +575,12 @@ fi
 # 11차: 확정 plan 합본 생성 (AGENT_CMD 무관 — 테스트 가능성, 워커 settings 와 동형).
 # plan 은 사용자 산출물 → LEAD boot 의 sed 치환·예약토큰 잔존검증을 거치지 않는다(별도 파일).
 # 우연히 {{HARNESS_ROOT}} 등이 들어있어도 그대로 전달되는 것이 의도.
+# LEAD 시스템프롬프트 합본 = 역할(obf) + plan(있으면). claude --append-system-prompt-file 복수 불가 →
+# 단일 파일로 cat 합본. 역할을 시스템으로 올려 injection 우회(워커/리뷰어와 동일 원리).
+LEAD_SYSPROMPT_FILE="$WORKSPACE/.boot/lead-system.md"
+# PLAN_BOOT_FILE = 순수 plan 합본(있을 때만). codex LEAD 의 vendor_lead_plan_directive 가
+#   "이 파일 Read" 로 가리킬 대상 — 역할이 섞이면 안 되므로 plan 전용 유지.
+#   (실제론 LEAD=claude 고정[resolve_orchestrator_vendor]이라 codex 경로 미발생 — 의미 명료성 위해 분리.)
 PLAN_BOOT_FILE=""
 if [ "${#PLAN_FILES[@]}" -gt 0 ]; then
   PLAN_BOOT_FILE="$WORKSPACE/.boot/plan.md"
@@ -582,6 +591,10 @@ if [ "${#PLAN_FILES[@]}" -gt 0 ]; then
       printf '\n'
     done; } > "$PLAN_BOOT_FILE"
 fi
+# LEAD 시스템 합본 = 역할 + (plan 있으면 plan 합본). plan 없으면 역할만.
+{ cat "$obf" 2>/dev/null || :
+  [ -n "$PLAN_BOOT_FILE" ] && { printf '\n\n'; cat "$PLAN_BOOT_FILE" 2>/dev/null || :; }
+} > "$LEAD_SYSPROMPT_FILE" 2>/dev/null || cp "$obf" "$LEAD_SYSPROMPT_FILE" 2>/dev/null
 
 # ★ AWA 방향 가드(2026-05-31): LEAD 는 claude 전용(codex 는 워커/리뷰어만 — P17 회피).
 #   LEAD_VENDOR 를 가드 통과값으로 고정 → 이후 모든 ${LEAD_VENDOR:-...} 참조가 claude 사용.
@@ -606,19 +619,21 @@ if [ -z "$LEAD_MODEL_EFF" ]; then
     && LEAD_MODEL_EFF="$(vendor_default_model lead)"
   [ -n "$LEAD_MODEL_EFF" ] || LEAD_MODEL_EFF="opus"
 fi
-lead_cmd="$(agent_cmd_for "$LEAD_MODEL_EFF" "$settings_path" "$lead_sid" "$PLAN_BOOT_FILE" "${LEAD_VENDOR:-}")" || {
+lead_cmd="$(agent_cmd_for "$LEAD_MODEL_EFF" "$settings_path" "$lead_sid" "$LEAD_SYSPROMPT_FILE" "${LEAD_VENDOR:-}")" || {
   echo "오류: LEAD 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
 bootstrap_pane "$LEAD_PID" "LEAD" "$lead_cmd" "LEAD" "" "$LEAD_MODEL_EFF" "${LEAD_VENDOR:-}"
 splash_append_member "LEAD" "" "$LEAD_MODEL_EFF"
 # plan 주입 시 lead 부트 입력은 "확정 plan 즉시 진행" 으로 분기 — lead.md ⓑ 자동 착수 트리거를
 # 부트 입력이 부정하던 결함 해결(13차 D 실험 발견). 워커·reviewer 는 대기형 유지.
+# LEAD 역할/plan 은 시스템프롬프트로 주입됨(injection 우회). send_prompt 는 *착수 트리거*만 —
+# 시스템프롬프트는 "어떻게"(맥락)이지 "지금 시작"(트리거)이 아니라, 능동 착수엔 send_prompt 필요.
 if [ -n "$PLAN_BOOT_FILE" ]; then
   # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
   vendor_source "${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}" 2>/dev/null || true
   _plan_directive="$(vendor_lead_plan_directive "$PLAN_BOOT_FILE" 2>/dev/null || true)"
-  send_prompt "$LEAD_PID" "$(boot_directive "$obf" "${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라.")"
+  send_prompt "$LEAD_PID" "${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라."
 else
-  send_prompt "$LEAD_PID" "$(boot_directive "$obf" "준비되면 다음 지시를 대기하라.")"
+  send_prompt "$LEAD_PID" "준비되면 다음 지시를 대기하라."
 fi
 
 # pm 부트: roles/pm.md 합본 + pm 템플릿 settings. 사용자 창구.
@@ -655,11 +670,14 @@ if [ -z "$PM_MODEL_EFF" ]; then
     && PM_MODEL_EFF="$(vendor_default_model pm)"
   [ -n "$PM_MODEL_EFF" ] || PM_MODEL_EFF="sonnet"
 fi
-pm_cmd="$(agent_cmd_for "$PM_MODEL_EFF" "$settings_path" "$pm_sid" "" "${PM_VENDOR:-}")" || {
+# PM 은 claude 고정(벤더 정책). 역할을 시스템 주입, send_prompt 스킵(헬퍼 일관성).
+_pv="${PM_VENDOR:-${HARNESS_VENDOR:-claude}}"
+_psysprompt=""; [ "$_pv" = "claude" ] && _psysprompt="$pbf"
+pm_cmd="$(agent_cmd_for "$PM_MODEL_EFF" "$settings_path" "$pm_sid" "$_psysprompt" "${PM_VENDOR:-}")" || {
   echo "오류: PM 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
 bootstrap_pane "$PM_PID" "PM" "$pm_cmd" "PM" "" "$PM_MODEL_EFF" "${PM_VENDOR:-}"
 splash_append_member "PM" "" "$PM_MODEL_EFF"
-send_prompt "$PM_PID" "$(boot_directive "$pbf" "사용자와 대화할 준비를 하라.")"
+claude_systemprompt_boot "$_pv" "$PM_PID" "$pbf" "사용자와 대화할 준비를 하라."
 
 # 리뷰어 부트: _common.md 제외. roles/<리뷰어역할>.md 만.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
@@ -697,12 +715,15 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
         && ENTRY_MODEL="$(vendor_default_model "$ENTRY_ROLE")"
       [ -n "$ENTRY_MODEL" ] || ENTRY_MODEL="sonnet"
     fi
-    rev_cmd="$(agent_cmd_for "$ENTRY_MODEL" "$settings_path" "$rev_sid" "" "${ENTRY_VENDOR:-}")" || {
+    # claude 리뷰어면 역할을 시스템 주입(injection 우회 — 라이브 결함 해소), codex 면 빈값(send_prompt 경로).
+    _rv="${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}"
+    _rsysprompt=""; [ "$_rv" = "claude" ] && _rsysprompt="$rbf"
+    rev_cmd="$(agent_cmd_for "$ENTRY_MODEL" "$settings_path" "$rev_sid" "$_rsysprompt" "${ENTRY_VENDOR:-}")" || {
       echo "오류: 리뷰어 '$ENTRY_NAME' 벤더 명령 조립 실패 — 부트 skip" >&2
       SKIPPED_PANES="${SKIPPED_PANES:-} $ENTRY_NAME"; j=$((j + 1)); continue; }
     bootstrap_pane "$rtgt" "$ENTRY_NAME" "$rev_cmd" "리뷰어" "$ENTRY_ROLE" "$ENTRY_MODEL" "${ENTRY_VENDOR:-}"
     splash_append_member "$ENTRY_NAME" "$ENTRY_ROLE" "$ENTRY_MODEL"
-    send_prompt "$rtgt" "$(boot_directive "$rbf" "준비되면 다음 지시를 대기하라.")"
+    claude_systemprompt_boot "$_rv" "$rtgt" "$rbf" "준비되면 다음 지시를 대기하라."
     j=$((j + 1))
   done
 fi
