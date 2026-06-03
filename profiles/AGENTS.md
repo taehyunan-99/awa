@@ -13,6 +13,7 @@
 ## 2. CONTENTS
 
 - `default.sh` — 워커 engineer/researcher, 투표 리뷰어 alignment-rev/quality-rev(claude)+security-rev(codex)(N=3 다벤더) + 집계 review-mgr
+- `web.sh` — 워커 frontend/backend/infra(claude), 투표 리뷰어 alignment-rev/quality-rev(claude)+security-rev(codex)(N=3 다벤더) + 집계 review-mgr (default 와 동일 회로·워커만 풀스택 3분업)
 - `code-review.sh` — 워커 security, 리뷰어 spec-rev/quality-rev/arch-rev
 - `research.sh` — 워커 researcher×3, 리뷰어 quality-rev
 - `feature-team.sh` — 워커 dev/test/arch, 리뷰어 spec-rev/quality-rev/arch-rev (모델 차등)
