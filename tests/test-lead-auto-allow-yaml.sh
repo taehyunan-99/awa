@@ -91,4 +91,24 @@ assert_eq "self-verify:Bash(source :*)" "$out" "Y11b source ./X → self-verify"
 out="$(lead_auto_allow_lookup Bash '{"command":"bash /etc/passwd"}')"
 assert_eq "self-verify:Bash(bash :*)" "$out" "Y11b bash /절대 → auto단 self-verify (종단은 danger 우선)"
 
+echo "[Y12] read-only 확대 — 부작용 0 출력 도구 (게이트 폭주 완화 2026-06-03)"
+# 워커/리뷰어가 흔히 쓰는 순수 출력 도구. 부작용·명령실행 없음 → 게이트 노이즈 제거.
+for c in "nl -ba app.js" "cut -d, -f1 data.csv" "sort names.txt" "uniq -c log" \
+         "comm a b" "column -t tbl" "tr a b" "basename /x/y" "dirname /x/y" \
+         "realpath ./x" "jq . pkg.json" "cmp a b" "cksum f" "od -c bin"; do
+  out="$(lead_auto_allow_lookup Bash "{\"command\":\"$c\"}")"
+  case "$out" in read-only:*) : ;; *) assert_eq "read-only:*" "$out" "Y12 '$c' → read-only" ;; esac
+done
+# 대표 1건 명시 어서션(케이스 무력화 방지 — 실제 매칭 문자열 검증)
+out="$(lead_auto_allow_lookup Bash '{"command":"nl -ba app.js"}')"
+assert_eq "read-only:Bash(nl:*)" "$out" "Y12 nl → read-only:Bash(nl:*)"
+
+echo "[Y13] 임의코드/공급망 도구는 gray 유지 (deny-bounded 보존)"
+# node=임의코드, npm install <pkg>=공급망, python script=임의코드. danger 불가시 위험이라
+# permission-gated(LEAD 1회 학습)로 메움 — auto 카탈로그 진입 금지.
+for c in "node index.js" "node ./server/app.js" "python app.py" "npx vite"; do
+  lead_auto_allow_lookup Bash "{\"command\":\"$c\"}" >/dev/null
+  assert_fail "$?" "Y13 '$c' 미매칭 (gray 유지 — 임의코드)"
+done
+
 test_summary
