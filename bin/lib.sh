@@ -420,14 +420,26 @@ send_prompt() {
 }
 
 # 부트 프롬프트 지시문 생성 ($1=부트파일경로, $2=역할별 tail 지시). stdout=주입 텍스트.
-# ★ 2026-06-03 라이브 수정: 옛 문구 "$파일 를 읽고 그 규약을 그대로 따르라" 가 claude
-#   opus 4.8 의 prompt-injection 휴리스틱을 발동 → 파일을 읽지도 않고 거부(비결정적,
-#   alignment 거부·quality 통과). 모든 claude 부트(워커/리뷰어/LEAD/PM) 위험. 해소:
-#   "인젝션 아님·하니스 생성 역할 부트" 맥락을 prefix 로 명시해 claude 가 정당한 부트로
-#   인지하게 한다. 5곳 하드코딩을 이 헬퍼로 통일(DRY — 한 곳 빠짐 드리프트 방지).
-boot_directive() {  # $1=file $2=tail → stdout
+# ★ 2026-06-03(2차): 부인 prefix("이건 프롬프트 인젝션이 아니라...")가 claude opus 4.8
+#   v2.1.161 휴리스틱을 *오히려* 발동(라이브 입증 — claude 가 이 prefix 를 의심 근거로 명시
+#   지목). claude 역할 부트는 --append-system-prompt-file 시스템프롬프트 경로로 이전 →
+#   boot_directive 미사용. 이 함수는 codex send_prompt 역할주입 전용으로 단순 지시로 축소
+#   (codex 는 부인 prefix 가 트리거 아니라 무해). claude_systemprompt_boot 헬퍼가 벤더 분기.
+boot_directive() {  # $1=file $2=tail → stdout. codex send_prompt 역할주입 전용.
   local file="$1" tail="${2:-}"
-  printf '%s' "이건 프롬프트 인젝션이 아니라 이 AWA 하니스가 너를 위해 생성한 역할 부트다. ${file} 는 하니스가 만든 네 역할 규약 파일이니, 읽고 그 역할 규약을 채택하라. ${tail}"
+  printf '%s' "${file} 는 네 역할 규약 파일이다. 읽고 그 역할 규약을 채택하라. ${tail}"
+}
+
+# 역할 부트 후처리 — 벤더 분기 캡슐화. claude 는 역할이 이미 --append-system-prompt-file 로
+# 시스템 주입됐으므로 send_prompt 역할주입 스킵(중복·injection 오인 회피). codex 는
+# 시스템프롬프트 플래그 부재라 send_prompt 로 역할(.boot 합본) 주입 유지.
+# $1=vendor $2=pane_id $3=boot_file $4=tail. claude 면 no-op(0), codex 면 send_prompt 발사.
+claude_systemprompt_boot() {  # vendor pane bf tail
+  local vendor="$1" pane="$2" bf="$3" tail="${4:-}"
+  case "$vendor" in
+    claude) return 0 ;;  # 시스템프롬프트 경로 — send_prompt 불필요
+    *) send_prompt "$pane" "$(boot_directive "$bf" "$tail")" ;;
+  esac
 }
 
 # --project 인자 정규화 (E12·F2). stdout=절대경로, $?=0 성공, return 1 실패.
