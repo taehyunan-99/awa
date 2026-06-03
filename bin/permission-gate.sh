@@ -110,9 +110,10 @@ main() {
         _dir="$(dirname "$_fp")"
         if _real_dir="$(cd "$_dir" 2>/dev/null && pwd -P)" && \
            _real_hp="$(cd "$_hp" 2>/dev/null && pwd -P)"; then
-          # 정규화된 부모가 _hp 직속(events.log·.harness-state) 또는 results 트리 안인지 검증.
+          # 정규화된 부모가 _hp 직속(events.log·.harness-state·.review-cursor.*) 또는
+          #   results/review 트리 안인지 검증. review/ 는 리뷰어 verdict 산출물(벤더 무관).
           case "$_real_dir" in
-            "$_real_hp"|"$_real_hp/results"|"$_real_hp/results/"*) : 자격유지 ;;
+            "$_real_hp"|"$_real_hp/results"|"$_real_hp/results/"*|"$_real_hp/review"|"$_real_hp/review/"*) : 자격유지 ;;
             *) _fp="" ;;   # prefix 탈출(심링크 해소 후) → 특례 무효화
           esac
         else
@@ -123,7 +124,7 @@ main() {
       # (c) 정규화 통과 + 문자열 prefix 정확 매칭. .harness-state 는 파일(lib.sh:_state_file)
       #   이므로 .harness-state/* 패턴은 형식상 보존만(실사용 없음).
       case "$_fp" in
-        "${_hp}/results/"*|"${_hp}/events.log"|"${_hp}/.harness-state"|"${_hp}/.harness-state/"*)
+        "${_hp}/results/"*|"${_hp}/events.log"|"${_hp}/.harness-state"|"${_hp}/.harness-state/"*|"${_hp}/review/"*|"${_hp}/.review-cursor."*)
           emit_allow "common-output"
           log_safe "[$(timestamp)] ${WORKER} ${tool} → COMMON-OUTPUT-ALLOW (${_fp})"
           return ;;

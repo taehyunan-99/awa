@@ -9,6 +9,7 @@ TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
 #   events.log·.harness-state 부모 = .agent-harness/ 자체, results/* 부모 = results/.
 #   정상 케이스(1~3·10)가 정규화 후에도 통과하도록 셋업에서 부모 디렉토리를 만든다.
 mkdir -p "$TMP_PROJ/.agent-harness/results"
+mkdir -p "$TMP_PROJ/.agent-harness/review"
 cleanup() { rm -rf "$TMP_PROJ"; }
 trap cleanup EXIT
 
@@ -41,6 +42,24 @@ EV_STATE=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/.harness-state" \
   '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u3"}')
 OUT3="$(run_gate "$EV_STATE")"
 assert_contains "$OUT3" '"permissionDecision":"allow"' ".harness-state Write 특례 allow"
+
+# 3b) review/ verdict 쓰기 → allow (리뷰어 산출물 — 벤더 무관 특례)
+#   라이브 결함(2026-06-03 다벤더 e2e): codex 리뷰어가 verdict 를 review/*.md 에 쓰려다
+#   permission-gate 공통산출 특례에 review/ 가 없어 deny → classify(reviewer=read-only) →
+#   막힘. claude 리뷰어는 settings.reviewer.allow(review/**)로 통과했으나 codex 는
+#   settings.allow 를 안 읽어(P12, config.toml hook 경유) gate 특례에만 의존 → 비대칭 붕괴.
+#   verdict 는 리뷰어의 하니스 규약 산출물 → results/·events.log 와 동급으로 항상 allow.
+EV_REVIEW=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/review/engineer-t-add.security-rev.md" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u3b"}')
+OUT3B="$(run_gate "$EV_REVIEW")"
+assert_contains "$OUT3B" '"permissionDecision":"allow"' "review/ verdict Write 특례 allow"
+assert_contains "$OUT3B" "common-output" "review/ 특례 사유 표시"
+
+# 3c) .review-cursor.* 쓰기 → allow (리뷰어 증분 커서 — 산출물 동급)
+EV_CURSOR=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/.review-cursor.security-rev" \
+  '{tool_name:"Edit", tool_input:{file_path:$p}, tool_use_id:"u3c"}')
+OUT3C="$(run_gate "$EV_CURSOR")"
+assert_contains "$OUT3C" '"permissionDecision":"allow"' ".review-cursor Edit 특례 allow"
 
 # 4) 위조 차단: 비-하니스 경로 Write 는 특례 미적용
 EV_FORGE=$(jq -nc --arg p "$TMP_PROJ/src/app.js" \
@@ -86,5 +105,26 @@ EV_DEEP=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/results/sub/deep.md" \
   '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u10"}')
 OUT10="$(run_gate "$EV_DEEP")"
 assert_contains "$OUT10" "common-output" "정상 results 깊은 경로는 정규화 후에도 allow"
+
+# === review/ 특례도 동일 위조 방어 (C1/C2 회귀, review/ 추가분) ===
+
+# 11) review/ .. 트래버설 — review/ prefix 로 시작해도 PROJECT_ROOT 탈출 시 특례 미적용
+EV_RV_DOTDOT=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/review/../../../etc/passwd" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u11"}')
+OUT11="$(run_gate "$EV_RV_DOTDOT")"
+assert_not_contains "$OUT11" "common-output" "review/ .. 트래버설은 특례 미적용(탈출 차단)"
+
+# 12) review/ 심링크 탈출 — review/link → /tmp 심링크 통한 외부 쓰기 차단
+ln -s /tmp "$TMP_PROJ/.agent-harness/review/link" 2>/dev/null || true
+EV_RV_SYM=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/review/link/evil.txt" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u12"}')
+OUT12="$(run_gate "$EV_RV_SYM")"
+assert_not_contains "$OUT12" "common-output" "review/ 심링크 탈출은 특례 미적용"
+
+# 13) .review-cursor prefix bleed — .review-cursorEVIL(점 없는 접미)은 .review-cursor.* 안 걸림
+EV_RC_BLEED=$(jq -nc --arg p "$TMP_PROJ/.agent-harness/.review-cursorEVIL" \
+  '{tool_name:"Write", tool_input:{file_path:$p, content:"x"}, tool_use_id:"u13"}')
+OUT13="$(run_gate "$EV_RC_BLEED")"
+assert_not_contains "$OUT13" "common-output" ".review-cursorEVIL 는 .review-cursor.* 매칭 아니라 특례 미적용"
 
 test_summary
