@@ -6,6 +6,7 @@
       "Bash(head:*)", "Bash(tail:*)", "Bash(wc:*)"
     ],
     "deny": [
+      "Skill(awa)",
       "Bash(rm -rf /:*)",
       "Bash(rm -rf /*:*)",
       "Bash(sudo:*)",

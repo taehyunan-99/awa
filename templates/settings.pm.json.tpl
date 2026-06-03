@@ -19,6 +19,7 @@
       "Bash(mv:*)"
     ],
     "deny": [
+      "Skill(awa)",
       "Write",
       "Edit",
       "NotebookEdit",

@@ -5,6 +5,7 @@
       "Edit({{PROJECT_ROOT}}/**)"
     ],
     "deny": [
+      "Skill(awa)",
       "Bash(git push *)",
       "Bash(rm *)",
       "Bash(/usr/bin/rm *)",

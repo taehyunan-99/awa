@@ -16,6 +16,7 @@
       "Bash(head:*)"
     ],
     "deny": [
+      "Skill(awa)",
       "Bash(git push --force:*)",
       "Bash(dd of=:*)",
       "Bash(sudo:*)",

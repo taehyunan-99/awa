@@ -72,20 +72,20 @@ fi
 
 # reviewer-quality 검증
 content="$(cat "$BOOTSET/reviewer-quality.json")"
-# deny 부재 (기술적 차단 불가)
-if printf '%s' "$content" | grep -q '"deny"'; then
-  assert_eq "no" "yes" "reviewer-quality.json deny 부재"
-fi
+# reviewer deny 는 Skill(awa) 만 — 위험 명령 차단은 permission-gate hook 위임(기술적 deny 최소).
+# Skill(awa) 는 게이트로 못 막는 재귀 가동이라 settings deny 로 확정 차단(2026-06-03 PM 납치).
+_rev_deny="$(printf '%s' "$content" | jq -r '.permissions.deny[]?' 2>/dev/null)"
+assert_contains "$_rev_deny" "Skill(awa)" "reviewer-quality.json deny 에 Skill(awa) (재귀 가동 차단)"
+assert_eq "Skill(awa)" "$(printf '%s' "$_rev_deny" | tr -d '[:space:]')" "reviewer-quality.json deny 는 Skill(awa) 단일 (위험명령은 게이트 위임)"
 assert_contains "$content" "permission-gate.sh" "reviewer-quality.json hook"
 assert_contains "$content" '"Read"' "reviewer-quality.json seed allow Read"
 assert_contains "$content" 'WORKER=\"quality-rev\"' "reviewer-quality.json WORKER=entry_name"
 
-# reviewer-spec / reviewer-arch 도 동일 reviewer 템플릿 — deny 부재 + hook 존재.
+# reviewer-spec / reviewer-arch 도 동일 reviewer 템플릿 — Skill(awa) deny + hook 존재.
 for rev in reviewer-spec reviewer-arch; do
   content="$(cat "$BOOTSET/$rev.json")"
-  if printf '%s' "$content" | grep -q '"deny"'; then
-    assert_eq "no" "yes" "$rev.json deny 부재"
-  fi
+  _rev_deny="$(printf '%s' "$content" | jq -r '.permissions.deny[]?' 2>/dev/null)"
+  assert_contains "$_rev_deny" "Skill(awa)" "$rev.json deny 에 Skill(awa)"
   assert_contains "$content" "permission-gate.sh" "$rev.json hook"
   assert_contains "$content" '"Read"' "$rev.json seed allow Read"
 done

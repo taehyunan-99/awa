@@ -1,6 +1,7 @@
 {
   "permissions": {
     "deny": [
+      "Skill(awa)",
       "Bash(rm *)",
       "Bash(/usr/bin/rm *)",
       "Bash(/bin/rm *)"

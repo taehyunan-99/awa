@@ -8,6 +8,9 @@
       "Edit({{PROJECT_ROOT}}/.agent-harness/review/**)",
       "Write({{PROJECT_ROOT}}/.agent-harness/.review-cursor.*)",
       "Edit({{PROJECT_ROOT}}/.agent-harness/.review-cursor.*)"
+    ],
+    "deny": [
+      "Skill(awa)"
     ]
   },
   "hooks": {
