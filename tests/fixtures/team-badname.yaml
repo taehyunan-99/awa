@@ -1,0 +1,6 @@
+session: badname-test
+layout: tiled
+
+workers:
+  - name: my:worker
+    role: engineer

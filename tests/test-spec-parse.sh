@@ -62,4 +62,13 @@ assert_eq "security-rev:reviewer-security:codex" "${REVIEWERS[1]}" "P-load 리�
 assert_eq "my-feature" "$SESSION" "P-load SESSION"
 assert_eq "tiled" "$LAYOUT" "P-load LAYOUT"
 
+echo "[P-load-edge] vendor 없이 model 만 → model 절삭(빈 vendor 절삭 요건)"
+WORKERS=(); REVIEWERS=()
+spec_parse_load "$ROOT/tests/fixtures/team-modelonly.yaml"
+assert_eq "engineer:engineer" "${WORKERS[0]}" "P-load-edge vendor 없으면 model 도 절삭"
+
+echo "[P-load-edge2] name에 콜론 든 yaml → load 거부(rc=1)"
+spec_parse_load "$ROOT/tests/fixtures/team-badname.yaml" 2>/dev/null
+assert_fail "$?" "P-load-edge 이름에 콜론 거부"
+
 test_summary

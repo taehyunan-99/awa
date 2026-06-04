@@ -1,0 +1,7 @@
+session: model-only-test
+layout: tiled
+
+workers:
+  - name: engineer
+    role: engineer
+    model: sonnet

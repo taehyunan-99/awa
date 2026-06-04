@@ -92,9 +92,19 @@ spec_parse_load() {
   WORKERS=(); REVIEWERS=()
   SESSION="$(spec_parse_scalar "$yaml" session)"
   LAYOUT="$(spec_parse_scalar "$yaml" layout)"
-  local kind name role vendor model entry
-  while IFS=$'\t' read -r kind name role vendor model; do
+  local kind name role vendor model entry line
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    kind="${line%%	*}";   line="${line#*	}"
+    name="${line%%	*}";   line="${line#*	}"
+    role="${line%%	*}";   line="${line#*	}"
+    vendor="${line%%	*}"; line="${line#*	}"
+    model="$line"
     [ -n "$name" ] || continue
+    # 버그2: name 문자셋 검증 — awa-up parse_entry 와 동일 규칙 [A-Za-z0-9_-]
+    case "$name" in *[!A-Za-z0-9_-]*) echo "오류: 워커/리뷰어 이름에 허용되지 않는 문자 → '$name'" >&2; return 1 ;; esac
+    # 버그3: role 누락/허용되지 않는 문자 검증
+    case "$role" in ""|*[!A-Za-z0-9_-]*) echo "오류: 역할 누락/허용되지 않는 문자 → name='$name' role='$role'" >&2; return 1 ;; esac
     entry="$name:$role"
     [ -n "$vendor" ] && entry="$entry:$vendor"
     [ -n "$vendor" ] && [ -n "$model" ] && entry="$entry:$model"
