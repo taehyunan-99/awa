@@ -165,4 +165,16 @@ UNK="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
 assert_success "$?" "미지정 역할도 settings 생성(fail-safe)"
 assert_not_contains "$(cat "$UNK")" "Write($TMP_PROJ/**)" "미지정 역할 fallback=readonly(최소권한)"
 
+# === web 프로파일 역할 매핑 (spec §6·결함12 수정) ===
+# frontend/backend/infra → dev 군 (코드 쓰기 권한, 결함12 선재 수정)
+for web_role in frontend backend infra; do
+  WEB="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
+    source '"$ROOT"'/bin/lib.sh
+    generate_worker_settings '"$web_role"' '"$web_role"'-1
+  ')"
+  assert_success "$?" "$web_role settings 생성"
+  assert_contains "$(cat "$WEB")" "Write($TMP_PROJ/**)" "$web_role 은 dev 군(코드 전역 쓰기 — 결함12)"
+  assert_contains "$(cat "$WEB")" "Bash(git push *)" "$web_role dev 템플릿 deny(git push) 포함"
+done
+
 test_summary
