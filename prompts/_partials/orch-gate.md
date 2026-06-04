@@ -14,7 +14,7 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
   printf '%s' "<decision>" > .agent-harness/state/pending-asks/<uuid>.response.tmp
   mv .agent-harness/state/pending-asks/<uuid>.response.tmp .agent-harness/state/pending-asks/<uuid>.response
   ```
-- hook 깨우기 **불필요**(P11 탈-tmux): `.response` 를 atomic 작성하면 hook 이 그 파일 출현을 직접 폴링해 즉시 판정한다. lead 는 tmux 를 건드리지 마라(격리 경계 안 — tmux 소켓 접근 차단 가능). timeout 으로 처리 불가한 항목은 `.json` 만 정리하면 hook 이 응답없음→deny 로 자가치유.
+- hook 깨우기 **불필요**(P11 탈-tmux): `.response` 를 atomic 작성하면 hook 이 그 파일 출현을 직접 폴링해 즉시 판정한다. orch 는 tmux 를 건드리지 마라(격리 경계 안 — tmux 소켓 접근 차단 가능). timeout 으로 처리 불가한 항목은 `.json` 만 정리하면 hook 이 응답없음→deny 로 자가치유.
   > `.response` 단일 방어선: 파일 있으면 그 결정, 없으면 hook 이 deny. 거짓 allow 0. tmux 채널 자체를 안 쓰므로 채널 누수·stale woken 문제도 소멸.
 
 ### 2단계. state/incidents/ 처리 (danger 자동거부 사후 보고)
@@ -26,6 +26,6 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
 ### 3단계. state/removal-requests/ 처리 (rm 위임)
 `ls .agent-harness/state/removal-requests/*.json` + `jq '.status=="pending"'`. 각 항목:
 - AskUserQuestion: "승인 / 거부 / 재고"
-- 승인 → 자기 pane 에서 `rm <path>`(lead settings 의 rm allow) + status=done
+- 승인 → 자기 pane 에서 `rm <path>`(orch settings 의 rm allow) + status=done
 - 거부 → status=denied / 재고 → status=reconsider
 - (status 갱신 atomic: `jq '.status="done"' f > f.tmp && mv f.tmp f`)

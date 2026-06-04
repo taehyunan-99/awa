@@ -41,8 +41,8 @@ cat > "$FIX_PROMPTS/roles/03-quality/test-reviewer.md" <<'EOF'
 리뷰는 {{HARNESS_ROOT}}/bin/log-event.sh 를 기준으로 한다.
 EOF
 
-# lead boot 도 토큰 검증 — lead.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
-cat >> "$FIX_PROMPTS/roles/01-orchestration/lead.md" <<'EOF'
+# orch boot 도 토큰 검증 — orch.md 사본에 {{HARNESS_ROOT}} 박기 (fixture 만).
+cat >> "$FIX_PROMPTS/roles/01-orchestration/orch.md" <<'EOF'
 
 ## (fixture) 토큰 검증
 dispatch: {{HARNESS_ROOT}}/bin/dispatch.sh

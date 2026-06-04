@@ -95,19 +95,19 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     rm -f "$f" 2>/dev/null   # 소비 완료(성공·실패 무관 1회만 — 실패는 위에서 lead 통지)
   done
 
-  # 1c) pm-queue 새 .json → lead 에 @pm: 전달 (P11 Phase4 탈-tmux: PM 도 sandbox 안이라
-  #     `tmux send-keys -t <lead> @pm:` 직접 못 함. PM 은 pm-queue/<id>.json 에 지시를 파일로
-  #     쓰고, watcher 가 폴링해 lead 페인에 대신 전달). dispatch-queue 분기와 동형. 처리 후 소비.
-  for f in "$STATE_DIR"/pm-queue/*.json; do
+  # 1c) desk-queue 새 .json → ORCH 에 @desk: 전달 (P11 Phase4 탈-tmux: DESK 도 sandbox 안이라
+  #     `tmux send-keys -t <orch> @desk:` 직접 못 함. DESK 는 desk-queue/<id>.json 에 지시를 파일로
+  #     쓰고, watcher 가 폴링해 ORCH 페인에 대신 전달). dispatch-queue 분기와 동형. 처리 후 소비.
+  for f in "$STATE_DIR"/desk-queue/*.json; do
     [ -f "$f" ] || continue
-    pm_inst="$(jq -r '.instruction // empty' "$f" 2>/dev/null)"
-    if [ -z "$pm_inst" ]; then
+    desk_inst="$(jq -r '.instruction // empty' "$f" 2>/dev/null)"
+    if [ -z "$desk_inst" ]; then
       rm -f "$f" 2>/dev/null   # 형식 불량 — 소비 폐기(무한 재시도 방지).
       continue
     fi
     pane_alive "$LEAD_PANE" || continue   # 죽은 pane 이면 소비 보류(살아나면 재시도 — .json 유지).
-    # lead 가 @pm: 접두로 pm 지시를 식별(사용자 입력과 구분). -l/Enter 분리(half-sent 방지).
-    tmux send-keys -t "$LEAD_PANE" -l "@pm: $pm_inst" 2>/dev/null
+    # ORCH 가 @desk: 접두로 DESK 지시를 식별(사용자 입력과 구분). -l/Enter 분리(half-sent 방지).
+    tmux send-keys -t "$LEAD_PANE" -l "@desk: $desk_inst" 2>/dev/null
     tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
     rm -f "$f" 2>/dev/null   # 소비 완료.
   done

@@ -558,8 +558,8 @@ for entry in "${WORKERS[@]}"; do
   catalog+="- $ENTRY_NAME (역할 $ENTRY_ROLE): $desc"$'\n'
 done
 obf="$(boot_file LEAD)"
-{ cat "$(resolve_role_file "$PROMPTS_DIR" lead)" 2>/dev/null || true
-  cat "$PROMPTS_DIR/_partials/lead-gate.md" 2>/dev/null || true
+{ cat "$(resolve_role_file "$PROMPTS_DIR" orch)" 2>/dev/null || true
+  cat "$PROMPTS_DIR/_partials/orch-gate.md" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"; } > "$obf"
 # lead boot 도 {{HARNESS_ROOT}}·{{SESSION}} 치환 + 토큰 잔존 검증 (일관성).
 _tmp_obf="$obf.tmp"
@@ -656,7 +656,7 @@ fi
 
 # pm 부트: roles/pm.md 합본 + pm 템플릿 settings. 사용자 창구.
 pbf="$(boot_file PM)"
-{ cat "$(resolve_role_file "$PROMPTS_DIR" pm)" 2>/dev/null || true
+{ cat "$(resolve_role_file "$PROMPTS_DIR" desk)" 2>/dev/null || true
   printf '\n## 현재 팀 카탈로그\n%s\n' "$catalog"
   # P11 Phase4: pm→lead 전달은 pm-queue 파일(watcher 대행). lead pane_id 주입 불필요
   #   (PM 은 tmux 직접호출 안 함 — 격리 경계 안에서 소켓 접근 차단 가능). pm.md ⓒ 규약 참조.
