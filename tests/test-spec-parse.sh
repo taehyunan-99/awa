@@ -17,4 +17,14 @@ assert_eq "my-feature" "$(spec_parse_scalar "$ROOT/tests/fixtures/team-basic.yam
 assert_eq "tiled" "$(spec_parse_scalar "$ROOT/tests/fixtures/team-basic.yaml" layout)" "P2 layout"
 assert_eq "docs/superpowers/plans/foo.md" "$(spec_parse_scalar "$ROOT/tests/fixtures/team-basic.yaml" plan)" "P2 plan"
 
+echo "[P3] 위험 문법 거부 (fail-fast)"
+spec_parse_validate "$ROOT/tests/fixtures/team-anchor.yaml" 2>/dev/null
+assert_fail "$?" "P3 yaml 앵커(&) 거부"
+spec_parse_validate "$ROOT/tests/fixtures/team-flow.yaml" 2>/dev/null
+assert_fail "$?" "P3 플로우([{) 거부"
+
+echo "[P4] 정상 명세는 통과"
+spec_parse_validate "$ROOT/tests/fixtures/team-basic.yaml" 2>/dev/null
+assert_success "$?" "P4 정상 team-basic 통과"
+
 test_summary
