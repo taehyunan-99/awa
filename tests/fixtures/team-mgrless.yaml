@@ -1,0 +1,6 @@
+workers:
+  - name: engineer
+    role: engineer
+reviewers:
+  - name: alignment-rev
+    role: reviewer-alignment

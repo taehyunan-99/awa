@@ -34,4 +34,14 @@ echo "[P4] 정상 명세는 통과"
 spec_parse_validate "$ROOT/tests/fixtures/team-basic.yaml" 2>/dev/null
 assert_success "$?" "P4 정상 team-basic 통과"
 
+echo "[P5] 리뷰어 불변식 — 투표 리뷰어≥1 이면 review-manager 필수"
+spec_parse_invariants "$ROOT/tests/fixtures/team-mgrless.yaml" 2>/dev/null
+assert_fail "$?" "P5 투표 리뷰어 있고 review-manager 없으면 거부"
+spec_parse_invariants "$ROOT/tests/fixtures/team-basic.yaml" 2>/dev/null
+assert_success "$?" "P5 투표+review-mgr 둘 다 있으면 통과"
+
+echo "[P6] 무리뷰 팀(투표 0)은 통과 (research 류 정당)"
+spec_parse_invariants "$ROOT/tests/fixtures/team-novote.yaml" 2>/dev/null
+assert_success "$?" "P6 투표 리뷰어 0 통과"
+
 test_summary
