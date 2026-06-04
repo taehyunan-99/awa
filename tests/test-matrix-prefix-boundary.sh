@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# prefix_match 단어경계 + matrix_lookup/lead_auto_allow_lookup 통합 검증.
+# prefix_match 단어경계 + matrix_lookup/orch_auto_allow_lookup 통합 검증.
 # claude 의 Bash(prefix:*) 단어경계 의미론(공식문서+probe 실측 확정)과 일치.
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -48,15 +48,15 @@ assert_fail "$?" "P4 space-glob echofoo 차단(단어경계)"
 rm -rf "$PT"
 unset PROJECT_ROOT
 
-echo "[P5] lead_auto_allow_lookup 통합 (실제 yaml 단어경계)"
-export PROJECT_ROOT="$ROOT"   # ROOT/config/lead-auto-allow.yaml 사용
-out="$(lead_auto_allow_lookup Bash '{"command":"git add ."}')"
+echo "[P5] orch_auto_allow_lookup 통합 (실제 yaml 단어경계)"
+export PROJECT_ROOT="$ROOT"   # ROOT/config/orch-auto-allow.yaml 사용
+out="$(orch_auto_allow_lookup Bash '{"command":"git add ."}')"
 assert_eq "git-write:Bash(git add:*)" "$out" "P5 git add . 통과"
-lead_auto_allow_lookup Bash '{"command":"git addfoo x"}' >/dev/null
+orch_auto_allow_lookup Bash '{"command":"git addfoo x"}' >/dev/null
 assert_fail "$?" "P5 git addfoo 차단(단어경계)"
-out="$(lead_auto_allow_lookup Bash '{"command":"echo hi"}')"
+out="$(orch_auto_allow_lookup Bash '{"command":"echo hi"}')"
 assert_eq "read-only:Bash(echo:*)" "$out" "P5 echo hi 통과"
-lead_auto_allow_lookup Bash '{"command":"echofoo"}' >/dev/null
+orch_auto_allow_lookup Bash '{"command":"echofoo"}' >/dev/null
 assert_fail "$?" "P5 echofoo 차단(단어경계)"
 unset PROJECT_ROOT
 

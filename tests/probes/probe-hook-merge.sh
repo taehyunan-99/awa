@@ -39,7 +39,7 @@ mkdir -p "$PROBE_DIR/.agent-harness/state/pending-asks" \
          "$PROBE_DIR/.agent-harness/.boot-settings" \
          "$PROBE_DIR/.claude"
 
-cat > "$PROBE_DIR/config/lead-auto-allow.yaml" <<'YAML'
+cat > "$PROBE_DIR/config/orch-auto-allow.yaml" <<'YAML'
 read-only:
   - "Bash(find:*)"
 YAML

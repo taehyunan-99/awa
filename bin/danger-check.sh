@@ -56,7 +56,7 @@ danger_check() {
     re='(^|[^a-zA-Z0-9_])(bash|sh|zsh)[[:space:]]+-c([[:space:]]|$)'
     [[ "$cmd" =~ $re ]] && { echo bash-c-wrapper; return 0; }
     # ★ 자가검증 게이트(2026-06-01): source(. /source)·인터프리터(bash/sh/zsh/dash)로
-    #   *절대 시스템·민감 경로* 스크립트를 실행하면 거부. self-verify auto-allow(lead-auto-allow
+    #   *절대 시스템·민감 경로* 스크립트를 실행하면 거부. self-verify auto-allow(orch-auto-allow
     #   self-verify 카테고리)가 `Bash(. :*)`·`Bash(bash :*)` 를 통째 허용하므로, 그 전에 danger 가
     #   시스템경로 실행을 막아야 `. /etc/profile`·`bash /usr/bin/evil.sh` 권한상승을 차단(평가순서
     #   danger→matrix→auto). 프로젝트 내부 상대경로(`. ./src/x.sh`·`bash ./x.sh`)는 SAFE → self-verify 통과.

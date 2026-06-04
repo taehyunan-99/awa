@@ -66,14 +66,14 @@ check B 5 "review-manager 에이전트 존재 + profile 등록" \
 
 # C. 권한 게이트 학습
 check C 1 "permission-gate 자동 허용 카탈로그" \
-  "test -f ${HARNESS_ROOT}/config/lead-auto-allow.yaml"
+  "test -f ${HARNESS_ROOT}/config/orch-auto-allow.yaml"
 check C 2 "classify 분류" \
   "test -f ${HARNESS_ROOT}/bin/classify.sh"
 check C 3 "danger-check deny 카탈로그" \
   "test -f ${HARNESS_ROOT}/bin/danger-check.sh"
 check C 4 "yaml 영구 누적 (add_to_allow)" \
-  "grep -q 'lead-auto-allow.yaml' ${HARNESS_ROOT}/bin/lib.sh" \
-  "test -f ${HARNESS_ROOT}/config/lead-auto-allow-stats.yaml"
+  "grep -q 'orch-auto-allow.yaml' ${HARNESS_ROOT}/bin/lib.sh" \
+  "test -f ${HARNESS_ROOT}/config/orch-auto-allow-stats.yaml"
 check C 5 "allow ∩ deny 충돌 검증" \
   "test -f ${HARNESS_ROOT}/tests/test-allow-deny-no-overlap.sh" \
   "bash ${HARNESS_ROOT}/tests/test-allow-deny-no-overlap.sh"

@@ -7,7 +7,7 @@
 # 수정 2단:
 #   (1) danger-check 신규 `exec-sensitive`: `.`/source/bash/sh/zsh/dash 로 *절대 시스템·민감
 #       경로* 스크립트 실행 거부(`. /etc/x`, `bash /usr/bin/evil.sh`). bash-c-wrapper 동류.
-#   (2) lead-auto-allow 신규 `self-verify` 카테고리: Bash(. :*)/Bash(source :*)/Bash(bash :*)/
+#   (2) orch-auto-allow 신규 `self-verify` 카테고리: Bash(. :*)/Bash(source :*)/Bash(bash :*)/
 #       Bash(sh :*). danger 통과(=시스템경로 아닌 프로젝트 스크립트)만 auto-allow.
 #   평가순서 danger→matrix→auto 라 위험 경로는 auto 닿기 전 차단.
 set -uo pipefail
@@ -24,14 +24,14 @@ source "$ROOT/bin/matrix-lookup.sh"
 source "$ROOT/bin/classify.sh"
 
 # ── Layer 1: grep 토큰 (정의 존재) ────────────────────────────────────────
-echo "[L1] danger-check exec-sensitive 가드 + lead-auto-allow self-verify 카테고리 정의"
+echo "[L1] danger-check exec-sensitive 가드 + orch-auto-allow self-verify 카테고리 정의"
 assert_success "$(grep -q 'exec-sensitive' "$ROOT/bin/danger-check.sh"; echo $?)" \
   "L1-a danger-check.sh 에 exec-sensitive 카테고리"
-assert_success "$(grep -q '^self-verify:' "$ROOT/config/lead-auto-allow.yaml"; echo $?)" \
-  "L1-b lead-auto-allow.yaml 에 self-verify 카테고리"
-assert_success "$(grep -qE 'Bash\(\. :\*\)' "$ROOT/config/lead-auto-allow.yaml"; echo $?)" \
+assert_success "$(grep -q '^self-verify:' "$ROOT/config/orch-auto-allow.yaml"; echo $?)" \
+  "L1-b orch-auto-allow.yaml 에 self-verify 카테고리"
+assert_success "$(grep -qE 'Bash\(\. :\*\)' "$ROOT/config/orch-auto-allow.yaml"; echo $?)" \
   "L1-c self-verify 에 Bash(. :*) 패턴"
-assert_success "$(grep -qE 'Bash\(bash :\*\)' "$ROOT/config/lead-auto-allow.yaml"; echo $?)" \
+assert_success "$(grep -qE 'Bash\(bash :\*\)' "$ROOT/config/orch-auto-allow.yaml"; echo $?)" \
   "L1-d self-verify 에 Bash(bash :*) 패턴"
 
 # ── Layer 2: 동작 (danger_check + classify) ──────────────────────────────
@@ -65,7 +65,7 @@ assert_eq "SAFE" "$(dc 'bash ./src/range.sh 1 5')"          "S3 bash ./src 상�
 assert_eq "SAFE" "$(dc 'source ./tests/x.sh')"              "S3 source ./tests"
 
 echo "[S4] classify 종단: 자가검증 → auto(self-verify), 위험 → danger"
-# self-verify 카테고리는 entry_role 무관 lead_auto_allow_lookup 이 잡음(PROJECT_ROOT 만 필요).
+# self-verify 카테고리는 entry_role 무관 orch_auto_allow_lookup 이 잡음(PROJECT_ROOT 만 필요).
 export PROJECT_ROOT="$ROOT"
 assert_eq "auto"   "$(cls engineer '. ./src/range.sh && range_sum 1 5')" "S4 자가검증 . → auto"
 assert_eq "auto"   "$(cls engineer 'bash ./src/range.sh 1 5')"           "S4 자가검증 bash → auto"

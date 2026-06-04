@@ -26,5 +26,5 @@ node_modules/
 *.swp
 *~
 .claude/
-config/.lead-auto-allow-marker
+config/.orch-auto-allow-marker
 config/*.bak

@@ -913,7 +913,7 @@ fi
 # I-9 정정 — 멀티 워커 동시 호출 시 lost update 차단 (add_to_allow 락 패턴 복제).
 bump_stats_counter() {
   local pattern="$1" field="$2"
-  local stats="${HARNESS_ROOT}/config/lead-auto-allow-stats.yaml"
+  local stats="${HARNESS_ROOT}/config/orch-auto-allow-stats.yaml"
   [ -f "$stats" ] || return 1
 
   local lock="${stats}.lock"
@@ -1008,7 +1008,7 @@ append_to_yaml() {
 # $1=pattern, exit 0=block 매치, exit 1=매치 안 함
 blocklist_contains() {
   local pattern="$1"
-  local blocklist="${HARNESS_ROOT}/config/lead-auto-allow-blocklist.yaml"
+  local blocklist="${HARNESS_ROOT}/config/orch-auto-allow-blocklist.yaml"
   [ -f "$blocklist" ] || return 1
   grep -q "^  - \"$pattern\"$" "$blocklist" 2>/dev/null
 }
@@ -1019,7 +1019,7 @@ blocklist_contains() {
 confirm_allow_yaml() {
   local pattern="$1" decision="$2"
   # P2/P6 수정(2026-05-30) — learned 쓰기 경로를 프로젝트 영구 파일로 분리.
-  #   기존: ${HARNESS_ROOT}/config/lead-auto-allow.yaml 에 써서
+  #   기존: ${HARNESS_ROOT}/config/orch-auto-allow.yaml 에 써서
   #     ① matrix-lookup 읽기(${PROJECT_ROOT}/config)와 불일치 → 학습이 게이트에 미반영(매 task 재프롬프트)
   #     ② 본체 git 추적 yaml 오염(e2e 마다 learned 누적)
   #   수정: ${PROJECT_ROOT}/.agent-harness/learned-allow.yaml 에 쓰고 matrix 가 함께 읽음.
@@ -1062,7 +1062,7 @@ confirm_allow_yaml() {
       ;;
     never)
       # 사용자 영구 거부 — blocklist 추가
-      append_to_yaml "${HARNESS_ROOT}/config/lead-auto-allow-blocklist.yaml" "$pattern" "patterns"
+      append_to_yaml "${HARNESS_ROOT}/config/orch-auto-allow-blocklist.yaml" "$pattern" "patterns"
       bump_stats_counter "$pattern" "never" || echo "[WARN] bump_stats_counter never failed for: $pattern" >&2
       ;;
     *)

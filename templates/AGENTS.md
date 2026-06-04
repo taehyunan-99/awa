@@ -33,7 +33,7 @@ _(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은
 ## 5. WHERE
 
 - **의존**:
-  - [`config/lead-auto-allow.yaml`](../config/lead-auto-allow.yaml) — 런타임 자동 허용은 여기서 정의되므로 템플릿은 base 권한만 담음(중복 회피)
+  - [`config/orch-auto-allow.yaml`](../config/orch-auto-allow.yaml) — 런타임 자동 허용은 여기서 정의되므로 템플릿은 base 권한만 담음(중복 회피)
 - **피의존**:
   - [`bin/lib.sh`](../bin/lib.sh) — `generate_worker_settings` case가 템플릿 선택
 - **경계 / 어댑터**:

@@ -49,9 +49,9 @@ assert_not_contains "$RVSET" "Edit($TMP_PROJ/**)" "reviewer 는 코드 전체 Ed
 # 이전 버전은 템플릿 문자열에 Write(...) 가 있는지만 검사해 버그를 통과시켰다.
 # 여기서는 classify 가 실제 verdict 를 산출하도록 PROJECT_ROOT 환경을 구성한다.
 # generate_worker_settings 가 dev settings 를 boot-settings/dev.json 에 이미 기록함
-# (= matrix_lookup 이 읽는 경로). lead-auto-allow.yaml 도 설치한다.
+# (= matrix_lookup 이 읽는 경로). orch-auto-allow.yaml 도 설치한다.
 mkdir -p "$TMP_PROJ/config"
-cat > "$TMP_PROJ/config/lead-auto-allow.yaml" <<'YAML'
+cat > "$TMP_PROJ/config/orch-auto-allow.yaml" <<'YAML'
 read-only:
   - "Bash(find:*)"
 YAML

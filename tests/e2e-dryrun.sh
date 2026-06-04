@@ -5,7 +5,7 @@
 #   - pane title (LEAD·워커명·리뷰어명)
 #   - settings.json marker 생성 + 워커별 .boot-settings/*.json 생성 + hook 공존
 #   - boot 합본 파일 (.boot/*.md) 토큰 치환
-#   - lead-auto-allow.yaml·state 디렉터리 설치
+#   - orch-auto-allow.yaml·state 디렉터리 설치
 #   - awa-down 정리 (런타임 산출물 제거, marker 제거)
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -82,7 +82,7 @@ if [ -f "$PROJ/.agent-harness/.boot/dev.md" ]; then
 fi
 
 # 5) config·state 설치
-has "$PROJ/config/lead-auto-allow.yaml" "lead-auto-allow.yaml 설치"
+has "$PROJ/config/orch-auto-allow.yaml" "orch-auto-allow.yaml 설치"
 has "$PROJ/.agent-harness/state/pending-asks" "state/pending-asks 디렉터리"
 
 # 5.5) 9차 아키텍처 전환: /loop 프롬프트·wait-worker.sh 부재 + watcher.sh 존재

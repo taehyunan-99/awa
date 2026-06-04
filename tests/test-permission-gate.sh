@@ -13,7 +13,7 @@ BOOT="$HARNESS_PROJECT/.agent-harness/.boot-settings"
 mkdir -p "$BOOT"
 echo '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$BOOT/dev.json"
 mkdir -p "$HARNESS_PROJECT/config"
-cat > "$HARNESS_PROJECT/config/lead-auto-allow.yaml" <<'YAML'
+cat > "$HARNESS_PROJECT/config/orch-auto-allow.yaml" <<'YAML'
 read-only:
   - "Bash(find:*)"
 YAML

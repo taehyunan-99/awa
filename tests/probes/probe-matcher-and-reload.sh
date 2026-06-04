@@ -104,7 +104,7 @@ export HARNESS_PROJECT="$P8_DIR" PROJECT_ROOT="$P8_DIR" HARNESS_ROOT="$ROOT"
 ( cd "$P8_DIR" && git init -q )
 mkdir -p "$P8_DIR/.agent-harness/state/pending-asks" "$P8_DIR/config" "$P8_DIR/.agent-harness/.boot-settings"
 echo '{"permissions":{"allow":[]}}' > "$P8_DIR/.agent-harness/.boot-settings/dev.json"
-echo 'read-only:' > "$P8_DIR/config/lead-auto-allow.yaml"   # 빈 카테고리 (Agent 가 gray 로)
+echo 'read-only:' > "$P8_DIR/config/orch-auto-allow.yaml"   # 빈 카테고리 (Agent 가 gray 로)
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh"
 P8_SET="$(generate_worker_settings dev dev-1)"

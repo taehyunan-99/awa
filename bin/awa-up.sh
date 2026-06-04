@@ -87,7 +87,7 @@ fi
 
 # Task 7 (§7) — yaml 부정합 검사 (boot 직전 가드, C5 PASS 조건).
 # allow ∩ deny 충돌 시 ABORT — 사용자가 학습시킨 패턴이 위험 카탈로그와 겹치는 케이스 차단.
-ALLOW_YAML="${HARNESS_ROOT}/config/lead-auto-allow.yaml"
+ALLOW_YAML="${HARNESS_ROOT}/config/orch-auto-allow.yaml"
 if [ -f "$ALLOW_YAML" ]; then
   if ! bash "$_DIR/danger-check.sh" --check-allow-yaml "$ALLOW_YAML"; then
     echo "[ABORT] yaml 부정합 — allow ∩ deny 충돌 발견. boot 거부" >&2
@@ -248,7 +248,7 @@ if [ "$PROJECT_ROOT_IS_GIT" = "1" ]; then
   if [ -f "$_gi" ] && [ -n "$(tail -c1 "$_gi" 2>/dev/null)" ]; then
     printf '\n' >> "$_gi"
   fi
-  for _pat in ".agent-harness/" ".claude/" "config/.lead-auto-allow-marker" "config/*.bak"; do
+  for _pat in ".agent-harness/" ".claude/" "config/.orch-auto-allow-marker" "config/*.bak"; do
     if [ ! -f "$_gi" ] || ! grep -qxF "$_pat" "$_gi" 2>/dev/null; then
       printf '%s\n' "$_pat" >> "$_gi"
     fi
@@ -282,16 +282,16 @@ splash_append_member() {  # $1=이름 $2=역할(bare, 빈값 가능) $3=모델
 # 생성하면 watcher 의 last_events 초기화(현재 줄 수=0) 와 정합 — 과거 done 폭주 없음.
 touch "$WORKSPACE/events.log"
 
-# 5차→8차: lead-auto-allow.yaml 설치 + marker 게이트 + 백업 갱신.
-# lead_auto_allow_lookup 은 ${PROJECT_ROOT}/config/lead-auto-allow.yaml 을 읽으므로,
-#   파일이 없으면 lookup 이 영구 rc=1 → lead-auto-allow 전체 무동작. 부트 시 설치.
+# 5차→8차: orch-auto-allow.yaml 설치 + marker 게이트 + 백업 갱신.
+# orch_auto_allow_lookup 은 ${PROJECT_ROOT}/config/orch-auto-allow.yaml 을 읽으므로,
+#   파일이 없으면 lookup 이 영구 rc=1 → orch-auto-allow 전체 무동작. 부트 시 설치.
 # 8차: settings.json marker 정책과 진짜로 통일(이전 주석은 "보존"이라 정반대였음).
 #   marker 있음(하네스 생성물) = 재가동 시 하네스 최신으로 갱신(안전정책 전파).
 #   marker 없음 + yaml 있음 = 사용자 직접 작성 → 보호(경고만, settings.json 게이트와 동일).
 #   yaml 은 사용자 커스텀 가능(settings.json.tpl 은 빈 {} 라 다름) → 갱신 시 .bak 백업.
-HARNESS_YAML="$HARNESS_ROOT/config/lead-auto-allow.yaml"
-PROJ_YAML="$PROJECT_ROOT/config/lead-auto-allow.yaml"
-YAML_MARKER="$PROJECT_ROOT/config/.lead-auto-allow-marker"
+HARNESS_YAML="$HARNESS_ROOT/config/orch-auto-allow.yaml"
+PROJ_YAML="$PROJECT_ROOT/config/orch-auto-allow.yaml"
+YAML_MARKER="$PROJECT_ROOT/config/.orch-auto-allow-marker"
 if [ -f "$HARNESS_YAML" ]; then
   mkdir -p "$PROJECT_ROOT/config"
   if [ ! -f "$PROJ_YAML" ]; then

@@ -33,8 +33,8 @@ classify() {
     esac
   fi
   if m="$(matrix_lookup "$entry_role" "$tool" "$Bash_input")"; then printf 'matrix%s%s' "$T" "$m"; return 0; fi
-  if cp="$(lead_auto_allow_lookup "$tool" "$Bash_input")"; then
-    # lead_auto_allow_lookup 은 "category:pattern" 반환. category 는 colon 없는 yaml 키 →
+  if cp="$(orch_auto_allow_lookup "$tool" "$Bash_input")"; then
+    # orch_auto_allow_lookup 은 "category:pattern" 반환. category 는 colon 없는 yaml 키 →
     # 첫 colon 으로만 분리, pattern 내부 colon 보존. TAB 으로 재포맷.
     printf 'auto%s%s%s%s' "$T" "${cp%%:*}" "$T" "${cp#*:}"; return 0
   fi

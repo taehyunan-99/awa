@@ -12,9 +12,9 @@ ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/config"
-cp "$ROOT/config/lead-auto-allow.yaml" "$TMP/config/"
-cp "$ROOT/config/lead-auto-allow-stats.yaml" "$TMP/config/" 2>/dev/null || printf 'patterns:\n' > "$TMP/config/lead-auto-allow-stats.yaml"
-printf 'patterns:\n' > "$TMP/config/lead-auto-allow-blocklist.yaml"
+cp "$ROOT/config/orch-auto-allow.yaml" "$TMP/config/"
+cp "$ROOT/config/orch-auto-allow-stats.yaml" "$TMP/config/" 2>/dev/null || printf 'patterns:\n' > "$TMP/config/orch-auto-allow-stats.yaml"
+printf 'patterns:\n' > "$TMP/config/orch-auto-allow-blocklist.yaml"
 
 # HARNESS_ROOT 도 TMP 로 격리 — bump_stats_counter/blocklist 가 HARNESS_ROOT/config 를 쓰므로
 #   본체 stats.yaml 오염 방지. lib.sh 가 source 시 _LIB_DIR 기준으로 HARNESS_ROOT 재계산하나,
@@ -34,7 +34,7 @@ PAT='Bash(myproject-tool:*)'
 CMD='{"command":"myproject-tool build"}'
 
 echo "[L1] 학습 전 NO_MATCH"
-lead_auto_allow_lookup Bash "$CMD" >/dev/null
+orch_auto_allow_lookup Bash "$CMD" >/dev/null
 assert_fail "$?" "L1 학습 전 myproject-tool 미매칭"
 
 echo "[L2] confirm_allow_yaml accepted → 프로젝트 learned 파일 생성"
@@ -45,20 +45,20 @@ assert_success "$?" "L2 accepted 성공"
 assert_success "$?" "L2 프로젝트 .agent-harness/learned-allow.yaml 생성됨"
 
 echo "[L3] 학습 후 MATCH (P2 해소 — 학습이 게이트에 즉시 반영)"
-out="$(lead_auto_allow_lookup Bash "$CMD")"
+out="$(orch_auto_allow_lookup Bash "$CMD")"
 assert_eq "learned:$PAT" "$out" "L3 학습 후 myproject-tool → learned 매칭"
 
-echo "[L4] 본체 yaml 무오염 (P6 — config/lead-auto-allow.yaml learned 비어있음)"
+echo "[L4] 본체 yaml 무오염 (P6 — config/orch-auto-allow.yaml learned 비어있음)"
 # 본체 yaml 의 learned: 카테고리에 방금 학습한 패턴이 들어가지 않아야 함.
-grep -q "^  - \"$PAT\"$" "$ROOT/config/lead-auto-allow.yaml"
-assert_fail "$?" "L4 본체 lead-auto-allow.yaml 에 학습 패턴 미기록 (오염 없음)"
+grep -q "^  - \"$PAT\"$" "$ROOT/config/orch-auto-allow.yaml"
+assert_fail "$?" "L4 본체 orch-auto-allow.yaml 에 학습 패턴 미기록 (오염 없음)"
 [ ! -f "$ROOT/.agent-harness/learned-allow.yaml" ] || \
   grep -q "^  - \"$PAT\"$" "$ROOT/.agent-harness/learned-allow.yaml" && \
   { echo "  (경고: 본체 .agent-harness/learned-allow.yaml 에 누출)"; }
 
 echo "[L5] 영구성 — 재읽기(부트 시뮬레이션)에도 학습 유지"
 # learned 파일이 보존되므로 새 매칭 호출에서도 여전히 매치.
-out="$(lead_auto_allow_lookup Bash "$CMD")"
+out="$(orch_auto_allow_lookup Bash "$CMD")"
 assert_eq "learned:$PAT" "$out" "L5 재읽기에도 학습 유지 (프로젝트 영구)"
 
 test_summary

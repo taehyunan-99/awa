@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# matrix_lookup + lead_auto_allow_lookup 단위 테스트.
+# matrix_lookup + orch_auto_allow_lookup 단위 테스트.
 set -uo pipefail
 cd "$(dirname "$0")/.."   # tests/ 로 이동
 source ./assert.sh
@@ -44,25 +44,25 @@ echo '{"permissions":{"deny":[],"allow":["Bash(git push *)"]}}' > "$BOOTSET/dev.
 matched="$(matrix_lookup dev Bash '{"command":"git push origin"}')"
 assert_eq "Bash(git push *)" "$matched" "M5b space-glob"
 
-echo "[M6] lead_auto_allow_lookup safe-test 매칭"
+echo "[M6] orch_auto_allow_lookup safe-test 매칭"
 mkdir -p "$HARNESS_PROJECT/config"
-cat > "$HARNESS_PROJECT/config/lead-auto-allow.yaml" <<'EOF'
+cat > "$HARNESS_PROJECT/config/orch-auto-allow.yaml" <<'EOF'
 read-only:
   - "Bash(ls:*)"
 safe-test:
   - "Bash(npm test:*)"
   - "Bash(pytest:*)"
 EOF
-out="$(lead_auto_allow_lookup Bash '{"command":"npm test foo"}')"
+out="$(orch_auto_allow_lookup Bash '{"command":"npm test foo"}')"
 assert_success "$?" "M6 exit 0"
 assert_eq "safe-test:Bash(npm test:*)" "$out" "M6 category:pattern"
 
-echo "[M7] lead_auto_allow_lookup NO_MATCH"
-lead_auto_allow_lookup Bash '{"command":"custom-tool"}' >/dev/null
+echo "[M7] orch_auto_allow_lookup NO_MATCH"
+orch_auto_allow_lookup Bash '{"command":"custom-tool"}' >/dev/null
 assert_fail "$?" "M7 NO_MATCH"
 
-echo "[M8] lead_auto_allow_lookup 위에서 아래로 — 첫 매칭 채택"
-out="$(lead_auto_allow_lookup Bash '{"command":"ls /tmp"}')"
+echo "[M8] orch_auto_allow_lookup 위에서 아래로 — 첫 매칭 채택"
+out="$(orch_auto_allow_lookup Bash '{"command":"ls /tmp"}')"
 assert_eq "read-only:Bash(ls:*)" "$out" "M8 read-only 매칭"
 
 test_summary

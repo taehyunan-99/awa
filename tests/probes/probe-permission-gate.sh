@@ -19,7 +19,7 @@ trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-ki
 export HARNESS_PROJECT="$PROBE_DIR" PROJECT_ROOT="$PROBE_DIR" HARNESS_ROOT="$ROOT"
 ( cd "$PROBE_DIR" && git init -q )   # resolve_project_root 의 git toplevel 안정화
 mkdir -p "$PROBE_DIR/.agent-harness/state/pending-asks" "$PROBE_DIR/config" "$PROBE_DIR/.agent-harness/.boot-settings"
-cat > "$PROBE_DIR/config/lead-auto-allow.yaml" <<'YAML'
+cat > "$PROBE_DIR/config/orch-auto-allow.yaml" <<'YAML'
 read-only:
   - "Bash(find:*)"
 YAML

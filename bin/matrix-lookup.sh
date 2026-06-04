@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# matrix_lookup + lead_auto_allow_lookup. source 시 부수효과 없음 (함수 정의만).
+# matrix_lookup + orch_auto_allow_lookup. source 시 부수효과 없음 (함수 정의만).
 # bash 3.2 호환.
 
 # 경로를 실물경로(심링크 해소)로 정규화. 신규 Write 라 파일 자체는 미존재 가능 →
@@ -64,7 +64,7 @@ matrix_lookup() {
   local allows
   allows="$(jq -r '.permissions.allow // [] | .[]' "$settings" 2>/dev/null)"
   # spec §5.1: add_to_allow 의 mv rename 과 동시 read 시 fd 가 구버전 잡아 빈 결과 가능 →
-  # 재시도 1회(E8 결정성 보강). 재시도도 비면 NO_MATCH (lead-auto-allow/pending 으로 흘러 재처리).
+  # 재시도 1회(E8 결정성 보강). 재시도도 비면 NO_MATCH (orch-auto-allow/pending 으로 흘러 재처리).
   if [ -z "$allows" ]; then
     sleep 0.05
     allows="$(jq -r '.permissions.allow // [] | .[]' "$settings" 2>/dev/null)"
@@ -109,7 +109,7 @@ matrix_lookup() {
           *':*')
             prefix="${pinner%:\*}"
             prefix="${prefix% }"   # self-verify 컨벤션: Bash(. :*) 의 ':*' 앞 구분 공백 트림 →
-            #   prefix=. 정규화(lead_auto_allow_lookup 과 동일). 끝 공백 없는 기존 패턴엔 무영향.
+            #   prefix=. 정규화(orch_auto_allow_lookup 과 동일). 끝 공백 없는 기존 패턴엔 무영향.
             prefix_match "$prefix" "$field" && { printf '%s' "$pat"; return 0; }
             ;;
           *' *')
@@ -145,11 +145,11 @@ EOF
   return 1
 }
 
-# lead-auto-allow.yaml 카테고리 순서대로 패턴 매칭 → MATCH 면 exit 0 + "category:pattern".
+# orch-auto-allow.yaml 카테고리 순서대로 패턴 매칭 → MATCH 면 exit 0 + "category:pattern".
 # $1=tool $2=input_json
-lead_auto_allow_lookup() {
+orch_auto_allow_lookup() {
   local tool="$1" input="$2"
-  local yaml="${PROJECT_ROOT}/config/lead-auto-allow.yaml"
+  local yaml="${PROJECT_ROOT}/config/orch-auto-allow.yaml"
   # P2 수정(2026-05-30) — 기본 카탈로그 + 프로젝트 학습 파일을 함께 매칭 대상으로.
   #   learned 쓰기가 .agent-harness/learned-allow.yaml 로 분리됐으므로(lib.sh confirm_allow_yaml)
   #   읽기도 둘 다 평탄화해야 학습 패턴이 게이트에 즉시 반영된다.

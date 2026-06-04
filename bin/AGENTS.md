@@ -23,7 +23,7 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 - `watcher.sh` — events.log/pending-asks 폴링 데몬, lead/reviewer 페인을 깨움
 - `classify.sh` — 명령어를 danger→matrix→auto→gray로 분류
 - `danger-check.sh` — 위험 명령(`rm -rf`, `sudo`, `dd of=`, `curl|sh`, `git push --force` 등) 거부
-- `matrix-lookup.sh` — `config/lead-auto-allow.yaml`의 카테고리 패턴 매칭(awk 파서)
+- `matrix-lookup.sh` — `config/orch-auto-allow.yaml`의 카테고리 패턴 매칭(awk 파서)
 - `permission-gate.sh` — PreToolUse hook 진입점, classify 결과로 allow/deny 결정
 - `log-event.sh` — events.log 포맷 라인 append 헬퍼
 - `lib.sh` — 공통 함수(`generate_worker_settings`·`worker_turn_count`·`confirm_allow_yaml`·`bump_stats_counter` 등), 다른 스크립트가 source
@@ -57,7 +57,7 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
   - [`profiles/`](../profiles/) — `awa-up.sh`가 프로파일 셸 fragment를 source (`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT`/`LEAD_MODEL`)
   - [`prompts/`](../prompts/) — `_common.md` + `roles/NN-part/<역할>.md` 글롭으로 자동 카탈로그, `{{HARNESS_ROOT}}` 토큰을 sed 치환 후 워커 stdin에 주입
   - [`templates/`](../templates/) — `lib.sh::generate_worker_settings`가 역할군에 맞는 `settings.<군>.json.tpl` 선택
-  - [`config/lead-auto-allow.yaml`](../config/lead-auto-allow.yaml) — `matrix-lookup.sh`의 awk 파서가 카테고리 패턴 읽음 (`category:` + 2칸 들여쓰기 + `- "패턴"` 단순 형식만)
+  - [`config/orch-auto-allow.yaml`](../config/orch-auto-allow.yaml) — `matrix-lookup.sh`의 awk 파서가 카테고리 패턴 읽음 (`category:` + 2칸 들여쓰기 + `- "패턴"` 단순 형식만)
 - **피의존**:
   - 워커(`prompts/roles/*`)가 `{{HARNESS_ROOT}}/bin/<도구>.sh` 절대경로로 호출
   - [`tests/`](../tests/) — `test-*.sh` 다수가 이 디렉토리의 함수/스크립트 단위 검증
