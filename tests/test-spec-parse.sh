@@ -22,6 +22,11 @@ spec_parse_validate "$ROOT/tests/fixtures/team-anchor.yaml" 2>/dev/null
 assert_fail "$?" "P3 yaml 앵커(&) 거부"
 spec_parse_validate "$ROOT/tests/fixtures/team-flow.yaml" 2>/dev/null
 assert_fail "$?" "P3 플로우([{) 거부"
+spec_parse_validate "$ROOT/tests/fixtures/team-multiline.yaml" 2>/dev/null
+assert_fail "$?" "P3 멀티라인(|) 거부"
+echo "[P3b] 대괄호 경로는 정상 통과 (거짓양성 회귀 가드)"
+spec_parse_validate "$ROOT/tests/fixtures/team-bracketpath.yaml" 2>/dev/null
+assert_success "$?" "P3b plan 경로 내 대괄호 오탐 안 함"
 
 echo "[P4] 정상 명세는 통과"
 spec_parse_validate "$ROOT/tests/fixtures/team-basic.yaml" 2>/dev/null

@@ -42,14 +42,13 @@ spec_parse_flatten() {
 # 거부: yaml 앵커(&)·별칭(*)·멀티라인(|/>)·플로우({}/[])·!! 태그·3-depth(6칸+ 들여쓰기).
 spec_parse_validate() {
   local yaml="$1"
-  [ -f "$yaml" ] || { echo "오류: 명세 파일 없음 → $yaml" >&2; return 1; }
+  [ -f "$yaml" ] && [ -r "$yaml" ] || { echo "오류: 명세 파일 없음/읽기불가 → $yaml" >&2; return 1; }
   local bad
   bad="$(awk '
     /^[[:space:]]*#/ { next }
     /(^|[[:space:]])[&*]/                 { print "anchor/alias"; exit }
     /:[[:space:]]*[|>]([[:space:]]|$)/    { print "multiline"; exit }
-    /[[{][^}]*[}\]]/                      { print "flow"; exit }
-    /[][{}]/                              { print "flow"; exit }
+    /:[[:space:]]*[[{]/                   { print "flow"; exit }
     /!!/                                  { print "tag"; exit }
     /^[[:space:]]{6,}[^[:space:]]/        { print "depth>2"; exit }
   ' "$yaml")"
