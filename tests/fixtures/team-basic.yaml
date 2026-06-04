@@ -1,0 +1,20 @@
+session: my-feature
+layout: tiled
+plan: docs/superpowers/plans/foo.md
+
+workers:
+  - name: engineer
+    role: engineer
+    vendor: claude
+    model: sonnet
+  - name: researcher
+    role: researcher
+
+reviewers:
+  - name: alignment-rev
+    role: reviewer-alignment
+  - name: security-rev
+    role: reviewer-security
+    vendor: codex
+  - name: review-mgr
+    role: review-manager
