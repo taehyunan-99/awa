@@ -82,7 +82,8 @@ spec_parse_invariants() {
 }
 
 # yaml → WORKERS/REVIEWERS/SESSION/LAYOUT 환산. validate+invariants 선행.
-# 빈 vendor/model 은 절삭("name:role" / "name:role:vendor"). awa-up.sh 의 "이름:역할[:벤더][:모델]" 파싱과 정합.
+# 빈 vendor/model 은 절삭. 출력: "name:role" / "name:role:vendor" / "name:role:vendor:model" /
+#   "name:role:model"(vendor 없이 model 만). awa-up.sh 의 "이름:역할[:벤더][:모델]" 파싱과 정합.
 # ★ WORKERS/REVIEWERS 는 bash 배열 — export 불가. 반드시 호출 셸과 같은 스코프에서 실행
 #   (서브셸 `$(spec_parse_load ...)` 금지). awa-up 은 source 된 함수를 직접 호출하므로 정합.
 spec_parse_load() {
@@ -106,8 +107,14 @@ spec_parse_load() {
     # 버그3: role 누락/허용되지 않는 문자 검증
     case "$role" in ""|*[!A-Za-z0-9_-]*) echo "오류: 역할 누락/허용되지 않는 문자 → name='$name' role='$role'" >&2; return 1 ;; esac
     entry="$name:$role"
-    [ -n "$vendor" ] && entry="$entry:$vendor"
-    [ -n "$vendor" ] && [ -n "$model" ] && entry="$entry:$model"
+    # vendor 있으면 "name:role:vendor[:model]". vendor 없이 model 만 있으면 "name:role:model"
+    #   — awa-up parse_entry 의 3필드 §2.2 규칙(알려진 벤더 아니면 model 해석)과 정합.
+    if [ -n "$vendor" ]; then
+      entry="$entry:$vendor"
+      [ -n "$model" ] && entry="$entry:$model"
+    elif [ -n "$model" ]; then
+      entry="$entry:$model"
+    fi
     case "$kind" in
       worker)   WORKERS+=("$entry") ;;
       reviewer) REVIEWERS+=("$entry") ;;
