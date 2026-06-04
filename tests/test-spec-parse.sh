@@ -44,4 +44,12 @@ echo "[P6] 무리뷰 팀(투표 0)은 통과 (research 류 정당)"
 spec_parse_invariants "$ROOT/tests/fixtures/team-novote.yaml" 2>/dev/null
 assert_success "$?" "P6 투표 리뷰어 0 통과"
 
+echo "[P7-inv] 파일 미존재 거부"
+spec_parse_invariants "/tmp/awa-nonexistent-$$.yaml" 2>/dev/null
+assert_fail "$?" "P7-inv 파일 없으면 거부"
+
+echo "[P8-inv] 대소문자 변형 role 도 투표 리뷰어로 인식 (거짓음성 방지)"
+spec_parse_invariants "$ROOT/tests/fixtures/team-uc-rev.yaml" 2>/dev/null
+assert_fail "$?" "P8-inv 대문자 role 도 voter 로 세고 mgr 없으면 거부"
+
 test_summary

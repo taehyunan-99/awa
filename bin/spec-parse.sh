@@ -65,10 +65,15 @@ spec_parse_validate() {
 # 투표 리뷰어 0 은 정당(research 류 무리뷰) → 통과.
 spec_parse_invariants() {
   local yaml="$1"
+  [ -f "$yaml" ] && [ -r "$yaml" ] || { echo "오류: 명세 파일 없음/읽기불가 → $yaml" >&2; return 1; }
   local flat; flat="$(spec_parse_flatten "$yaml")"
   local voters mgr
-  voters="$(printf '%s\n' "$flat" | awk -F'\t' '$1=="reviewer" && ($3=="reviewer-alignment"||$3=="reviewer-quality"||$3=="reviewer-security")' | awk 'END{print NR}')"
-  mgr="$(printf '%s\n' "$flat" | awk -F'\t' '$1=="reviewer" && $3=="review-manager"' | awk 'END{print NR}')"
+  read -r voters mgr <<< "$(printf '%s\n' "$flat" | awk -F'\t' '
+    { r=tolower($3) }
+    $1=="reviewer" && (r=="reviewer-alignment"||r=="reviewer-quality"||r=="reviewer-security") { v++ }
+    $1=="reviewer" && r=="review-manager" { m++ }
+    END { print v+0, m+0 }
+  ')"
   if [ "$voters" -ge 1 ] && [ "$mgr" -eq 0 ]; then
     echo "오류: 투표 리뷰어 ${voters}명 있으나 review-manager 없음 — drift-check 무력화(spec §4)" >&2
     return 1
