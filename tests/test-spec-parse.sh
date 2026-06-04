@@ -25,6 +25,8 @@ assert_fail "$?" "P3 플로우([{) 거부"
 spec_parse_validate "$ROOT/tests/fixtures/team-multiline.yaml" 2>/dev/null
 assert_fail "$?" "P3 멀티라인(|) 거부"
 echo "[P3b] 대괄호 경로는 정상 통과 (거짓양성 회귀 가드)"
+spec_parse_validate "$ROOT/tests/fixtures/team-flowmap.yaml" 2>/dev/null
+assert_fail "$?" "P3 인라인 flow map(- {) 거부"
 spec_parse_validate "$ROOT/tests/fixtures/team-bracketpath.yaml" 2>/dev/null
 assert_success "$?" "P3b plan 경로 내 대괄호 오탐 안 함"
 

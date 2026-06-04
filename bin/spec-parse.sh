@@ -49,6 +49,7 @@ spec_parse_validate() {
     /(^|[[:space:]])[&*]/                 { print "anchor/alias"; exit }
     /:[[:space:]]*[|>]([[:space:]]|$)/    { print "multiline"; exit }
     /:[[:space:]]*[[{]/                   { print "flow"; exit }
+    /^[[:space:]]*-[[:space:]]*[[{]/      { print "flow"; exit }
     /!!/                                  { print "tag"; exit }
     /^[[:space:]]{6,}[^[:space:]]/        { print "depth>2"; exit }
   ' "$yaml")"
