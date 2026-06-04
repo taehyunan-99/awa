@@ -633,7 +633,7 @@ _lv="${LEAD_VENDOR:-${HARNESS_VENDOR:-claude}}"
 #   ★ PM 과 동일 결함: 시스템프롬프트만으론 역할 준수 약함(claude no-op 빈화면). 안정성>빈화면.
 #   - system : send_prompt 생략(빈 화면 idle). 역할은 시스템프롬프트에만.
 #   - stdin/hybrid : 짧은 역할 인지 촉구를 send_prompt 로 → 화면에 보이고 준수율↑. PM 과 통일.
-_lead_inject="${LEAD_INJECT_MODE:-${INJECT_MODE:-system}}"
+_lead_inject="${LEAD_INJECT_MODE:-${INJECT_MODE:-hybrid}}"
 [ "$_lv" = "claude" ] || _lead_inject="stdin"   # 비-claude 는 시스템프롬프트 없음 → 항상 send_prompt
 if [ -n "$PLAN_BOOT_FILE" ]; then
   # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
@@ -688,7 +688,7 @@ if [ -z "$PM_MODEL_EFF" ]; then
     && PM_MODEL_EFF="$(vendor_default_model pm)"
   [ -n "$PM_MODEL_EFF" ] || PM_MODEL_EFF="sonnet"
 fi
-# PM 은 claude 고정(벤더 정책). 역할 주입 방식 = PM_INJECT_MODE (기본 system).
+# PM 은 claude 고정(벤더 정책). 역할 주입 방식 = INJECT_MODE (기본 hybrid — 라이브 채택 2026-06-03).
 #   ★ 2026-06-03 결함: 시스템프롬프트 주입(a8ef4ae 빈화면 전환)이 PM 역할 준수를 약화 —
 #     Sonnet 이 시스템프롬프트의 읽기전용·pm-queue 경계를 대화 메시지보다 약하게 따라 작은
 #     작업을 직접 실행 시도(cat>file). 안정성>빈화면 → 주입 방식을 토글로 비교 가능하게.
@@ -697,7 +697,7 @@ fi
 #   - hybrid : 시스템프롬프트 + 짧은 촉구 send_prompt('직접작업 금지·pm-queue 전달'). LEAD 패턴.
 _pv="${PM_VENDOR:-${HARNESS_VENDOR:-claude}}"
 # INJECT_MODE 는 PM·LEAD 공통(일관성). PM_INJECT_MODE 는 PM 단독 override(하위호환).
-_pm_inject="${PM_INJECT_MODE:-${INJECT_MODE:-system}}"
+_pm_inject="${PM_INJECT_MODE:-${INJECT_MODE:-hybrid}}"
 [ "$_pv" = "claude" ] || _pm_inject="stdin"   # 비-claude 는 시스템프롬프트 경로 없음 → stdin 고정
 case "$_pm_inject" in
   system) _psysprompt="$pbf" ;;   # 역할=시스템, 대화 주입 없음 (빈 화면)
