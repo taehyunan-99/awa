@@ -51,7 +51,7 @@ fi
    - User picks one → `bash "$HARNESS_ROOT/bin/awa-main.sh" attach --session <name>` → print attach cmd → END.
    - User picks none / no rows → continue to Step 0.5.
 
-   - **Step 0.5 — team.yaml 재호출:** Step 3(Project) 에서 PROJECT_ROOT 가 결정된 후,
+   - **Step 0.5 — team.yaml 재호출:** **이 체크는 Step 3(Project 결정) 직후 수행한다** — PROJECT 경로가 정해진 뒤라야 .awa/team.yaml 경로를 안다. Step 3(Project) 에서 PROJECT_ROOT 가 결정된 후,
      `bash -c "test -f <PROJECT>/.awa/team.yaml && echo found"` 실행.
      - `found` 출력 시 → 사용자에게 "이전 팀 구성을 찾았습니다. 이어서 띄울까요? (.awa/team.yaml)" 제시.
        - yes → Step 4 launch 로 직행 (`--spec <PROJECT>/.awa/team.yaml`).
@@ -156,5 +156,5 @@ actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 - `references/review-prompt.md` — 4-axis review subagent prompt
 - `references/presets.md` — preset suggestion heuristics
 - `references/interview.md` — 동적 팀 조합 인터뷰 절차
-- spec: `docs/superpowers/specs/2026-05-27-awa-unified-entry-dashboard.md`
+- spec: `docs/superpowers/specs/2026-05-29-dashboard-pane-grid-design.md`
 - spec: `docs/superpowers/specs/2026-06-04-dynamic-harness-composition-design.md`

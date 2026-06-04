@@ -8,7 +8,7 @@
 #   awa-main.sh attach --session <name>
 #       → "tmux attach -t <name>" 한 줄 출력
 #   awa-main.sh launch --project <path> --mode-launch <single|multi>
-#                            [--preset <name>|--workers <spec>] [--plan <path>]
+#                            [--preset <name>|--workers <spec>|--spec <yaml>] [--plan <path>]
 #       → 발진 명령 + AGPN_META 출력
 set -uo pipefail
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -9,10 +9,14 @@
 4. 리뷰 수위: full-vote(alignment+quality+security 3종) / quality-only / 무리뷰(research 류)
 
 ## 불변식 (spec §4 — 반드시 강제)
+
+**파서가 자동 검증(review-mgr 강제)하는 항목:**
 - 투표 리뷰어(reviewer-alignment/quality/security) ≥1 이면 review-manager(name: review-mgr) 자동 포함.
-- 무리뷰(투표 0)는 "합의 게이트 없이 진행"을 사용자에게 명시 확인.
-- 투표 리뷰어 1명뿐이면 단독 거부권 경고.
 - 저장 전 `bash -c 'source bin/spec-parse.sh && spec_parse_invariants <path>'` 로 검증(rc=0 확인).
+
+**인터뷰가 직접 판단해 사용자에게 경고·확인하는 항목 (파서 불변식 아님):**
+- 무리뷰(투표 0)는 "합의 게이트 없이 진행"을 사용자에게 명시 확인.
+- 투표 리뷰어 1명뿐이면 단독 거부권이 됨 — 인터뷰가 사용자에게 경고(파서 불변식이 아닌 인터뷰 책임).
 
 ## 저장 (.awa/team.yaml)
 - 대상 프로젝트 PROJECT_ROOT/.awa/team.yaml 작성.
