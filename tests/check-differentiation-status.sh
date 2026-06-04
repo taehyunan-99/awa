@@ -62,7 +62,7 @@ check B 4 "리뷰어 verdict 시계열 집계" \
   "grep -rq '시계열\\|plan-diff' ${HARNESS_ROOT}/prompts/roles/03-quality/review-manager.md"
 check B 5 "review-manager 에이전트 존재 + profile 등록" \
   "test -f ${HARNESS_ROOT}/prompts/roles/03-quality/review-manager.md" \
-  "grep -q 'review-manager' ${HARNESS_ROOT}/profiles/feature-team.sh"
+  "grep -qE 'role:[[:space:]]*review-manager' ${HARNESS_ROOT}/profiles/feature-team.yaml"
 
 # C. 권한 게이트 학습
 check C 1 "permission-gate 자동 허용 카탈로그" \

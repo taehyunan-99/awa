@@ -54,7 +54,7 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 <!-- 모두 약결합(마크다운 링크) — 강결합 승격은 /update에서 판단 -->
 
 - **의존**:
-  - [`profiles/`](../profiles/) — `awa-up.sh`가 프로파일 셸 fragment를 source (`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT`/`LEAD_MODEL`)
+  - [`profiles/`](../profiles/) — `awa-up.sh`가 `.yaml` 우선 로드(`spec_parse_load`), yaml 없으면 구 `.sh` source 폴백(`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT`)
   - [`prompts/`](../prompts/) — `_common.md` + `roles/NN-part/<역할>.md` 글롭으로 자동 카탈로그, `{{HARNESS_ROOT}}` 토큰을 sed 치환 후 워커 stdin에 주입
   - [`templates/`](../templates/) — `lib.sh::generate_worker_settings`가 역할군에 맞는 `settings.<군>.json.tpl` 선택
   - [`config/orch-auto-allow.yaml`](../config/orch-auto-allow.yaml) — `matrix-lookup.sh`의 awk 파서가 카테고리 패턴 읽음 (`category:` + 2칸 들여쓰기 + `- "패턴"` 단순 형식만)

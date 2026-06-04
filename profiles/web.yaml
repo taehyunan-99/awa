@@ -1,0 +1,18 @@
+layout: tiled
+workers:
+  - name: frontend
+    role: frontend
+  - name: backend
+    role: backend
+  - name: infra
+    role: infra
+reviewers:
+  - name: alignment-rev
+    role: reviewer-alignment
+  - name: quality-rev
+    role: reviewer-quality
+  - name: security-rev
+    role: reviewer-security
+    vendor: codex
+  - name: review-mgr
+    role: review-manager

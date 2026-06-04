@@ -1,0 +1,13 @@
+layout: tiled
+workers:
+  - name: research1
+    role: researcher
+  - name: research2
+    role: researcher
+  - name: research3
+    role: researcher
+reviewers:
+  - name: quality-rev
+    role: reviewer-quality
+  - name: review-mgr
+    role: review-manager

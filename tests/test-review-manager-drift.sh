@@ -33,10 +33,14 @@ for f in "$ROOT"/prompts/roles/03-quality/reviewer-quality.md \
 done
 assert_eq "0" "$leak" "L1 quality/security/alternative 는 plan_alignment 출력 안 함(렌즈 독립)"
 
-# Layer 1: profiles/feature-team.sh review-manager 등록
-# 모델 접미사(:opus)는 제거됨 — vendor_default_model(claude review-manager→opus) 폴백 위임.
-grep -qE 'review-mgr:review-manager(:|")' "$ROOT/profiles/feature-team.sh"
-assert_success "$?" "L1 profiles review-manager pane 등록"
+# Layer 1: profiles/feature-team.yaml review-manager 등록 (yaml 파서로 로드)
+source "$ROOT/bin/spec-parse.sh"
+spec_parse_load "$ROOT/profiles/feature-team.yaml"
+found_mgr=0
+for entry in "${REVIEWERS[@]}"; do
+  case "$entry" in *review-manager*) found_mgr=1 ;; esac
+done
+assert_eq "1" "$found_mgr" "L1 profiles feature-team.yaml review-manager pane 등록"
 
 # Layer 1: watcher.sh drift-check 트리거 + lib.sh worker_turn_count 함수
 grep -q 'drift-check' "$ROOT/bin/watcher.sh"

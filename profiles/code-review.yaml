@@ -1,0 +1,13 @@
+layout: tiled
+workers:
+  - name: security
+    role: security
+reviewers:
+  - name: spec-rev
+    role: reviewer-spec
+  - name: quality-rev
+    role: reviewer-quality
+  - name: arch-rev
+    role: reviewer-arch
+  - name: review-mgr
+    role: review-manager

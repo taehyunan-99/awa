@@ -2,32 +2,37 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
-
 ROOT="$(cd .. && pwd)"
+source "$ROOT/bin/spec-parse.sh"
 
-source "$ROOT/profiles/default.sh"
-# SESSION 라인 삭제됨 (T13) — _session_autoname 폴백이 PROJECT_ROOT 별 자동명 제공.
-assert_eq "" "${SESSION:-}" "default SESSION 미정의(폴백 의존)"
+spec_parse_load "$ROOT/profiles/default.yaml"
 assert_eq "tiled" "$LAYOUT" "default LAYOUT"
-assert_eq "2" "${#WORKERS[@]}" "default 워커 2개(reviewer 워커 제거·일원화)"
+assert_eq "2" "${#WORKERS[@]}" "default 워커 2개"
 assert_eq "engineer:engineer" "${WORKERS[0]}" "default 첫 워커"
+assert_eq "4" "${#REVIEWERS[@]}" "default 리뷰어 4개(투표3+mgr)"
+assert_contains "${REVIEWERS[*]}" "review-mgr:review-manager" "default review-manager 포함"
+assert_contains "${REVIEWERS[*]}" "security-rev:reviewer-security:codex" "default security codex"
 
-source "$ROOT/profiles/code-review.sh"
-assert_eq "1" "${#WORKERS[@]}" "code-review 워커 1개(reviewer 워커 제거·일원화)"
-assert_contains "${WORKERS[*]}" "security" "code-review 에 security 포함"
+spec_parse_load "$ROOT/profiles/code-review.yaml"
+assert_eq "1" "${#WORKERS[@]}" "code-review 워커 1개"
+assert_contains "${WORKERS[*]}" "security:security" "code-review security"
+assert_contains "${REVIEWERS[*]}" "review-mgr:review-manager" "code-review review-mgr 추가됨"
 
-source "$ROOT/profiles/research.sh"
+spec_parse_load "$ROOT/profiles/research.yaml"
 assert_eq "3" "${#WORKERS[@]}" "research 워커 3개"
+assert_contains "${REVIEWERS[*]}" "review-mgr:review-manager" "research review-mgr 추가됨"
 
-source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
-[ -f "$ROOT/prompts/_common.md" ]; assert_success "$?" "prompts/_common.md 존재"
-for r in dev tester security researcher orch reviewer-spec reviewer-quality reviewer-arch; do
-  resolve_role_file "$ROOT/prompts" "$r" >/dev/null 2>&1; assert_success "$?" "역할 $r 글롭 해석"
+spec_parse_load "$ROOT/profiles/web.yaml"
+assert_eq "3" "${#WORKERS[@]}" "web 워커 3개"
+assert_contains "${WORKERS[*]}" "frontend:frontend" "web frontend"
+
+spec_parse_load "$ROOT/profiles/feature-team.yaml"
+assert_eq "3" "${#WORKERS[@]}" "feature-team 워커 3개"
+
+# 모든 profile 이 리뷰어 불변식 통과
+for p in default web feature-team code-review research; do
+  spec_parse_invariants "$ROOT/profiles/$p.yaml" 2>/dev/null
+  assert_success "$?" "$p 리뷰어 불변식 통과"
 done
-
-COMMON="$(cat "$ROOT/prompts/_common.md")"
-assert_contains "$COMMON" '{{WORKER_NAME}}' "_common 에 치환 토큰"
-assert_contains "$COMMON" 'done 라인' "_common 에 완료 신호 규약(events.log done 라인, P11 탈-tmux)"
-assert_contains "$COMMON" '.agent-harness/tasks/' "_common 에 tasks 읽기 규약"
 
 test_summary

@@ -1,0 +1,17 @@
+layout: tiled
+workers:
+  - name: dev
+    role: dev
+  - name: test
+    role: tester
+  - name: arch
+    role: researcher
+reviewers:
+  - name: spec-rev
+    role: reviewer-spec
+  - name: quality-rev
+    role: reviewer-quality
+  - name: arch-rev
+    role: reviewer-arch
+  - name: review-mgr
+    role: review-manager
