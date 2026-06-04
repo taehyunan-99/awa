@@ -219,8 +219,8 @@ generate_worker_settings() {
     researcher|review-manager) tpl_name="readonly" ;;
     tester) tpl_name="test" ;;
     reviewer-*) tpl_name="reviewer" ;;
-    lead|LEAD) tpl_name="lead" ;;
-    pm|PM) tpl_name="pm" ;;
+    orch|ORCH|lead|LEAD) tpl_name="orch" ;;   # lead|LEAD = 구 역할명 하위호환
+    desk|DESK|pm|PM) tpl_name="desk" ;;        # pm|PM = 구 역할명 하위호환
     *) tpl_name="readonly" ;;
   esac
   local tpl="$HARNESS_ROOT/templates/settings.${tpl_name}.json.tpl"

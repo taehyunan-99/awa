@@ -50,20 +50,22 @@ content="$(cat "$out")"
 assert_contains "$content" "Bash(git push *)" "G4 security 가 dev 템플릿"
 assert_contains "$content" 'WORKER=\"sec\"' "G4 ENTRY_NAME 토큰 치환"
 
-echo "[G5] lead → settings.lead.json.tpl (2인자, non-empty path)"
-out="$(generate_worker_settings lead LEAD)"
+echo "[G5] orch → settings.orch.json.tpl (2인자, non-empty path)"
+out="$(generate_worker_settings orch ORCH)"
 rc=$?
-assert_eq "0" "$rc" "G5 lead rc=0"
-assert_eq "$TMP/.agent-harness/.boot-settings/lead.json" "$out" "G5 lead 경로"
-[ -f "$out" ]; assert_success "$?" "G5 lead.json 생성"
+assert_eq "0" "$rc" "G5 orch rc=0"
+assert_eq "$TMP/.agent-harness/.boot-settings/orch.json" "$out" "G5 orch 경로"
+[ -f "$out" ]; assert_success "$?" "G5 orch.json 생성"
 content="$(cat "$out")"
-assert_contains "$content" "Bash(rm:*)" "G5 lead allow rm"
-assert_contains "$content" "Bash(jq:*)" "G5 lead allow jq"
+assert_contains "$content" "Bash(rm:*)" "G5 orch allow rm"
+assert_contains "$content" "Bash(jq:*)" "G5 orch allow jq"
 
-echo "[G5b] LEAD (대문자) 도 lead 분기"
-out="$(generate_worker_settings LEAD LEAD)"
-assert_eq "$TMP/.agent-harness/.boot-settings/LEAD.json" "$out" "G5b LEAD 경로"
-[ -f "$out" ]; assert_success "$?" "G5b LEAD.json 생성"
+echo "[G5b] 구 역할명 lead|LEAD 도 orch 템플릿으로 (하위호환)"
+out="$(generate_worker_settings lead LEAD)"
+assert_eq "$TMP/.agent-harness/.boot-settings/lead.json" "$out" "G5b lead 하위호환 경로"
+[ -f "$out" ]; assert_success "$?" "G5b lead 하위호환 생성"
+content="$(cat "$out")"
+assert_contains "$content" "Bash(rm:*)" "G5b lead 하위호환도 orch 템플릿(rm allow)"
 
 echo "[G5c] unknown 역할 → settings.readonly.json.tpl (2인자, fallback=readonly)"
 out="$(generate_worker_settings unknown_role somebot)"
@@ -123,10 +125,10 @@ for r in dev tester reviewer-quality unknown-role-xyz; do
   printf '%s' "$post" | grep -q 'log-event.sh'; assert_success "$?" "G11 $r PostToolUse log-event 공존"
 done
 
-echo "[G12] lead 는 PostToolUse 없음 (감시 대상 아님)"
-outl="$(generate_worker_settings lead LEAD)"
-! grep -q 'PostToolUse' "$outl"; assert_success "$?" "G12 lead PostToolUse 부재"
-! grep -q 'PreToolUse' "$outl"; assert_success "$?" "G12 lead PreToolUse 부재 (게이트 대상 아님)"
+echo "[G12] orch 는 PostToolUse 없음 (감시 대상 아님)"
+outl="$(generate_worker_settings orch ORCH)"
+! grep -q 'PostToolUse' "$outl"; assert_success "$?" "G12 orch PostToolUse 부재"
+! grep -q 'PreToolUse' "$outl"; assert_success "$?" "G12 orch PreToolUse 부재 (게이트 대상 아님)"
 
 # === 역할 카탈로그 매핑 (2026-06-01 재배선) ===
 TMP_PROJ="$TMP"
