@@ -49,7 +49,16 @@ fi
 1. **Step 0 — Resume check (Bash):** `bash "$HARNESS_ROOT/bin/awa-main.sh" resume`
    - Parses TSV output (header line + 0+ rows). If rows exist, present them to user via chat. `_DASHBOARD` row is labeled `multi-view`.
    - User picks one → `bash "$HARNESS_ROOT/bin/awa-main.sh" attach --session <name>` → print attach cmd → END.
-   - User picks none / no rows → continue to Step 1.
+   - User picks none / no rows → continue to Step 0.5.
+
+   - **Step 0.5 — team.yaml 재호출:** Step 3(Project) 에서 PROJECT_ROOT 가 결정된 후,
+     `bash -c "test -f <PROJECT>/.awa/team.yaml && echo found"` 실행.
+     - `found` 출력 시 → 사용자에게 "이전 팀 구성을 찾았습니다. 이어서 띄울까요? (.awa/team.yaml)" 제시.
+       - yes → Step 4 launch 로 직행 (`--spec <PROJECT>/.awa/team.yaml`).
+       - no → Step 1 인터뷰 (새 조합).
+     - 살아있는 세션과 team.yaml 둘 다 있으면: 세션 attach 가 우선, team.yaml 은 "새로 띄우기" 옵션.
+     - team.yaml 없으면 → Step 1 인터뷰로 진행.
+     - (PROJECT_ROOT 는 Step 3 에서 결정되므로, Step 0.5 체크는 Step 3 직후 Step 4 직전에 수행한다.)
 
 2. **Step 1 — Plan (SKILL chat):**
    - **Auto-discover** (9th review [CRIT-22]): `bash -c "ls -t \"$HARNESS_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip.
@@ -69,19 +78,14 @@ fi
    - **Preset suggestion** (9th review [MINOR-24]):
      - After APPROVED, *SKILL itself* (no subagent) applies heuristics in `references/presets.md` to the plan body:
        - keyword/path scan (Test:, tests/, "research", "security", Create:-count).
-       - returns one recommended preset + reasoning.
-   - If user skips plan → directly proceed to preset choice.
-   - **Preset choice — 2-stage branch** (15th live finding [L-2], AskUserQuestion 4-option cap):
-     - **Stage A — preset or custom?** AskUserQuestion: `preset (recommended) | custom (manual roles)`.
-     - **Stage B-preset** (if user chose preset): AskUserQuestion with 4 options — `default | feature-team | research | code-review`. Recommended option is highlighted from heuristic output above.
-     - **Stage B-custom** (if user chose custom): proceed to *Custom branch* below.
-   - **Custom branch** (9th review [MAJOR-23]):
-     - Worker roles inventory: `$HARNESS_ROOT/prompts/roles/02-development/*.md` (dev, researcher) and `$HARNESS_ROOT/prompts/roles/04-security/*.md` (security), plus `$HARNESS_ROOT/prompts/roles/03-quality/tester.md`.
-     - Reviewer roles inventory: `$HARNESS_ROOT/prompts/roles/03-quality/reviewer-{spec,arch,quality}.md` (excluding `reviewer-common.md`).
-     - AskUserQuestion: which worker roles (multi-select). For each chosen role ask count (1-3) and model (`opus|sonnet|haiku`, recommended default sonnet).
-     - AskUserQuestion: which reviewer roles (multi-select, optional).
-     - Assemble `--workers "name1:role1:model1,name2:role2:model2,..."` (matches awa-up.sh `WORKERS_ARG` format).
-     - Validation: SKILL checks every role file exists via Bash test; reject with clear error if missing.
+       - returns one recommended seed profile + reasoning (구현→default, 조사→research, 보안→code-review, 풀스택→web, 혼합→feature-team).
+   - If user skips plan → directly proceed to 조합 인터뷰.
+   - **조합 인터뷰** — 2-stage 구성 (`references/interview.md` 절차 수행):
+     - **Stage 1**: 작업 종류 질문 → 시드 profile yaml(`profiles/<seed>.yaml`) 을 읽어 초안 제시.
+     - **Stage 2**: 워커·리뷰어 가감 인터뷰 → 사용자 승인/수정.
+     - 불변식 검증(`spec_parse_invariants`) → 위반 시 자동 교정(review-mgr 추가)/경고.
+     - 결과를 `<PROJECT>/.awa/team.yaml` 작성(Write). git 추적 안내.
+     - Step 4 launch 는 `--preset` 대신 `--spec <PROJECT>/.awa/team.yaml` 전달.
 
 3. **Step 2 — Mode (SKILL chat, dynamic):**
    - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_DASHBOARD$)' | wc -l`
@@ -100,18 +104,21 @@ fi
    - **Resolve to absolute path:** `bash "$HARNESS_ROOT/bin/awa-main.sh" resolve-path --input <user-input>` → returns resolved path or exit 1.
 
 5. **Step 4 — Launch command output (Bash, non-interactive):**
+   (Step 3 직후 Step 0.5 team.yaml 체크 수행 — 위 Step 0.5 참조)
    ```
    bash "$HARNESS_ROOT/bin/awa-main.sh" launch \
      --project <resolved-path> \
      --mode-launch <single|multi> \
-     [--preset <name>|--workers <spec>] \
+     [--spec <PROJECT>/.awa/team.yaml | --preset <name> | --workers <spec>] \
      [--plan <path>]
    ```
-   main.sh prints the awa-up.sh command + `# AWA_META: session=<n> mode=<m>` line.
+   - team.yaml 재호출 시: `--spec <PROJECT>/.awa/team.yaml`
+   - 새 조합 인터뷰 완료 시: `--spec <PROJECT>/.awa/team.yaml` (Write 후)
+   main.sh prints the awa-up.sh command + `# AGPN_META: session=<n> mode=<m>` line.
 
-   **AWA_META parsing** (10th review [CRIT-27]):
+   **AGPN_META parsing** (10th review [CRIT-27]):
    ```bash
-   meta=$(grep '^# AWA_META:' <main.sh-output>)
+   meta=$(grep '^# AGPN_META:' <main.sh-output>)
    launch_session=$(printf '%s' "$meta" | sed -n 's/.*session=\([^ ]*\).*/\1/p')
    launch_mode=$(printf '%s' "$meta" | sed -n 's/.*mode=\([^ ]*\).*/\1/p')
    ```
@@ -148,4 +155,6 @@ actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 
 - `references/review-prompt.md` — 4-axis review subagent prompt
 - `references/presets.md` — preset suggestion heuristics
+- `references/interview.md` — 동적 팀 조합 인터뷰 절차
 - spec: `docs/superpowers/specs/2026-05-27-awa-unified-entry-dashboard.md`
+- spec: `docs/superpowers/specs/2026-06-04-dynamic-harness-composition-design.md`
