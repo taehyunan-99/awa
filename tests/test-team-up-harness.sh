@@ -34,18 +34,18 @@ AGENT_CMD="cat" bash "$ROOT/bin/awa-up.sh" "$PROF" >/dev/null 2>&1
 rc=$?
 assert_success "$rc" "awa-up 2윈도우 가동"
 
-# 14차 UX: window 0=team, window 1=workers, window 2=review.
+# 14차 UX: window 0=team, window 1=workers, window 2=reviewers.
 wins="$(tmux list-windows -t "$S" -F '#{window_index}' | tr '\n' ' ')"
 assert_contains "$wins" "0" "window 0(team) 존재"
 assert_contains "$wins" "1" "window 1(workers) 존재"
-assert_contains "$wins" "2" "window 2(review) 존재"
+assert_contains "$wins" "2" "window 2(reviewers) 존재"
 
 w0titles="$(tmux list-panes -t "$S:team" -F '#{pane_title}' | tr '\n' ' ')"
 assert_contains "$w0titles" "LEAD" "team 윈도우에 lead"
 w1titles="$(tmux list-panes -t "$S:workers" -F '#{pane_title}' | tr '\n' ' ')"
 assert_contains "$w1titles" "dev" "workers 윈도우에 dev 워커"
-w2titles="$(tmux list-panes -t "$S:review" -F '#{pane_title}' | tr '\n' ' ')"
-assert_contains "$w2titles" "qual" "review 윈도우에 리뷰어 qual"
+w2titles="$(tmux list-panes -t "$S:reviewers" -F '#{pane_title}' | tr '\n' ' ')"
+assert_contains "$w2titles" "qual" "reviewers 윈도우에 리뷰어 qual"
 
 tmux kill-session -t "$S" 2>/dev/null || true
 test_summary

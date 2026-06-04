@@ -47,9 +47,9 @@ trap 'tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"; _agpn15_xd
 SESSION_OVERRIDE="$S2" HARNESS_PROJECT="$TMP2" AGENT_CMD=cat \
   bash "$ROOT/bin/awa-up.sh" "$PROF" >/dev/null 2>&1 || true
 
-# W2a: 윈도우 이름 = team, workers, review (REVIEWERS 있으니 3개)
+# W2a: 윈도우 이름 = team, workers, reviewers (REVIEWERS 있으니 3개)
 got_windows="$(tmux list-windows -t "$S2" -F '#{window_name}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
-assert_eq "team,workers,review" "$got_windows" "W2a 윈도우 3개(team,workers,review)"
+assert_eq "team,workers,reviewers" "$got_windows" "W2a 윈도우 3개(team,workers,reviewers)"
 
 # W2b: window 0 (team) pane 2개, title 순서 LEAD/PM
 got_team="$(tmux list-panes -t "$S2:team" -F '#{pane_title}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"

@@ -408,7 +408,7 @@ REV_PIDS=()
 REVIEW_MANAGER_PANE=""   # I-3 정정: review-manager 역할 pane 별도 추출 (drift-check 전용 깨움)
 EXPECTED_VOTERS=0   # 투표 리뷰어(alignment/quality/security) 수 — watcher quorum 기준.
 if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
-  tmux new-window -t "$SESSION" -n review
+  tmux new-window -t "$SESSION" -n reviewers
   # allow-set-title 은 window-level 옵션 → 새 윈도우는 global 상속.
   fix_session_titles "$SESSION"
   first=1
@@ -416,7 +416,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   for entry in "${REVIEWERS[@]}"; do
     parse_entry "$entry"
     if [ "$first" = "1" ]; then
-      pid="$(tmux display-message -p -t "$SESSION:review" '#{pane_id}')"
+      pid="$(tmux display-message -p -t "$SESSION:reviewers" '#{pane_id}')"
       first=0
     else
       # 이전 리뷰어 pane_id 명시 타겟 → split 순서(상→하) 보장.
@@ -433,7 +433,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
     esac
     _prev_rev_pid="$pid"
   done
-  tmux select-layout -t "$SESSION:review" even-vertical
+  tmux select-layout -t "$SESSION:reviewers" even-vertical
 fi
 
 # claude REPL 준비 대기(trust 통과 + ready 폴링)는 bin/vendors/claude.sh 의
