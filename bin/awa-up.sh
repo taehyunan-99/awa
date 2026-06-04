@@ -633,8 +633,8 @@ _lv="${ORCH_VENDOR:-${HARNESS_VENDOR:-claude}}"
 #   ★ PM 과 동일 결함: 시스템프롬프트만으론 역할 준수 약함(claude no-op 빈화면). 안정성>빈화면.
 #   - system : send_prompt 생략(빈 화면 idle). 역할은 시스템프롬프트에만.
 #   - stdin/hybrid : 짧은 역할 인지 촉구를 send_prompt 로 → 화면에 보이고 준수율↑. PM 과 통일.
-_lead_inject="${ORCH_INJECT_MODE:-${LEAD_INJECT_MODE:-${INJECT_MODE:-hybrid}}}"   # LEAD_INJECT_MODE = 구 변수명 하위호환
-[ "$_lv" = "claude" ] || _lead_inject="stdin"   # 비-claude 는 시스템프롬프트 없음 → 항상 send_prompt
+_orch_inject="${ORCH_INJECT_MODE:-${LEAD_INJECT_MODE:-${INJECT_MODE:-hybrid}}}"   # LEAD_INJECT_MODE = 구 변수명 하위호환
+[ "$_lv" = "claude" ] || _orch_inject="stdin"   # 비-claude 는 시스템프롬프트 없음 → 항상 send_prompt
 if [ -n "$PLAN_BOOT_FILE" ]; then
   # 벤더별 plan 지시문 — claude=빈값(시스템 컨텍스트 주입), codex=plan 경로 명시 Read(P10).
   vendor_source "$_lv" 2>/dev/null || true
@@ -642,7 +642,7 @@ if [ -n "$PLAN_BOOT_FILE" ]; then
   send_prompt "$ORCH_PID" "${_plan_directive}확정 plan 을 ⓑ 절차(분해→배정 트리→승인 게이트)로 즉시 진행하라."
 else
   # plan 없는 부트. system=빈화면 idle, stdin/hybrid=역할 인지 촉구(준수율↑).
-  case "$_lead_inject" in
+  case "$_orch_inject" in
     system)
       case "$_lv" in
         claude) : ;;  # no-op — 시스템프롬프트 orch.md ⓑ 가 @desk 대기. 빈 화면 idle.
@@ -697,9 +697,9 @@ fi
 #   - hybrid : 시스템프롬프트 + 짧은 촉구 send_prompt(직접작업 금지·desk-queue 전달). LEAD 패턴.
 _pv="${DESK_VENDOR:-${HARNESS_VENDOR:-claude}}"
 # INJECT_MODE 는 PM·LEAD 공통(일관성). DESK_INJECT_MODE 는 PM 단독 override(하위호환).
-_pm_inject="${DESK_INJECT_MODE:-${PM_INJECT_MODE:-${INJECT_MODE:-hybrid}}}"   # PM_INJECT_MODE = 구 변수명 하위호환
-[ "$_pv" = "claude" ] || _pm_inject="stdin"   # 비-claude 는 시스템프롬프트 경로 없음 → stdin 고정
-case "$_pm_inject" in
+_desk_inject="${DESK_INJECT_MODE:-${PM_INJECT_MODE:-${INJECT_MODE:-hybrid}}}"   # PM_INJECT_MODE = 구 변수명 하위호환
+[ "$_pv" = "claude" ] || _desk_inject="stdin"   # 비-claude 는 시스템프롬프트 경로 없음 → stdin 고정
+case "$_desk_inject" in
   system) _psysprompt="$pbf" ;;   # 역할=시스템, 대화 주입 없음 (빈 화면)
   hybrid) _psysprompt="$pbf" ;;   # 역할=시스템 + 아래서 짧은 촉구 send_prompt 추가
   *)      _psysprompt="" ;;       # stdin 은 역할 전문을 send_prompt 로 주입(시스템 비움)
@@ -708,7 +708,7 @@ pm_cmd="$(agent_cmd_for "$DESK_MODEL_EFF" "$settings_path" "$pm_sid" "$_psysprom
   echo "오류: PM 벤더 명령 조립 실패 — 부트 중단" >&2; exit 1; }
 bootstrap_pane "$DESK_PID" "DESK" "$pm_cmd" "DESK" "" "$DESK_MODEL_EFF" "${DESK_VENDOR:-}"
 splash_append_member "DESK" "" "$DESK_MODEL_EFF"
-case "$_pm_inject" in
+case "$_desk_inject" in
   system)
     claude_systemprompt_boot "$_pv" "$DESK_PID" "$pbf" "사용자와 대화할 준비를 하라." ;;
   stdin)

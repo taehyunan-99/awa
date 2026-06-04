@@ -5,7 +5,7 @@ LAYOUT="tiled"
 # 형식: "워커이름:역할[:벤더][:모델]"
 #   - 2필드 "frontend:frontend" → HARNESS_VENDOR 상속 + 역할 기본 모델(vendor_default_model)
 #   - 3필드 "frontend:frontend:codex" → 벤더 명시 / "frontend:frontend:sonnet" → 모델 명시
-# 모델 미지정 시 벤더 기본: claude=lead/reviewer opus·그외 sonnet, codex=gpt-5.5(+effort).
+# 모델 미지정 시 벤더 기본: claude=orch/reviewer opus·그외 sonnet, codex=gpt-5.5(+effort).
 # 워커는 claude 고정(codex 워커 배제 — P17 데드락). codex 는 security 리뷰어 전용.
 # SESSION 미설정 → awa-up.sh 가 awa-web 자동 부여(default.sh 와 동일 관례 — 누락 아님).
 WORKERS=(

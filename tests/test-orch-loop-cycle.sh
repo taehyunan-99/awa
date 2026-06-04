@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# lead.md 9차: 게이트 3단계(pending/incident/removal) + reviewer 거버넌스 보존. 데몬·dedup·PRE폴링 폐기.
+# orch.md 9차: 게이트 3단계(pending/incident/removal) + reviewer 거버넌스 보존. 데몬·dedup·PRE폴링 폐기.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
 source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
-content="$(cat "$(resolve_role_file "$ROOT/prompts" lead)")"
+content="$(cat "$(resolve_role_file "$ROOT/prompts" orch)")"
 
 # 6차 게이트 3단계 (보존·핵심)
 assert_contains "$content" "pending-asks" "1단계 pending-asks"

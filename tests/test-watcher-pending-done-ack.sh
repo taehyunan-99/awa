@@ -23,9 +23,9 @@ assert_success "$(grep -q 'enqueue_pending_done' "$ROOT/bin/watcher.sh"; echo $?
   "L1c watcher.sh enqueue 호출"
 assert_success "$(grep -q 'requeue_pending_done' "$ROOT/bin/watcher.sh"; echo $?)" \
   "L1d watcher.sh requeue 호출"
-echo "[L1] lead.md ⓒ 가 종합 후 pending-done ack(rm) 의무 명시"
-assert_success "$(grep -q 'pending-done' "$ROOT/prompts/roles/01-orchestration/lead.md"; echo $?)" \
-  "L1e lead.md pending-done ack 명시"
+echo "[L1] orch.md ⓒ 가 종합 후 pending-done ack(rm) 의무 명시"
+assert_success "$(grep -q 'pending-done' "$ROOT/prompts/roles/01-orchestration/orch.md"; echo $?)" \
+  "L1e orch.md pending-done ack 명시"
 
 # ── Layer 2: 실제 동작 (큐 적재 → 재발화 → ack 소비) ────────────────────────
 PT="$(mktemp -d)"

@@ -8,7 +8,7 @@
 # claude TUI 에서 소실 → 영영 재발화 안 함 → 종합 트리거 유실(회로① 침묵).
 # 해결: done 발화 시 pending-done/<worker>__<task>.json 적재(ack 큐). LEAD 는 ⓒ 종합 완료
 # 후 그 .json 을 rm(ack). watcher 는 매 사이클 미해소(미ack) 큐를 재발화 → LEAD 가 idle 로
-# 돌아온 다음 폴링에 도달. dispatch-queue/pm-queue(파일 IPC)와 동형이되 방향만 watcher→LEAD.
+# 돌아온 다음 폴링에 도달. dispatch-queue/desk-queue(파일 IPC)와 동형이되 방향만 watcher→ORCH.
 
 # 파일명 안전화 — worker/task 의 '/' 등을 '_' 로 치환(디렉토리 깨짐·경로 탈출 방지).
 _pd_sanitize() {

@@ -24,13 +24,13 @@ trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-ki
 
 # lead pane (window0 pane1), reviewer pane (split)
 tmux new-session -d -s "$SES" -x 200 -y 50
-LEAD_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
+ORCH_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
 REV_PANE="$(tmux split-window -t "$SES" -d -P -F '#{pane_id}')"
 # 셸 프롬프트가 send-keys 텍스트를 그대로 받도록 (Enter 로 실행돼도 command not found 무해)
 
 # watcher 를 백그라운드로 기동. env 로 pane_id·경로 주입.
 SESSION="$SES" \
-LEAD_PANE="$LEAD_PANE" \
+ORCH_PANE="$ORCH_PANE" \
 REVIEWER_PANES="$REV_PANE" \
 STATE_DIR="$TMP_STATE" \
 EVENTS="$EVENTS" \
@@ -41,13 +41,13 @@ WPID=$!
 sleep 2.5  # 첫 폴링 사이클 보장 (여유 — CI 부하 대비, OLD 재발화 검증 엄격화)
 
 # --- 케이스 0: 기동 전 done 라인 재발화 방지 (R4 — last_events 초기화) ---
-DUMP_INIT="$(tmux capture-pane -p -t "$LEAD_PANE")"
+DUMP_INIT="$(tmux capture-pane -p -t "$ORCH_PANE")"
 assert_not_contains "$DUMP_INIT" "OLD" "기동 전 과거 done(OLD) 재발화 안 함 (last_events 초기화)"
 
 # --- 케이스 1: pending-ask → lead @gate: ---
 echo '{"uuid":"u1"}' > "$TMP_STATE/pending-asks/u1.json"
 sleep 2
-DUMP_LEAD="$(tmux capture-pane -p -t "$LEAD_PANE")"
+DUMP_LEAD="$(tmux capture-pane -p -t "$ORCH_PANE")"
 assert_contains "$DUMP_LEAD" "@gate:" "pending-ask → lead @gate: send-keys"
 assert_contains "$DUMP_LEAD" "u1" "@gate: 알림에 uuid 포함"
 
@@ -55,7 +55,7 @@ assert_contains "$DUMP_LEAD" "u1" "@gate: 알림에 uuid 포함"
 # u1.json 그대로 둠. 다음 사이클에 재전송 안 해야. capture 줄 수 안 늘어남으로 판정.
 CNT_BEFORE="$(printf '%s' "$DUMP_LEAD" | grep -c '@gate:' || true)"
 sleep 2
-DUMP_LEAD2="$(tmux capture-pane -p -t "$LEAD_PANE")"
+DUMP_LEAD2="$(tmux capture-pane -p -t "$ORCH_PANE")"
 CNT_AFTER="$(printf '%s' "$DUMP_LEAD2" | grep -c '@gate:' || true)"
 assert_eq "$CNT_BEFORE" "$CNT_AFTER" "중복 pending-ask 재전송 안 함 (.watcher-seen)"
 
@@ -79,7 +79,7 @@ assert_fail "$?" "케이스3.1b: reviewer 깨움에 단발 Enter send-keys 잔�
 # --- 케이스 4: done 라인 → lead @done: worker/task ---
 printf '%s\tdev\tT1\tdone\t-\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$EVENTS"
 sleep 2
-DUMP_LEAD3="$(tmux capture-pane -p -t "$LEAD_PANE")"
+DUMP_LEAD3="$(tmux capture-pane -p -t "$ORCH_PANE")"
 assert_contains "$DUMP_LEAD3" "@done:" "done 라인 → lead @done: send-keys"
 assert_contains "$DUMP_LEAD3" "dev/T1" "@done: 알림에 worker/task 포함 (C2)"
 

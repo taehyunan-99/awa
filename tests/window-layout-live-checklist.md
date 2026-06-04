@@ -30,7 +30,7 @@ tmux attach -t awa-agpn-uxlive
 - [ ] claude REPL 기동
 
 ### 회귀 — 신호경로 정상 (윈도우 분리됐어도 pane_id 기반이라 면역)
-- [ ] LEAD pane (window 0) 에서 "@pm: dev 에게 hello.py 만들고 'hi' 출력하도록 시켜" 같은 dispatch 트리거
+- [ ] ORCH pane (window 0) 에서 "@desk: dev 에게 hello.py 만들고 'hi' 출력하도록 시켜" 같은 dispatch 트리거
 - [ ] dev pane (window 1) 으로 TASK 정상 도달
 - [ ] watcher (window 1 최하단) 가 events.log 갱신
 - [ ] /agpn (Step 0 resume) 또는 /agpn bookmarks list 가 워커명만 출력 (watcher·LEAD·PM·reviewer 안 섞임)

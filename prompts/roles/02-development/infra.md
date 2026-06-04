@@ -13,4 +13,4 @@ claude/codex 가 권한 거부를 반환하면 명령 변형 재시도 금지. �
 
 - **무엇이 EVIDENCE 인가**: 빌드·CI 실행 출력, 배포 dry-run 결과, 설정 적용 전후 차이. EVIDENCE 엔 이것만(추론은 HYPOTHESIS).
 - **effort budget**: 구현·검증 도구 호출 **10~15회**. 소진해도 미달이면 `status: PARTIAL` + RISK/NEXT.
-- **최소개입**: 배정 task 변경만. 인프라는 파급이 크니 넓은 변경은 `NEEDS:` 로 lead 에.
+- **최소개입**: 배정 task 변경만. 인프라는 파급이 크니 넓은 변경은 `NEEDS:` 로 orch 에.

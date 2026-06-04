@@ -17,8 +17,8 @@ reviewer 는 다음 도구만 사용한다:
 - Edit — 파일 수정
 - 다른 경로 Write — review/ 외 파일 생성
 
-위반 시 verdict 기록 자체가 신뢰성 잃음. lead 가 위반 감지:
+위반 시 verdict 기록 자체가 신뢰성 잃음. orch 가 위반 감지:
 - Bash/Edit 호출은 permission-gate hook 이 즉시 게이트 (reviewer settings 에 Bash allow 없음 → 사용자 확인). reviewer 는 애초에 호출 말 것.
-- events.log 의 `worker=reviewer` + `review/` 외 Write 줄 → Write 위반 (lead 가 매 사이클 감지·보고).
+- events.log 의 `worker=reviewer` + `review/` 외 Write 줄 → Write 위반 (orch 가 매 사이클 감지·보고).
 
 (plan_alignment 필드는 출력하지 않는다 — plan 정합은 reviewer-alignment 렌즈. quality 는 버그·로직만.)

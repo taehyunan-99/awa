@@ -44,16 +44,16 @@ check A 1 "Plan 스키마 강제" \
   "grep -q '검증가능성.*abort\\|검증가능성.*FAIL.*abort' ${HARNESS_ROOT}/.claude/skills/awa/SKILL.md" \
   "test -f ${HARNESS_ROOT}/tests/test-awa-plan-review.sh"
 check A 2 "plan-defect 신호 채널" \
-  "grep -q '@plan-defect' ${HARNESS_ROOT}/prompts/roles/01-orchestration/lead.md" \
+  "grep -q '@plan-defect' ${HARNESS_ROOT}/prompts/roles/01-orchestration/orch.md" \
   "test -f ${HARNESS_ROOT}/tests/test-plan-defect-e2e.sh"
 check A 3 "ⓖ 섹션 — plan 결함 push" \
-  "grep -q '## ⓖ' ${HARNESS_ROOT}/prompts/roles/01-orchestration/lead.md"
+  "grep -q '## ⓖ' ${HARNESS_ROOT}/prompts/roles/01-orchestration/orch.md"
 check A 4 "워커 _common.md plan-defect 한 줄" \
   "grep -q '@plan-defect' ${HARNESS_ROOT}/prompts/_common.md"
 
 # B. 감시 (리뷰 매니저)
 check B 1 "lead 게이트웨이 (사용자 단독 채널)" \
-  "grep -q '사용자 대화 진입 금지\\|pm 경유' ${HARNESS_ROOT}/prompts/roles/01-orchestration/lead.md"
+  "grep -q '사용자 대화 진입 금지\\|desk 경유' ${HARNESS_ROOT}/prompts/roles/01-orchestration/orch.md"
 check B 2 "plan_alignment 필드 reviewer 출력" \
   "grep -rq 'plan_alignment' ${HARNESS_ROOT}/prompts/roles/03-quality/"
 check B 3 "worker_turn_count watcher 트리거" \

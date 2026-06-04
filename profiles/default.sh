@@ -5,7 +5,7 @@ LAYOUT="tiled"
 #   - 2필드 "engineer:engineer" → HARNESS_VENDOR 상속 + 역할 기본 모델(vendor_default_model)
 #   - 3필드 "engineer:engineer:codex" → 벤더 명시 / "engineer:engineer:sonnet" → 모델 명시
 #   - 4필드 "engineer:engineer:codex:gpt-5.5" → 벤더+모델
-# 모델 미지정 시 벤더 기본: claude=lead/reviewer opus·그외 sonnet, codex=gpt-5.5(+effort).
+# 모델 미지정 시 벤더 기본: claude=orch/reviewer opus·그외 sonnet, codex=gpt-5.5(+effort).
 # HARNESS_VENDOR="claude"   # (미설정 시 claude) 세션 기본 벤더
 # reviewer 워커는 워커 풀에서 제거 — 감시 리뷰어(REVIEWERS)로 일원화.
 WORKERS=(

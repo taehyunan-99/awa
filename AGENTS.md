@@ -27,7 +27,7 @@ Claude Code 는 같은 폴더의 CLAUDE.md(= `@./AGENTS.md` 한 줄) 를 통해 
 - **profiles/** — 팀 구성 정의 (default/feature-team/code-review/research) → [`profiles/AGENTS.md`](profiles/AGENTS.md)
 - **prompts/** — 워커 부트 프롬프트 (`_common.md` + `roles/NN-part/*.md`) → [`prompts/AGENTS.md`](prompts/AGENTS.md)
 - **templates/** — Claude `settings.json` 권한 템플릿 군 → [`templates/AGENTS.md`](templates/AGENTS.md)
-- **config/** — permission-gate 자동 허용 카탈로그 (`lead-auto-allow.yaml`) → [`config/AGENTS.md`](config/AGENTS.md)
+- **config/** — permission-gate 자동 허용 카탈로그 (`orch-auto-allow.yaml`) → [`config/AGENTS.md`](config/AGENTS.md)
 - **tests/** — bash 테스트 + 통합 probe + 시나리오(lead-arena/m3/probes/role5axis/stress) → [`tests/AGENTS.md`](tests/AGENTS.md)
 - **docs/** — 설계 노트·E2E 시나리오·probe 결과·superpowers 11차 plan/specs → [`docs/AGENTS.md`](docs/AGENTS.md)
 

@@ -21,7 +21,7 @@ assert_eq "3" "${#WORKERS[@]}" "research 워커 3개"
 
 source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
 [ -f "$ROOT/prompts/_common.md" ]; assert_success "$?" "prompts/_common.md 존재"
-for r in dev tester security researcher lead reviewer-spec reviewer-quality reviewer-arch; do
+for r in dev tester security researcher orch reviewer-spec reviewer-quality reviewer-arch; do
   resolve_role_file "$ROOT/prompts" "$r" >/dev/null 2>&1; assert_success "$?" "역할 $r 글롭 해석"
 done
 

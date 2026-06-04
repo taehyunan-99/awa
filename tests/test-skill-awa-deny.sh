@@ -10,7 +10,7 @@ source ./assert.sh
 ROOT="$(cd .. && pwd)"
 
 # deny 블록을 갖는 모든 역할군 템플릿이 Skill(awa) 를 차단해야 한다.
-for tpl in pm lead dev test readonly reviewer; do
+for tpl in desk orch dev test readonly reviewer; do
   f="$ROOT/templates/settings.${tpl}.json.tpl"
   [ -f "$f" ] || { assert_eq "1" "0" "$tpl 템플릿 존재"; continue; }
   deny="$(sed -e 's|{{[^}]*}}|null|g' "$f" | jq -r '.permissions.deny[]?' 2>/dev/null)"
@@ -22,7 +22,7 @@ TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
 cleanup() { rm -rf "$TMP_PROJ"; }
 trap cleanup EXIT
 
-for role in pm frontend reviewer-alignment; do
+for role in desk frontend reviewer-alignment; do
   OUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
     source '"$ROOT"'/bin/lib.sh
     generate_worker_settings '"$role"' '"$role"'

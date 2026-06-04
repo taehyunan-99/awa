@@ -32,7 +32,7 @@ trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-ki
 # LEAD pane 은 interactive shell 대신 `cat > sink` 수동 싱크 — send-keys 라인을 셸 가공 없이
 # 그대로 파일에 적재(I-1: 큰 N 버스트 끝 토큰 mangling 방지).
 tmux new-session -d -s "$SES" -x 200 -y 50 "cat > '$LEAD_SINK'"
-LEAD_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
+ORCH_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
 WORKERS=""
 i=0
 while [ "$i" -lt "$N" ]; do
@@ -43,7 +43,7 @@ done
 WORKERS="${WORKERS# }"
 
 # watcher 백그라운드 기동 (reviewer 없음 — done/gate 만 측정).
-SESSION="$SES" LEAD_PANE="$LEAD_PANE" REVIEWER_PANES="" \
+SESSION="$SES" ORCH_PANE="$ORCH_PANE" REVIEWER_PANES="" \
 STATE_DIR="$TMP_STATE" EVENTS="$EVENTS" SEEN="$TMP_STATE/.watcher-seen" \
   bash "$ROOT/bin/watcher.sh" &
 WPID=$!

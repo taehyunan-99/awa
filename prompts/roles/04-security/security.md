@@ -9,4 +9,4 @@
 
 - **무엇이 EVIDENCE 인가**: 취약점의 정확한 위치 `file:line` + 재현/근거. 완화 방안은 CHANGE 또는 RISK/NEXT 에. 추측성 우려는 HYPOTHESIS(버킷)로.
 - **effort budget**: 검토 도구 호출 **5~10회**. 소진해도 미달이면 `status: PARTIAL` + 못 본 영역을 RISK/NEXT 에.
-- **최소개입**: 보안 검토는 보고가 본업 — 직접 수정은 배정 task scope 내만. scope 밖 수정 제안은 `NEEDS:` 로 lead 에.
+- **최소개입**: 보안 검토는 보고가 본업 — 직접 수정은 배정 task scope 내만. scope 밖 수정 제안은 `NEEDS:` 로 orch 에.

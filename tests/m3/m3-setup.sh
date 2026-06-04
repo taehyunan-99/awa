@@ -52,8 +52,8 @@ done
 # --- 더미 세션: LEAD pane(곧 실 claude) + 더미 워커 pane N ---
 # LEAD pane 은 PROJECT_ROOT 에서 셸로 시작 → 아래에서 claude 기동.
 tmux new-session -d -s "$SES" -c "$PROJ" -x 220 -y 50 -n team
-LEAD_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
-tmux select-pane -t "$LEAD_PANE" -T "LEAD"
+ORCH_PANE="$(tmux display-message -p -t "$SES" '#{pane_id}')"
+tmux select-pane -t "$ORCH_PANE" -T "ORCH"
 i=0
 while [ "$i" -lt "$N" ]; do
   i=$((i+1))
@@ -67,8 +67,8 @@ tmux select-layout -t "$SES" tiled 2>/dev/null || true
 #   .harness-state atomic write(cat>tmp && mv) 시 권한 다이얼로그에서 멈춰 사람 개입을
 #   요구한다 → "LEAD 단독 종합" 순수 관측이 깨지고 재현이 번거로움. 임시 PROJECT_ROOT
 #   (mktemp)에서만 도는 격리 관측이라 안전.
-tmux send-keys -t "$LEAD_PANE" -l "claude --dangerously-skip-permissions"
-tmux send-keys -t "$LEAD_PANE" Enter
+tmux send-keys -t "$ORCH_PANE" -l "claude --dangerously-skip-permissions"
+tmux send-keys -t "$ORCH_PANE" Enter
 # REPL 준비 폴링 (awa-up wait_repl 패턴 축약).
 ready=0
 for _i in $(seq 1 60); do
@@ -76,11 +76,11 @@ for _i in $(seq 1 60); do
   # -S -200: 스크롤백 포함 캡처. 현 화면만 보면 welcome 박스 헤더(ready 신호)가
   # 위로 밀려 false negative → 영구 폴링 hang(실측 2026-05-25). awa-up
   # bootstrap_pane 과 동일 정책. [[wait-repl-pattern-fragility]] 회피.
-  dump="$(tmux capture-pane -t "$LEAD_PANE" -p -S -200 2>/dev/null)"
+  dump="$(tmux capture-pane -t "$ORCH_PANE" -p -S -200 2>/dev/null)"
   # trust 화면 + --dangerously-skip-permissions 첫 실행 경고 수락 화면 모두 기본선택 Enter 통과.
   # (경고 화면이 안 뜨면 안 매칭될 뿐 — 안전망.)
   if printf '%s' "$dump" | grep -Eq 'trust this folder|Yes, I trust|accept the risk|bypass permissions and continue|skip all permission'; then
-    tmux send-keys -t "$LEAD_PANE" Enter; continue
+    tmux send-keys -t "$ORCH_PANE" Enter; continue
   fi
   if printf '%s' "$dump" | grep -qE 'Claude Code v[0-9]|Welcome back|bypass permissions on|accept edits on'; then
     ready=1; break
@@ -93,15 +93,15 @@ if [ "$ready" != "1" ]; then
 fi
 
 # --- LEAD 에게 관측용 규약 주입 (채점 가능한 결정론적 종합 형식) ---
-# lead.md 책임 #2(@done→results 읽기)·#6(.harness-state atomic 기록)을 그대로 쓰되,
+# orch.md 책임 #2(@done→results 읽기)·#6(.harness-state atomic 기록)을 그대로 쓰되,
 # 채점을 위해 "T<n>: <marker>" 고정 형식을 명시. 권한게이트/AskUserQuestion 불필요(관측).
 LEAD_BRIEF="너는 이 관측의 LEAD 다. 잠시 후 watcher 가 '@done: dev<k>/T<k> 완료...' 형식의 완료 알림 6개를 연달아 보낸다(T1~T6). 각 알림을 받을 때마다 해당 .agent-harness/results/T<k>.md 를 읽고, 그 파일의 'MARKER:' 값을 추출하라. 6개를 모두 받으면 종합 결과를 .agent-harness/.harness-state 에 다음 고정 형식으로 atomic 기록하라(부분 read 방지: tmp 작성 후 mv). 형식은 정확히 한 줄에 하나씩 'T<번호>: <MARKER값>' (예 'T1: ALPHA'), T1부터 T6까지 6줄. 다른 설명/머리말 없이 6줄만. AskUserQuestion 호출하지 마라(이건 관측이라 사용자 판단 불필요). 지금은 알림을 기다려라."
-tmux send-keys -t "$LEAD_PANE" -l "$LEAD_BRIEF"
-tmux send-keys -t "$LEAD_PANE" Enter
+tmux send-keys -t "$ORCH_PANE" -l "$LEAD_BRIEF"
+tmux send-keys -t "$ORCH_PANE" Enter
 sleep 3   # LEAD 가 브리핑 수신·idle 진입 여유
 
 # --- watcher 백그라운드 기동 (실경로) ---
-SESSION="$SES" LEAD_PANE="$LEAD_PANE" REVIEWER_PANES="" \
+SESSION="$SES" ORCH_PANE="$ORCH_PANE" REVIEWER_PANES="" \
 STATE_DIR="$WS/state" EVENTS="$EVENTS" SEEN="$WS/state/.watcher-seen" \
   bash "$ROOT/bin/watcher.sh" &
 WPID=$!
@@ -125,7 +125,7 @@ ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 echo "=== M3 셋업 완료 ==="
 echo "세션: $SES   PROJECT_ROOT: $PROJ"
 echo "워커 N=$N, results/T1..T6 에 마커 ALPHA..FOXTROT 주입, done 6개 일괄 기록."
-echo "watcher(PID $WPID)가 LEAD($LEAD_PANE)에 @done: 6연발 주입 → 실 claude LEAD 가 종합 중."
+echo "watcher(PID $WPID)가 LEAD($ORCH_PANE)에 @done: 6연발 주입 → 실 claude LEAD 가 종합 중."
 echo
 echo "LEAD 종합을 눈으로 보려면:  tmux attach -t $SES"
 echo "30~60초 뒤 자동 채점:        bash $ROOT/tests/m3/m3-score.sh"

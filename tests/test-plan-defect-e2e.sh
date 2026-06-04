@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/test-plan-defect-e2e.sh — @plan-defect: 자동 분기 검증 (Task 3 / D2 자동)
-# Layer 1: lead.md ⓖ 섹션 + _common.md 한 줄 + watcher.sh 분기 패턴 존재 확인
+# Layer 1: orch.md ⓖ 섹션 + _common.md 한 줄 + watcher.sh 분기 패턴 존재 확인
 # Layer 2: watcher awk 분기가 plan-defect events.log 라인을 정확히 추출하는지 검증
 # 실 AskUserQuestion 도달은 Task 11 sanity check 사이클에서 D1 수동.
 set -uo pipefail
@@ -10,11 +10,11 @@ ROOT="$(cd .. && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Layer 1: lead.md ⓖ 섹션 + 신호 N종 (I-2 정정 후 @drift: 추가, Task 7 후 @allow-confirm: 추가 → 7종)
-grep -q '## ⓖ' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md ⓖ 섹션 존재"
-grep -qE '신호 [0-9]+종' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md 신호 N종 헤더 반영"
+# Layer 1: orch.md ⓖ 섹션 + 신호 N종 (I-2 정정 후 @drift: 추가, Task 7 후 @allow-confirm: 추가 → 7종)
+grep -q '## ⓖ' "$ROOT/prompts/roles/01-orchestration/orch.md"
+assert_success "$?" "L1 orch.md ⓖ 섹션 존재"
+grep -qE '신호 [0-9]+종' "$ROOT/prompts/roles/01-orchestration/orch.md"
+assert_success "$?" "L1 orch.md 신호 N종 헤더 반영"
 
 # Layer 1: _common.md 한 줄 존재
 grep -q '@plan-defect' "$ROOT/prompts/_common.md"

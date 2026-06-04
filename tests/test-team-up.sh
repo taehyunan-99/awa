@@ -48,8 +48,8 @@ assert_contains "$TITLES" "researcher" "워커 title researcher 설정됨"
 assert_contains "$TITLES" "watcher" "watcher pane title 설정됨"
 # team 윈도우 title 검증.
 TEAM_TITLES="$(tmux list-panes -t "$SESSION_OVERRIDE:team" -F '#{pane_title}' | sort | tr '\n' ',')"
-assert_contains "$TEAM_TITLES" "PM" "pm pane title 설정됨"
-assert_contains "$TEAM_TITLES" "LEAD" "lead title 설정됨"
+assert_contains "$TEAM_TITLES" "DESK" "desk pane title 설정됨"
+assert_contains "$TEAM_TITLES" "ORCH" "orch title 설정됨"
 
 # title 보존 결정적 검증: 워커 페인을 실제 셸로 띄워 OSC0 escape 를 흘려도
 # allow-set-title off 덕에 select-pane -T 로 준 title 이 유지돼야 함 (spec §6 전제).

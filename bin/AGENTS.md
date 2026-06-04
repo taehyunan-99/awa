@@ -8,7 +8,7 @@ tmux 세션 생애주기(up/down)와 워커 dispatch·watcher·classify·permiss
 
 ## 1. WHAT
 
-AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들. 사용자 창구(pm) + 순수 오케스트레이터(lead) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등 아키텍처 (2차 하니스 설계).
+AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatch·완료 감지·권한 분류를 담당하는 bash 모듈들. 사용자 창구(desk) + 순수 오케스트레이터(orch) 분리 + watcher 데몬 이벤트 반응형 감시 + scope 사전차단 + 모델 차등 아키텍처 (2차 하니스 설계).
 
 ## 2. CONTENTS
 
@@ -16,11 +16,11 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 - `awa-down.sh` — 런타임 정리(tasks/results는 보존)
 - `awa-main.sh` — `/awa` 비대화 명령 백엔드 (resume/attach/launch/resolve-path)
 - `awa-down-menu.sh` — `/awa down` 진입점 (N=0/1/multi 분기 + down.sh 위임)
-- `awa-dashboard.sh` — _DASHBOARD 멀티뷰 관제탑: 각 프로젝트 lead/pm pane 만 한 윈도우 grid 로 집결(골격 split + swap-pane, dash_render 중앙 재구성). 프로젝트당 1행(좌 lead·우 pm), 윈도우당 3프로젝트, 4번째부터 grid-2. 액션 merge/add/detach/split/kill (detach·kill 인자=프로젝트명)
+- `awa-dashboard.sh` — _DASHBOARD 멀티뷰 관제탑: 각 프로젝트 orch/desk pane 만 한 윈도우 grid 로 집결(골격 split + swap-pane, dash_render 중앙 재구성). 프로젝트당 1행(좌 orch·우 desk), 윈도우당 3프로젝트, 4번째부터 grid-2. 액션 merge/add/detach/split/kill (detach·kill 인자=프로젝트명)
 - `awa-splash.sh` — attach 첫 화면 splash (client-attached 훅의 display-popup 모달로 실행, 팀 요약 파일 읽어 브랜딩+팀 표 렌더, read -t N 키/타임아웃 닫힘)
 - `awa-bookmarks.sh` — bookmarks wrapper (list/set-alias/remove/prune)
-- `dispatch.sh` — lead/외부가 `<role> <task-id>` 형식으로 워커에 작업 주입
-- `watcher.sh` — events.log/pending-asks 폴링 데몬, lead/reviewer 페인을 깨움
+- `dispatch.sh` — orch/외부가 `<role> <task-id>` 형식으로 워커에 작업 주입
+- `watcher.sh` — events.log/pending-asks 폴링 데몬, orch/reviewer 페인을 깨움
 - `classify.sh` — 명령어를 danger→matrix→auto→gray로 분류
 - `danger-check.sh` — 위험 명령(`rm -rf`, `sudo`, `dd of=`, `curl|sh`, `git push --force` 등) 거부
 - `matrix-lookup.sh` — `config/orch-auto-allow.yaml`의 카테고리 패턴 매칭(awk 파서)
@@ -32,14 +32,14 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 - `--profile <name>` — 프로파일 fragment 선택 (`profiles/<name>.sh`)
 - `--project <path>` — PROJECT_ROOT 명시 (cwd 자동 도출 우회)
 - `--dry-check` — yaml 가드 (`danger-check.sh --check-allow-yaml`) 만 실행 후 즉시 종료 (boot 안 함, Task 7)
-- `--plan <file>` — 확정 plan 자동주입 (반복 가능, 합본 후 `--append-system-prompt-file` 로 LEAD 주입, 11차)
+- `--plan <file>` — 확정 plan 자동주입 (반복 가능, 합본 후 `--append-system-prompt-file` 로 ORCH 주입, 11차)
 
 기술 스택: bash 3.2+/zsh (macOS 기본 호환), tmux 3.6+, awk, sed, claude CLI
 
 ## 3. HOW
 
 - **watcher.sh awk 분기 패턴** — 새 신호 라우팅 추가 시 done 분기 (L74-81) 100% 모방: `sed -n "$((last_events+1)),${cur}p" "$EVENTS"` 구간 추출 → `awk -F'\t' '$4=="<action>"{...}'` 필터 → `while IFS= read` + `pane_alive` 가드 + `send-keys -l <text>` + `send-keys Enter` 분리. drift-check (L85-102) / plan-defect (L104-111) / allow-confirm (L113-120) 모두 동일 형태.
-- **`lib.sh` 는 source 전용** — 진입점 없음. 직접 실행 (`bash lib.sh`) 하면 함수 정의만 만들고 종료. lead LLM 이 함수 호출해야 할 때는 `bash -c "source $HARNESS_ROOT/bin/lib.sh && confirm_allow_yaml '<pattern>' '<decision>'"` 형식으로 명시.
+- **`lib.sh` 는 source 전용** — 진입점 없음. 직접 실행 (`bash lib.sh`) 하면 함수 정의만 만들고 종료. orch LLM 이 함수 호출해야 할 때는 `bash -c "source $HARNESS_ROOT/bin/lib.sh && confirm_allow_yaml '<pattern>' '<decision>'"` 형식으로 명시.
 - **events.log 5필드 조작 시 `event_field` / `event_valid` 호출** — `lib.sh` 의 `event_field` / `event_valid` 함수. 하드코딩 `awk -F'\t' '{print $N}'` 재사용 금지 — 5필드 규약 변경 시 전 수정 필요.
 
 ## 4. ⛔ HOW NOT
@@ -83,12 +83,12 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 
 ## 벤더 정책 (2026-05-31 확정)
 
-**베이스(LEAD/PM)는 claude 전용. codex 는 워커/리뷰어로만.** `awa-up.sh` 는 LEAD/PM 부트 직전 `resolve_orchestrator_vendor`(lib.sh)로 비-claude 벤더를 claude 로 강제(+경고). 워커/리뷰어는 `<role>:codex` 또는 `ENTRY_VENDOR=codex` 로 자유 지정.
+**베이스(ORCH/DESK)는 claude 전용. codex 는 워커/리뷰어로만.** `awa-up.sh` 는 ORCH/DESK 부트 직전 `resolve_orchestrator_vendor`(lib.sh)로 비-claude 벤더를 claude 로 강제(+경고). 워커/리뷰어는 `<role>:codex` 또는 `ENTRY_VENDOR=codex` 로 자유 지정.
 
-- **사유 = P17**: watcher 가 `send-keys` 로 LEAD/PM 입력창에 알림(@gate/@done 등)을 쏘는데, codex TUI 는 작업 중이면 입력을 큐잉만 하고 제출 안 함 → 알림 잔상 + 게이트 타임아웃 → dispatch 반복 실패(실측). 워커는 알림 받는 쪽이 아니라(events.log/results 쓰는 쪽) 무관 → codex 워커/리뷰어는 정상.
+- **사유 = P17**: watcher 가 `send-keys` 로 ORCH/DESK 입력창에 알림(@gate/@done 등)을 쏘는데, codex TUI 는 작업 중이면 입력을 큐잉만 하고 제출 안 함 → 알림 잔상 + 게이트 타임아웃 → dispatch 반복 실패(실측). 워커는 알림 받는 쪽이 아니라(events.log/results 쓰는 쪽) 무관 → codex 워커/리뷰어는 정상.
 - **codex 워커 게이트 = 해결됨**: P12(trusted_hash)·P14(env 자기도출+fail-closed)·P15(sed -n auto-allow)·P16(allow=빈출력+exit0). 1사이클 완주 실측.
 - **antigravity = 통째 보류**: 헤드리스 부트 자체 불가(conversation ID 미노출·workspace 미루팅·API key 인증 미지원 — 상류 OPEN). 워커조차 불가. `bin/vendors/antigravity.sh` 자리만 정의.
-- 재진입: codex LEAD/PM 은 P17(send-keys↔TUI 큐잉) 재설계 후. 상세 → 메모리 `codex-vendor-worker-reviewer-only-2026-05-31`.
+- 재진입: codex ORCH/DESK 은 P17(send-keys↔TUI 큐잉) 재설계 후. 상세 → 메모리 `codex-vendor-worker-reviewer-only-2026-05-31`.
 
 ## 멀티 프로젝트 동시 가동
 

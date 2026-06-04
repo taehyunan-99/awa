@@ -90,10 +90,10 @@ assert_contains "$AUP" "EXPECTED_VOTERS=0" "L1-awaup: EXPECTED_VOTERS 초기화"
 assert_contains "$AUP" "reviewer-alignment|reviewer-quality|reviewer-security" "L1-awaup: 투표 리뷰어 카운트 case"
 assert_contains "$AUP" 'EXPECTED_VOTERS=\"$EXPECTED_VOTERS\"' "L1-awaup: watcher env 주입"
 
-# ── L1: lead.md 규약 (grep 구조) ─────────────────────────────────────────────
-LEAD="$(cat "$ROOT/prompts/roles/01-orchestration/lead.md")"
-assert_contains "$LEAD" "@verdict-arrived:" "L1-lead: @verdict-arrived 신호 등록"
-assert_contains "$LEAD" "신호 9종" "L1-lead: 신호 8종→9종 갱신"
-assert_contains "$LEAD" ".verdict-fired" "L1-lead: 마커 ack 규약"
+# ── L1: orch.md 규약 (grep 구조) ─────────────────────────────────────────────
+ORCH="$(cat "$ROOT/prompts/roles/01-orchestration/orch.md")"
+assert_contains "$ORCH" "@verdict-arrived:" "L1-orch: @verdict-arrived 신호 등록"
+assert_contains "$ORCH" "신호 9종" "L1-orch: 신호 8종→9종 갱신"
+assert_contains "$ORCH" ".verdict-fired" "L1-orch: 마커 ack 규약"
 
 test_summary

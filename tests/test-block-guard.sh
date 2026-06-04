@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tests/test-block-guard.sh — dispatch 차단 가드 (회로① 합의 게이트 집행)
-# Layer 1: lead.md ⓒ 합의 분기 + dispatch.sh 가드 호출 grep (Task 2/4 에서 추가)
+# Layer 1: orch.md ⓒ 합의 분기 + dispatch.sh 가드 호출 grep (Task 2/4 에서 추가)
 # Layer 2: lib.sh is_worker_blocked/record_block/clear_block/quarantine_block 동작
 set -uo pipefail
 cd "$(dirname "$0")"
@@ -92,13 +92,13 @@ is_worker_blocked "bob"; assert_eq "1" "$?" "L2 흐름: 격리 후 워커는 다
 test -f "$TMPDIR/state/quarantine/bob.json"
 assert_success "$?" "L2 흐름: 격리 task 는 quarantine 에 보존 (LEAD 가 사용자 push)"
 
-# Layer 1: lead.md ⓒ 가 합의 게이트(만장일치 record_block / 불일치 push)를 명시
-grep -q 'record_block' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md 가 record_block 호출 명시"
-grep -qE '만장일치|전원 blocking|투표인단' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md 가 합의 게이트(만장일치) 분기 명시"
-grep -q 'clear_block' "$ROOT/prompts/roles/01-orchestration/lead.md"
-assert_success "$?" "L1 lead.md 가 재판정 OK 해소(clear_block) 명시"
+# Layer 1: orch.md ⓒ 가 합의 게이트(만장일치 record_block / 불일치 push)를 명시
+grep -q 'record_block' "$ROOT/prompts/roles/01-orchestration/orch.md"
+assert_success "$?" "L1 orch.md 가 record_block 호출 명시"
+grep -qE '만장일치|전원 blocking|투표인단' "$ROOT/prompts/roles/01-orchestration/orch.md"
+assert_success "$?" "L1 orch.md 가 합의 게이트(만장일치) 분기 명시"
+grep -q 'clear_block' "$ROOT/prompts/roles/01-orchestration/orch.md"
+assert_success "$?" "L1 orch.md 가 재판정 OK 해소(clear_block) 명시"
 
 
 # Layer 2-h: quarantine 후 *같은 task* 재차단 시 attempt 누적 (무한 차단↔격리 방지)
@@ -124,15 +124,15 @@ case "$(_block_state_dir)" in
   *) assert_success "1" "L2 격리 실패 — _block_state_dir 가 TMPDIR 밖: $(_block_state_dir)" ;;
 esac
 
-# Layer 1: lead.md ⓒ 가 실제 리뷰어 파일명 규약(.alignment-rev/.quality-rev/.security-rev)을 명시
+# Layer 1: orch.md ⓒ 가 실제 리뷰어 파일명 규약(.alignment-rev/.quality-rev/.security-rev)을 명시
 # (모호한 <리뷰어> 토큰으로 되돌리면 blocking 집계 0건→만장일치 차단 영원히 미발동 — 회로 무력화 회귀 방지)
-LEAD_F="$ROOT/prompts/roles/01-orchestration/lead.md"
+LEAD_F="$ROOT/prompts/roles/01-orchestration/orch.md"
 grep -q 'alignment-rev' "$LEAD_F"
-assert_success "$?" "L1 lead.md 가 .alignment-rev 파일명 규약 명시(토큰 되돌림 회귀 방지)"
+assert_success "$?" "L1 orch.md 가 .alignment-rev 파일명 규약 명시(토큰 되돌림 회귀 방지)"
 grep -q 'quality-rev' "$LEAD_F"
-assert_success "$?" "L1 lead.md 가 .quality-rev 파일명 규약 명시"
+assert_success "$?" "L1 orch.md 가 .quality-rev 파일명 규약 명시"
 grep -q 'security-rev' "$LEAD_F"
-assert_success "$?" "L1 lead.md 가 .security-rev 파일명 규약 명시"
+assert_success "$?" "L1 orch.md 가 .security-rev 파일명 규약 명시"
 
 # Layer 2: dispatch.sh 가 차단 워커에 정확히 exit 2 (exit 1 로 바뀌면 watcher 오통지 — M1 회귀)
 # 격리 프로젝트 + tmux 세션에서 실제 실행. dispatch.sh 는 차단 가드(L55)가 세션 확인(L46) *뒤*라
@@ -214,7 +214,7 @@ if command -v tmux >/dev/null 2>&1; then
   # watcher 좀비 방지: EXIT trap 에 세션 kill 누적(기존 TMPDIR rm 유지). 중간 실패에도 정리 보장.
   trap 'tmux kill-session -t "'"$_wsess"'" 2>/dev/null; rm -rf "'"$WDIR"'" "$TMPDIR"' EXIT
   if tmux new-session -d -s "$_wsess" 2>/dev/null; then
-    _wlead="$(tmux list-panes -t "$_wsess" -F '#{pane_id}' | head -1)"
+    _worch="$(tmux list-panes -t "$_wsess" -F '#{pane_id}' | head -1)"
     # 차단 워커 큐(q1): blocked-workers 있음 → exit 2. task 파일은 둬도 차단 가드(L55)가
     # task 확인(L60)보다 앞이라 무관 — 차단이 우선해 exit 2.
     printf '{"worker":"blkw2","task_id":"BQ","attempt":1,"reason":"t"}' \
@@ -226,7 +226,7 @@ if command -v tmux >/dev/null 2>&1; then
     _qfile2="$WDIR/.agent-harness/state/dispatch-queue/q2.json"
     printf '{"worker":"okw","task_id":"OQ"}' > "$_qfile2"
     # watcher 한 사이클 라이브 기동(백그라운드). STATE_DIR/EVENTS/HARNESS_PROJECT 정확 주입.
-    SESSION="$_wsess" LEAD_PANE="$_wlead" \
+    SESSION="$_wsess" ORCH_PANE="$_worch" \
       STATE_DIR="$WDIR/.agent-harness/state" EVENTS="$_wevents" \
       HARNESS_PROJECT="$WDIR" \
       bash "$ROOT/bin/watcher.sh" >/dev/null 2>&1 &
@@ -239,7 +239,7 @@ if command -v tmux >/dev/null 2>&1; then
     done
     # 발화 통지가 입력창에 쌓일 시간 한 박자 확보(send-keys 직후 capture 레이스 완화).
     sleep 0.5
-    _wcap="$(tmux capture-pane -p -t "$_wlead" 2>/dev/null || true)"
+    _wcap="$(tmux capture-pane -p -t "$_worch" 2>/dev/null || true)"
     # (a) 차단 워커는 @dispatch-fail 미발화 — exit 2 를 조용히 소비. 워커명으로 정밀 구분.
     assert_not_contains "$_wcap" "@dispatch-fail: blkw2/" \
       "L2 단계3: 차단 워커(blkw2) dispatch-queue 처리 시 @dispatch-fail 미발화(조용한 소비)"

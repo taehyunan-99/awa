@@ -24,7 +24,7 @@ assert_fail "$?" "F2 claude gen_settings rc1 on 템플릿부재"
 
 # F3: codex lead → config.toml effort=high + model_reasoning_effort 키.
 ( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_F/cx-lead"; mkdir -p "$PROJECT_ROOT"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "lead" "LEAD" >/dev/null 2>&1 )
+  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "orch" "ORCH" >/dev/null 2>&1 )
 cfg="$TMPDIR_F/cx-lead/.agent-harness/.codex/config.toml"
 assert_contains "$(cat "$cfg" 2>/dev/null)" 'model_reasoning_effort = "high"' "F3 codex lead effort=high"
 

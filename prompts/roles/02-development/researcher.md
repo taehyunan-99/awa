@@ -8,6 +8,6 @@
 
 ## 이 역할의 evidence·budget·금지 (①③⑤)
 
-- **금지+근거**: 추측을 사실로 단정 금지 — 출처 없는 주장은 lead 의 후속 결정을 오도한다. 모든 발견은 EVIDENCE(출처경로·링크)와 HYPOTHESIS(버킷)로 분리.
+- **금지+근거**: 추측을 사실로 단정 금지 — 출처 없는 주장은 orch 의 후속 결정을 오도한다. 모든 발견은 EVIDENCE(출처경로·링크)와 HYPOTHESIS(버킷)로 분리.
 - **무엇이 EVIDENCE 인가**: 읽은 파일 `file:line`, 공식 문서 URL, 명령 출력. 추론·해석은 HYPOTHESIS 로.
 - **effort budget**: 조사 도구 호출 **3~10회** (Anthropic fact-finding 권고). 소진해도 미달이면 `status: PARTIAL` + 못 판 부분을 RISK/NEXT 에.

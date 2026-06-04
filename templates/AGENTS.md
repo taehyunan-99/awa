@@ -8,14 +8,14 @@
 
 ## 1. WHAT
 
-각 역할군(default/dev/test/pm/lead/reviewer)에 대응하는 Claude Code `settings.json` 권한 템플릿. 토큰 치환 후 워커 페인 cwd의 `.claude/settings.json`으로 배치된다.
+각 역할군(default/dev/test/desk/orch/reviewer)에 대응하는 Claude Code `settings.json` 권한 템플릿. 토큰 치환 후 워커 페인 cwd의 `.claude/settings.json`으로 배치된다.
 
 ## 2. CONTENTS
 
 - `settings.readonly.json.tpl` — 읽기전용 군 (researcher/review-manager/미지정 fallback) + 미지정 역할 fallback
 - `settings.dev.json.tpl` — dev 워커 (engineer/dev/security)
-- `settings.lead.json.tpl` — lead (게이트 + 허용 폭 넓음)
-- `settings.pm.json.tpl` — pm
+- `settings.orch.json.tpl` — orch (게이트 + 허용 폭 넓음)
+- `settings.desk.json.tpl` — desk
 - `settings.reviewer.json.tpl` — reviewer-* (글롭으로 자동 매칭)
 - `settings.test.json.tpl` — test 워커
 - `settings.json.tpl` — 일반 settings 기본 틀
