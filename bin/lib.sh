@@ -1069,3 +1069,7 @@ confirm_allow_yaml() {
       return 1 ;;
   esac
 }
+
+# team 명세 yaml 파서 (동적 하네스 조합) — 함수 노출. HARNESS_ROOT 는 L7 에서 이미 정의.
+# shellcheck disable=SC1090
+. "$HARNESS_ROOT/bin/spec-parse.sh"

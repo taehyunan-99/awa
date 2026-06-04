@@ -32,6 +32,7 @@ _normalize_plan_arg() {
 }
 PROFILE_ARG=""
 WORKERS_ARG=""
+SPEC_FILE=""
 DRY_CHECK=0
 # set -u 안전성을 위해 루프 앞에 선언 필수 (미선언 배열은 set -u 에서 unbound 오류).
 PLAN_FILES=()
@@ -54,6 +55,11 @@ while [ $# -gt 0 ]; do
       shift 2 ;;
     --workers=*)
       WORKERS_ARG="${1#--workers=}"; shift ;;
+    --spec)
+      SPEC_FILE="${2:-}"; [ -n "$SPEC_FILE" ] || { echo "오류: --spec 인자 누락" >&2; exit 1; }
+      shift 2 ;;
+    --spec=*)
+      SPEC_FILE="${1#--spec=}"; shift ;;
     --dry-check)
       # Task 7 (§7) — yaml 부정합 가드만 실행 후 종료 (boot 안 함).
       DRY_CHECK=1
@@ -95,19 +101,17 @@ if [ -f "$ALLOW_YAML" ]; then
   fi
 fi
 
-# --dry-check 모드: 가드만 실행 후 종료 (실제 boot 안 함).
-if [ "${DRY_CHECK:-0}" = "1" ]; then
-  echo "[dry-check] yaml 부정합 검사 PASS"
-  exit 0
-fi
-
 # prompts 디렉터리 — 기본 $HARNESS_ROOT/prompts, 테스트 fixture 용 PROMPTS_DIR env override.
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 
-# 12차 Task3: --workers 경로는 profile source 를 건너뛰고 WORKERS 를 직접 구성.
-# profile 과 상호배타.
+# 3분기: --spec / --workers / profile(yaml 우선·sh 하위호환).
 # REVIEWERS 미설정 — 기존 ${REVIEWERS+x} 가드가 빈/미정의를 안전 처리.
-if [ -n "${WORKERS_ARG:-}" ]; then
+if [ -n "${SPEC_FILE:-}" ]; then
+  [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --spec 와 프로파일 동시 지정 불가" >&2; exit 1; }
+  [ -n "${WORKERS_ARG:-}" ] && { echo "오류: --spec 와 --workers 동시 지정 불가" >&2; exit 1; }
+  PROFILE="(spec)"
+  spec_parse_load "$SPEC_FILE" || exit 1     # WORKERS/REVIEWERS/SESSION/LAYOUT 정의 (같은 셸 — 배열 보존)
+elif [ -n "${WORKERS_ARG:-}" ]; then
   [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --workers 와 프로파일 동시 지정 불가" >&2; exit 1; }
   PROFILE="(custom)"                    # 종료 메시지(팀 '$PROFILE' 가동 완료)용 라벨.
   # ORCH_MODEL/DESK_MODEL 디폴트 미지정 — EFF 폴백이 빈값을 보고 vendor_default_model 로 채움.
@@ -117,22 +121,37 @@ if [ -n "${WORKERS_ARG:-}" ]; then
   SESSION=""                            # profile SESSION 없음 — PROFILE_SESSION 빈값으로.
 else
   PROFILE="${PROFILE_ARG:-default}"
-  # PROFILE 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.sh 로 해석.
+  # PROFILE 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.yaml → .sh 우선순위로 해석.
   if [ -f "$PROFILE" ]; then
     PROFILE_FILE="$PROFILE"
   else
-    PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.sh"
+    if [ -f "$HARNESS_ROOT/profiles/$PROFILE.yaml" ]; then
+      PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.yaml"
+    else
+      PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.sh"
+    fi
   fi
 
   if [ ! -f "$PROFILE_FILE" ]; then
     echo "오류: 프로파일 없음 → $PROFILE_FILE" >&2
-    echo "사용 가능: $(ls "$HARNESS_ROOT/profiles" 2>/dev/null | sed 's/\.sh$//' | tr '\n' ' ')" >&2
+    echo "사용 가능: $(ls "$HARNESS_ROOT/profiles" 2>/dev/null | sed 's/\.\(sh\|yaml\)$//' | sort -u | tr '\n' ' ')" >&2
     exit 1
   fi
 
-  # 프로파일 로드 (SESSION, WORKERS 정의)
-  # shellcheck disable=SC1090
-  source "$PROFILE_FILE"
+  # 프로파일 로드: yaml → spec_parse_load, sh → source (하위호환)
+  case "$PROFILE_FILE" in
+    *.yaml) spec_parse_load "$PROFILE_FILE" || exit 1 ;;
+    # shellcheck disable=SC1090
+    *)      source "$PROFILE_FILE" ;;
+  esac
+fi
+
+# --dry-check: 파싱·검증 완료 후 boot 없이 종료. WORKERS 가 채워진 뒤여야 의미.
+if [ "${DRY_CHECK:-0}" = "1" ]; then
+  _rev_count=0
+  if [ -n "${REVIEWERS+x}" ]; then _rev_count="${#REVIEWERS[@]}"; fi
+  echo "[dry-check] PASS — workers=${#WORKERS[@]} reviewers=$_rev_count"
+  exit 0
 fi
 
 # 프로파일이 정의한 SESSION 을 resolve_session 체인에 노출 (이슈 2, T2).
