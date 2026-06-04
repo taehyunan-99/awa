@@ -106,7 +106,7 @@ rm -rf "$TMP_GI"
 #    bad#role 은 sed s#...#bad#role#g 를 파손 — 사전 거부 필수.
 #    SESSION_OVERRIDE 해제: 기존 tu_$$ 세션과 충돌 방지 (autoname 경로 사용).
 TMP_BR="$(mktemp -d)"; ( cd "$TMP_BR" && git init -q )
-_pf_br="$(mktemp /tmp/profile_badXXXX.sh)"
+_pf_br="$(mktemp -d)/profile_bad.sh"
 printf 'WORKERS=("worker1:bad#role")\nREVIEWERS=()\nLEAD_MODEL="sonnet"\n' > "$_pf_br"
 err_br="$(unset SESSION_OVERRIDE; HARNESS_PROJECT="$TMP_BR" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" "$_pf_br" 2>&1 >/dev/null)"; rc_br=$?
 _safe_br="$(printf '%s' "$(basename "$TMP_BR")" | sed 's/[^A-Za-z0-9_-]/_/g')"

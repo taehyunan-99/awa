@@ -19,8 +19,9 @@ yaml 명세 (우선):
 - `research.yaml` — 워커 researcher×3, 리뷰어 quality-rev + review-mgr
 - `feature-team.yaml` — 워커 dev/test/arch, 리뷰어 spec-rev/quality-rev/arch-rev + review-mgr
 
-구 bash fragment (하위호환, Task 8에서 폐기):
+구 bash fragment (하위호환):
 - `default.sh`, `web.sh`, `code-review.sh`, `research.sh`, `feature-team.sh`
+- **폐기 조건**: yaml 경로가 라이브 가동에서 안정 확인되고, `profiles/*.sh`를 참조하는 테스트·문서가 0건이 되면 다음 정리 사이클에 `git rm`. 현재는 awa-up이 `.yaml` 우선·`.sh` 폴백이므로 `.sh` 삭제해도 기능은 동작하나, 회귀 안전을 위해 유지.
 
 yaml 스키마 (파서가 읽는 형식):
 ```yaml
@@ -44,6 +45,8 @@ reviewers:
 - **REVIEWERS 이름 컨벤션** — `<역할>-rev` 접미사 (예: `spec-rev:reviewer-spec`, `quality-rev:reviewer-quality`, `arch-rev:reviewer-arch`) 또는 review-<필드>. `review-manager` 는 pane 이름 `review-mgr` 로 *고정* (`bin/awa-up.sh` 의 `REVIEW_MANAGER_PANE` 결정 로직이 이 이름으로 pane 조회).
 
 ## 4. ⛔ HOW NOT
+
+- **profile .sh/yaml 에 부수효과 코드 금지** — 순수 변수/배열 정의만. `mkdir`·`touch`·파일생성을 넣으면 `--dry-check`(boot 없이 파싱만) 가 부수효과를 일으켜 검증 의미가 깨진다.
 
 - **`review-mgr` pane 이름 임의 변경 금지** — `bin/awa-up.sh` 의 `REVIEW_MANAGER_PANE` 환경변수 주입 로직이 정확히 `review-mgr` 토큰으로 pane 식별. 변경 시 `watcher.sh` 의 drift-check 깨움 (line 97-100) 이 빈 PANE 으로 silent skip → review-manager 가 영원히 안 깨워짐.
 
