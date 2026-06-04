@@ -52,4 +52,14 @@ echo "[P8-inv] 대소문자 변형 role 도 투표 리뷰어로 인식 (거짓�
 spec_parse_invariants "$ROOT/tests/fixtures/team-uc-rev.yaml" 2>/dev/null
 assert_fail "$?" "P8-inv 대문자 role 도 voter 로 세고 mgr 없으면 거부"
 
+echo "[P-load] WORKERS/REVIEWERS 배열 환산 (awa-up 소비 형식)"
+spec_parse_load "$ROOT/tests/fixtures/team-basic.yaml"
+assert_eq "2" "${#WORKERS[@]}" "P-load 워커 2개"
+assert_eq "engineer:engineer:claude:sonnet" "${WORKERS[0]}" "P-load 워커 4필드"
+assert_eq "researcher:researcher" "${WORKERS[1]}" "P-load 워커 2필드(빈 vendor/model 절삭)"
+assert_eq "3" "${#REVIEWERS[@]}" "P-load 리뷰어 3개"
+assert_eq "security-rev:reviewer-security:codex" "${REVIEWERS[1]}" "P-load 리뷰어 3필드(model 빈칸 절삭)"
+assert_eq "my-feature" "$SESSION" "P-load SESSION"
+assert_eq "tiled" "$LAYOUT" "P-load LAYOUT"
+
 test_summary

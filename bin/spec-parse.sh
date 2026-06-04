@@ -80,3 +80,29 @@ spec_parse_invariants() {
   fi
   return 0
 }
+
+# yaml → WORKERS/REVIEWERS/SESSION/LAYOUT 환산. validate+invariants 선행.
+# 빈 vendor/model 은 절삭("name:role" / "name:role:vendor"). awa-up.sh 의 "이름:역할[:벤더][:모델]" 파싱과 정합.
+# ★ WORKERS/REVIEWERS 는 bash 배열 — export 불가. 반드시 호출 셸과 같은 스코프에서 실행
+#   (서브셸 `$(spec_parse_load ...)` 금지). awa-up 은 source 된 함수를 직접 호출하므로 정합.
+spec_parse_load() {
+  local yaml="$1"
+  spec_parse_validate "$yaml" || return 1
+  spec_parse_invariants "$yaml" || return 1
+  WORKERS=(); REVIEWERS=()
+  SESSION="$(spec_parse_scalar "$yaml" session)"
+  LAYOUT="$(spec_parse_scalar "$yaml" layout)"
+  local kind name role vendor model entry
+  while IFS=$'\t' read -r kind name role vendor model; do
+    [ -n "$name" ] || continue
+    entry="$name:$role"
+    [ -n "$vendor" ] && entry="$entry:$vendor"
+    [ -n "$vendor" ] && [ -n "$model" ] && entry="$entry:$model"
+    case "$kind" in
+      worker)   WORKERS+=("$entry") ;;
+      reviewer) REVIEWERS+=("$entry") ;;
+    esac
+  done < <(spec_parse_flatten "$yaml")
+  export SESSION LAYOUT
+  return 0
+}
