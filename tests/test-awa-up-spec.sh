@@ -17,4 +17,8 @@ echo "[S3] --spec 의 불변식 위반 yaml 거부 (team-mgrless)"
 OUT="$(AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" --project "$ROOT" --spec "$ROOT/tests/fixtures/team-mgrless.yaml" --dry-check 2>&1)"; RC=$?
 assert_fail "$RC" "S3 불변식 위반 yaml 거부"
 
+echo "[S4] --spec 와 --workers 동시 지정 거부"
+OUT="$(AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" --project "$ROOT" --spec "$ROOT/tests/fixtures/team-basic.yaml" --workers "x:engineer" --dry-check 2>&1)"; RC=$?
+assert_fail "$RC" "S4 --spec + --workers 동시 거부"
+
 test_summary

@@ -840,6 +840,7 @@ _PLAN_FIRST=""
 [ "${#PLAN_FILES[@]}" -gt 0 ] && _PLAN_FIRST="${PLAN_FILES[0]}"
 _PRESET_LABEL="${PROFILE:-custom}"
 [ "$_PRESET_LABEL" = "(custom)" ] && _PRESET_LABEL="custom"
+[ "$_PRESET_LABEL" = "(spec)" ] && _PRESET_LABEL="spec"
 bookmarks_upsert "$PROJECT_ROOT" "$_PRESET_LABEL" "$_PLAN_FIRST" 2>/dev/null || true
 
 # P2 §2.3: SKIPPED_PANES 가시화. bootstrap_pane 에서 skip 시 누적된 변수.
