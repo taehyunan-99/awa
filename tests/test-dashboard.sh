@@ -25,13 +25,13 @@ mk_src() {
   [ -n "$s" ] || { echo "오류: mk_src 인자 필요" >&2; return 1; }
   tmux kill-session -t "$s" 2>/dev/null || true
   tmux new-session -d -s "$s" -n team -x 200 -y 50
-  local lead pm
-  lead="$(tmux list-panes -t "${s}:team" -F '#{pane_id}' | head -1)"
-  pm="$(tmux split-window -h -t "$lead" -d -P -F '#{pane_id}')"
-  tmux set-option -p -t "$lead" @awa-role lead
-  tmux set-option -p -t "$pm"   @awa-role pm
-  tmux select-pane -t "$lead" -T "LEAD"
-  tmux select-pane -t "$pm"   -T "PM"
+  local orch_p desk_p
+  orch_p="$(tmux list-panes -t "${s}:team" -F '#{pane_id}' | head -1)"
+  desk_p="$(tmux split-window -h -t "$orch_p" -d -P -F '#{pane_id}')"
+  tmux set-option -p -t "$orch_p" @awa-role orch
+  tmux set-option -p -t "$desk_p"   @awa-role desk
+  tmux select-pane -t "$orch_p" -T "ORCH"
+  tmux select-pane -t "$desk_p"   -T "DESK"
   tmux new-window -t "$s" -n workers
   tmux set-option -t "$s" @awa-project "/tmp/$s" 2>/dev/null || true
 }
@@ -53,9 +53,9 @@ assert_eq "4" "$n" "D1b grid-1 에 4 pane"
 rows="$(tmux list-panes -t "${DASH}:grid-1" -F '#{pane_top}' 2>/dev/null | sort -u | wc -l | tr -d ' ')"
 assert_eq "2" "$rows" "D1c 2개 행(distinct top)"
 # 각 lead 는 left=0, 각 pm 은 left>0
-lead_lefts="$(tmux list-panes -t "${DASH}:grid-1" -F '#{@awa-role} #{pane_left}' 2>/dev/null | awk '$1=="lead"{print $2}')"
+lead_lefts="$(tmux list-panes -t "${DASH}:grid-1" -F '#{@awa-role} #{pane_left}' 2>/dev/null | awk '$1=="orch"{print $2}')"
 assert_eq "" "$(printf '%s\n' "$lead_lefts" | awk '$1!=0{print "BAD"}')" "D1d 모든 lead pane left=0"
-pm_lefts="$(tmux list-panes -t "${DASH}:grid-1" -F '#{@awa-role} #{pane_left}' 2>/dev/null | awk '$1=="pm"{print $2}')"
+pm_lefts="$(tmux list-panes -t "${DASH}:grid-1" -F '#{@awa-role} #{pane_left}' 2>/dev/null | awk '$1=="desk"{print $2}')"
 # 공허한 참 방지: pm pane 이 0개면 left>0 검사가 빈 입력으로 무의미 통과 → 개수 먼저 단언.
 pm_cnt="$(printf '%s\n' "$pm_lefts" | grep -c '[0-9]')"
 assert_eq "2" "$pm_cnt" "D1e-pre pm pane 2개 존재 (공허한 참 방지)"
@@ -118,8 +118,8 @@ echo "[D6] 식별 견고성: title 바꿔도 @awa-role 로 식별"
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$
 # title 을 엉뚱하게 변경 (식별이 title 의존이면 깨짐 — @awa-role 로 식별해야 통과)
-lead="$(tmux list-panes -t "_S_A_$$:team" -F '#{@awa-role} #{pane_id}' | awk '$1=="lead"{print $2}')"
-tmux select-pane -t "$lead" -T "ZZZ_NOT_LEAD" 2>/dev/null || true
+orch_p="$(tmux list-panes -t "_S_A_$$:team" -F '#{@awa-role} #{pane_id}' | awk '$1=="orch"{print $2}')"
+tmux select-pane -t "$orch_p" -T "ZZZ_NOT_LEAD" 2>/dev/null || true
 mk_src _S_B_$$
 bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
 # A 가 grid 에 정상 들어갔는지 (lead 식별 성공)
@@ -129,8 +129,8 @@ assert_contains "$projs" "_S_A_$$" "D6 title 변경에도 @awa-role 로 A 식별
 echo "[D7] swap 후 @awa-role/@awa-project 보존 (cross-session 옵션 귀속)"
 # grid 의 lead pane 이 @awa-role=lead 를 유지하는지
 roles="$(tmux list-panes -s -t "$DASH" -F '#{@awa-role}' 2>/dev/null | sort -u | grep -v '^$')"
-assert_contains "$roles" "lead" "D7a @awa-role lead 보존"
-assert_contains "$roles" "pm" "D7b @awa-role pm 보존"
+assert_contains "$roles" "orch" "D7a @awa-role orch 보존"
+assert_contains "$roles" "desk" "D7b @awa-role desk 보존"
 
 echo "[D8] 자기참조/부재 스킵 (계승)"
 tmux kill-session -t "$DASH" 2>/dev/null

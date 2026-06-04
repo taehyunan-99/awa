@@ -4,7 +4,7 @@
 #
 # env (awa-up 이 주입):
 #   SESSION              감시 대상 세션명 (has-session 가드)
-#   LEAD_PANE            lead pane_id (%N) — @gate:/@done: 대상
+#   ORCH_PANE            lead pane_id (%N) — @gate:/@done: 대상
 #   REVIEWER_PANES       공백구분 reviewer pane_id 목록 (0~N, 빈 문자열 가능)
 #   REVIEW_MANAGER_PANE  review-manager pane_id (있으면) — drift-check 전용 깨움 (I-3 정정)
 #   STATE_DIR            .agent-harness/state (pending-asks/ 포함)
@@ -14,7 +14,7 @@
 set -u
 
 SESSION="${SESSION:-}"
-LEAD_PANE="${LEAD_PANE:-}"
+ORCH_PANE="${ORCH_PANE:-}"
 REVIEWER_PANES="${REVIEWER_PANES:-}"
 REVIEW_MANAGER_PANE="${REVIEW_MANAGER_PANE:-}"
 STATE_DIR="${STATE_DIR:-}"
@@ -56,12 +56,12 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     [ -f "$f" ] || continue
     uuid="$(basename "$f" .json)"
     grep -qxF "$uuid" "$SEEN" 2>/dev/null && continue
-    pane_alive "$LEAD_PANE" || continue   # M2: 죽은 pane 이면 seen 마킹 보류(살아나면 재시도)
+    pane_alive "$ORCH_PANE" || continue   # M2: 죽은 pane 이면 seen 마킹 보류(살아나면 재시도)
     printf '%s\n' "$uuid" >> "$SEEN"
     # -l 과 Enter 를 독립 실행: && 체이닝이면 -l 성공·Enter 실패 시 텍스트만 입력되고 미제출
     # (half-sent) 되며 || true 가 그걸 삼킨다. set -e 없으니 분리해도 루프 안 죽음 (send_prompt 와 동형).
-    tmux send-keys -t "$LEAD_PANE" -l "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리." 2>/dev/null
-    tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+    tmux send-keys -t "$ORCH_PANE" -l "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리." 2>/dev/null
+    tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
   done
 
   # 1b) dispatch-queue 새 .json → dispatch.sh 실행 (P11 탈-tmux: lead 가 sandbox 안이라
@@ -87,10 +87,10 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     elif [ "$_dq_rc" = 2 ]; then
       :   # 차단(계획 B 합의 게이트) — dispatch.sh 가 거부. 실패 아님이라 @dispatch-fail 통지 안 함.
           #   LEAD 가 차단 워커를 재배정한 경우라 조용히 소비(통지 루프 방지). 해소는 clear_block.
-    elif pane_alive "$LEAD_PANE"; then
+    elif pane_alive "$ORCH_PANE"; then
       # 진짜 실패만 lead 에 통지(세션/페인/task 파일 이상). -l 과 Enter 분리(half-sent 방지).
-      tmux send-keys -t "$LEAD_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)." 2>/dev/null
-      tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+      tmux send-keys -t "$ORCH_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)." 2>/dev/null
+      tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
     fi
     rm -f "$f" 2>/dev/null   # 소비 완료(성공·실패 무관 1회만 — 실패는 위에서 lead 통지)
   done
@@ -105,10 +105,10 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       rm -f "$f" 2>/dev/null   # 형식 불량 — 소비 폐기(무한 재시도 방지).
       continue
     fi
-    pane_alive "$LEAD_PANE" || continue   # 죽은 pane 이면 소비 보류(살아나면 재시도 — .json 유지).
+    pane_alive "$ORCH_PANE" || continue   # 죽은 pane 이면 소비 보류(살아나면 재시도 — .json 유지).
     # ORCH 가 @desk: 접두로 DESK 지시를 식별(사용자 입력과 구분). -l/Enter 분리(half-sent 방지).
-    tmux send-keys -t "$LEAD_PANE" -l "@desk: $desk_inst" 2>/dev/null
-    tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+    tmux send-keys -t "$ORCH_PANE" -l "@desk: $desk_inst" 2>/dev/null
+    tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
     rm -f "$f" 2>/dev/null   # 소비 완료.
   done
 
@@ -144,9 +144,9 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       | while IFS=$'\t' read -r dw dt; do
           [ -n "$dw" ] && [ -n "$dt" ] || continue
           enqueue_pending_done "$STATE_DIR" "$dw" "$dt"   # ack 큐 적재(LEAD 가 종합 후 rm)
-          pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@done: $dw/$dt 완료. results/ 확인 후 종합." 2>/dev/null
-          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+          pane_alive "$ORCH_PANE" || continue
+          tmux send-keys -t "$ORCH_PANE" -l "@done: $dw/$dt 완료. results/ 확인 후 종합." 2>/dev/null
+          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
     # @drift-check: worker_turn_count 임계 (N=10) 도달 → review-manager 깨움 트리거 (§5.7).
     # done 라인 발생 시 worker 별 turn 누적 검사. sort -u 로 동일 worker 중복 트리거 방지.
@@ -174,18 +174,18 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       | awk -F'\t' '$4=="plan-defect"{print $2"/"$3"\t"$5}' \
       | while IFS=$'\t' read -r wt desc; do
           [ -n "$wt" ] || continue
-          pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@plan-defect: $wt $desc" 2>/dev/null
-          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+          pane_alive "$ORCH_PANE" || continue
+          tmux send-keys -t "$ORCH_PANE" -l "@plan-defect: $wt $desc" 2>/dev/null
+          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
     # @allow-confirm: 라인 payload(필드5 = pattern=...;role=...) 추출 → lead ⓘ 라우팅 (§7 Phase A).
     sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
       | awk -F'\t' '$4=="allow-confirm"{print $5}' \
       | while IFS= read -r payload; do
           [ -n "$payload" ] || continue
-          pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@allow-confirm: $payload" 2>/dev/null
-          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+          pane_alive "$ORCH_PANE" || continue
+          tmux send-keys -t "$ORCH_PANE" -l "@allow-confirm: $payload" 2>/dev/null
+          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
   fi
@@ -197,9 +197,9 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     requeue_pending_done "$STATE_DIR" "$REQUEUE_AGE" 2>/dev/null \
       | while IFS= read -r rq; do
           [ -n "$rq" ] || continue
-          pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@done: $rq 완료. results/ 확인 후 종합." 2>/dev/null
-          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+          pane_alive "$ORCH_PANE" || continue
+          tmux send-keys -t "$ORCH_PANE" -l "@done: $rq 완료. results/ 확인 후 종합." 2>/dev/null
+          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
   fi
 
@@ -211,9 +211,9 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     scan_verdict_quorum "$_review_dir" "$STATE_DIR" "$EXPECTED_VOTERS" 2>/dev/null \
       | while IFS= read -r wid; do
           [ -n "$wid" ] || continue
-          pane_alive "$LEAD_PANE" || continue
-          tmux send-keys -t "$LEAD_PANE" -l "@verdict-arrived: $wid 투표 $EXPECTED_VOTERS종 전원 도착. review/ 재종합." 2>/dev/null
-          tmux send-keys -t "$LEAD_PANE" Enter 2>/dev/null
+          pane_alive "$ORCH_PANE" || continue
+          tmux send-keys -t "$ORCH_PANE" -l "@verdict-arrived: $wid 투표 $EXPECTED_VOTERS종 전원 도착. review/ 재종합." 2>/dev/null
+          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
   fi
 

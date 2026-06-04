@@ -51,9 +51,9 @@ SESSION_OVERRIDE="$S2" HARNESS_PROJECT="$TMP2" AGENT_CMD=cat \
 got_windows="$(tmux list-windows -t "$S2" -F '#{window_name}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
 assert_eq "team,workers,reviewers" "$got_windows" "W2a 윈도우 3개(team,workers,reviewers)"
 
-# W2b: window 0 (team) pane 2개, title 순서 LEAD/PM
+# W2b: window 0 (team) pane 2개, title 순서 ORCH/DESK
 got_team="$(tmux list-panes -t "$S2:team" -F '#{pane_title}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"
-assert_eq "LEAD,PM" "$got_team" "W2b team 윈도우 = LEAD,PM"
+assert_eq "ORCH,DESK" "$got_team" "W2b team 윈도우 = ORCH,DESK"
 
 # W2c: window 1 (workers) 마지막 pane title = watcher
 got_last_workers="$(tmux list-panes -t "$S2:workers" -F '#{pane_title}' 2>/dev/null | tail -1)"

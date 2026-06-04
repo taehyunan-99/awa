@@ -47,10 +47,10 @@ dash_collect_current() {
     | awk '
         NF>=3 && $1!=""{
           if (!(($1) in seen)) { order[n++]=$1; seen[$1]=1 }
-          if ($2=="lead") lead[$1]=$3
-          if ($2=="pm")   pm[$1]=$3
+          if ($2=="orch") orch[$1]=$3
+          if ($2=="desk")   desk[$1]=$3
         }
-        END{ for(i=0;i<n;i++){ p=order[i]; printf "%s\t%s\t%s\n", p, lead[p], pm[p] } }'
+        END{ for(i=0;i<n;i++){ p=order[i]; printf "%s\t%s\t%s\n", p, orch[p], desk[p] } }'
 }
 
 # 지정 윈도우에 rows 행 × 2열 빈 골격 생성. 각 행의 <lead_slot>\t<pm_slot> pane_id 를 rows 줄 출력.
@@ -76,16 +76,16 @@ dash_make_skeleton() {
 # 전체 grid 재구성. stdin: <session>\t<lead_pane>\t<pm_pane> 행들 (프로젝트 순서대로).
 # 프로젝트 0개 → _DASHBOARD kill. 3개씩 묶어 grid-1, grid-2 ... 윈도우.
 #
-# ⚠️ 핵심 안전순서: kill-window 는 내부 pane 을 죽인다(실측). 입력 leads/pms 가
+# ⚠️ 핵심 안전순서: kill-window 는 내부 pane 을 죽인다(실측). 입력 orchs/desks 가
 # 기존 grid 윈도우에 살아있을 수 있으므로(add/재패킹), 기존 윈도우를 먼저 죽이면 안 된다.
 # → 새 grid 를 **임시 이름(_new-N)** 으로 만들어 swap 으로 실제 pane 을 끌어온 뒤,
 #   비게 된 기존 grid-* 윈도우를 일괄 kill, 마지막에 _new-N → grid-N rename.
 dash_render() {
-  local -a sess=() leads=() pms=()
+  local -a sess=() orchs=() desks=()
   local s l p
   while IFS=$'\t' read -r s l p || [ -n "$s" ]; do
     [ -n "$s" ] || continue
-    sess+=("$s"); leads+=("$l"); pms+=("$p")
+    sess+=("$s"); orchs+=("$l"); desks+=("$p")
   done
   local total="${#sess[@]}"
   if [ "$total" -eq 0 ]; then
@@ -113,17 +113,17 @@ dash_render() {
     while [ "$r" -lt "$rows" ]; do
       local gi=$(( idx + r ))
       # lead/pm pane_id 결손(한쪽만 있는 깨진 잔재 등) → 빈 swap 으로 골격 노출 방지. 경고 후 skip.
-      if [ -z "${leads[$gi]}" ] || [ -z "${pms[$gi]}" ]; then
+      if [ -z "${orchs[$gi]}" ] || [ -z "${desks[$gi]}" ]; then
         echo "경고: ${sess[$gi]} 의 lead/pm pane 결손 — 해당 행 skip" >&2
         r=$((r+1)); continue
       fi
-      tmux swap-pane -s "${leads[$gi]}" -t "${slot_l[$r]}" 2>/dev/null || true
-      tmux swap-pane -s "${pms[$gi]}"   -t "${slot_r[$r]}" 2>/dev/null || true
-      # @awa-role/@awa-project 재적용 (양쪽 pane — 단일 장애점 회피). swap 후 실제 pane = leads/pms.
-      tmux set-option -p -t "${leads[$gi]}" @awa-role lead 2>/dev/null || true
-      tmux set-option -p -t "${pms[$gi]}"   @awa-role pm   2>/dev/null || true
-      tmux set-option -p -t "${leads[$gi]}" @awa-project "${sess[$gi]}" 2>/dev/null || true
-      tmux set-option -p -t "${pms[$gi]}"   @awa-project "${sess[$gi]}" 2>/dev/null || true
+      tmux swap-pane -s "${orchs[$gi]}" -t "${slot_l[$r]}" 2>/dev/null || true
+      tmux swap-pane -s "${desks[$gi]}"   -t "${slot_r[$r]}" 2>/dev/null || true
+      # @awa-role/@awa-project 재적용 (양쪽 pane — 단일 장애점 회피). swap 후 실제 pane = orchs/desks.
+      tmux set-option -p -t "${orchs[$gi]}" @awa-role orch 2>/dev/null || true
+      tmux set-option -p -t "${desks[$gi]}"   @awa-role desk   2>/dev/null || true
+      tmux set-option -p -t "${orchs[$gi]}" @awa-project "${sess[$gi]}" 2>/dev/null || true
+      tmux set-option -p -t "${desks[$gi]}"   @awa-project "${sess[$gi]}" 2>/dev/null || true
       r=$((r+1))
     done
     # ⚠️ swap 후 select-layout 호출 금지 — even-vertical 은 좌우 쌍을 무시하고 전체 pane 을
@@ -169,8 +169,8 @@ _dash_resolve_sessions() {
       echo "경고: 원세션 $s 부재 — 스킵" >&2
       continue
     fi
-    l="$(dash_find_role_pane "$s" lead)"
-    p="$(dash_find_role_pane "$s" pm)"
+    l="$(dash_find_role_pane "$s" orch)"
+    p="$(dash_find_role_pane "$s" desk)"
     if [ -z "$l" ] || [ -z "$p" ]; then
       echo "경고: $s 에서 lead/pm pane(@awa-role) 미발견 — 스킵" >&2
       continue
@@ -224,14 +224,14 @@ dash_detach_one() {
   if [ "$proj" = "$DASH" ]; then
     echo "오류: $DASH 자신은 detach 대상 아님" >&2; return 1
   fi
-  # grid 에서 해당 프로젝트 lead/pm pane 찾기.
-  local row lead pm
+  # grid 에서 해당 프로젝트 orch/desk pane 찾기.
+  local row orch_pane desk_pane
   row="$(dash_collect_current | awk -F'\t' -v p="$proj" '$1==p{print; exit}')"
   if [ -z "$row" ]; then
     echo "경고: $proj 가 grid 에 없음 — 스킵" >&2; return 1
   fi
-  lead="$(printf '%s' "$row" | cut -f2)"
-  pm="$(printf '%s' "$row" | cut -f3)"
+  orch_pane="$(printf '%s' "$row" | cut -f2)"
+  desk_pane="$(printf '%s' "$row" | cut -f3)"
   # 원세션 부재 → 사용자 확인 후 재생성 (자동 경로면 프롬프트 없이 스킵).
   if ! tmux has-session -t "$proj" 2>/dev/null; then
     echo "경고: 원세션 $proj 부재." >&2
@@ -259,19 +259,19 @@ dash_detach_one() {
       echo "경고: $proj 경로 미입력 — @awa-project(경로) 미설정. /awa down 메뉴에서 이 세션은 제외될 수 있음." >&2
     fi
   fi
-  # 원세션 team 윈도우에 빈 슬롯(lead|pm) 2개 만들고 swap 으로 복원.
+  # 원세션 team 윈도우에 빈 슬롯(orch|desk) 2개 만들고 swap 으로 복원.
   if ! tmux list-windows -t "$proj" -F '#W' 2>/dev/null | grep -qx 'team'; then
     tmux new-window -d -t "$proj" -n team 2>/dev/null || true
   fi
   local slot_l slot_r
   slot_l="$(tmux list-panes -t "${proj}:team" -F '#{pane_id}' | head -1)"
   slot_r="$(tmux split-window -h -t "$slot_l" -d -P -F '#{pane_id}' 2>/dev/null)"
-  tmux swap-pane -s "$lead" -t "$slot_l" 2>/dev/null || true
-  tmux swap-pane -s "$pm"   -t "$slot_r" 2>/dev/null || true
-  tmux set-option -p -t "$lead" @awa-role lead 2>/dev/null || true
-  tmux set-option -p -t "$pm"   @awa-role pm   2>/dev/null || true
-  tmux select-pane -t "$lead" -T "LEAD" 2>/dev/null || true
-  tmux select-pane -t "$pm"   -T "PM"   2>/dev/null || true
+  tmux swap-pane -s "$orch_pane" -t "$slot_l" 2>/dev/null || true
+  tmux swap-pane -s "$desk_pane" -t "$slot_r" 2>/dev/null || true
+  tmux set-option -p -t "$orch_pane" @awa-role orch 2>/dev/null || true
+  tmux set-option -p -t "$desk_pane" @awa-role desk 2>/dev/null || true
+  tmux select-pane -t "$orch_pane" -T "ORCH" 2>/dev/null || true
+  tmux select-pane -t "$desk_pane" -T "DESK" 2>/dev/null || true
   tmux select-layout -t "${proj}:team" even-horizontal 2>/dev/null || true
   fix_session_titles "$proj" 2>/dev/null || true
   return 0

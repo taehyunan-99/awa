@@ -41,7 +41,7 @@ assert_contains "$wins" "1" "window 1(workers) 존재"
 assert_contains "$wins" "2" "window 2(reviewers) 존재"
 
 w0titles="$(tmux list-panes -t "$S:team" -F '#{pane_title}' | tr '\n' ' ')"
-assert_contains "$w0titles" "LEAD" "team 윈도우에 lead"
+assert_contains "$w0titles" "ORCH" "team 윈도우에 orch"
 w1titles="$(tmux list-panes -t "$S:workers" -F '#{pane_title}' | tr '\n' ' ')"
 assert_contains "$w1titles" "dev" "workers 윈도우에 dev 워커"
 w2titles="$(tmux list-panes -t "$S:reviewers" -F '#{pane_title}' | tr '\n' ' ')"

@@ -21,12 +21,12 @@ else
 fi
 
 # 역할(bare) → 한국어 요약 매핑 (단일 출처). awa-up 은 raw role 만 파일에 쓴다.
-# 매핑은 prompts/roles 실측: lead=팀 감독 / pm=사용자 창구 / dev·researcher=개발 /
+# 매핑은 prompts/roles 실측: orch=팀 감독 / desk=사용자 창구 / dev·researcher=개발 /
 # tester=품질 검증 / reviewer-*·review-manager=드리프트 추적 / security=안전 한계선.
 splash_role_summary() {
   case "$1" in
-    lead)                       printf '팀 감독' ;;
-    pm)                         printf '사용자 창구' ;;
+    orch|lead)                  printf '팀 감독' ;;     # lead = 구 역할명 하위호환
+    desk|pm)                    printf '사용자 창구' ;;  # pm = 구 역할명 하위호환
     reviewer-*|review-manager)  printf '드리프트 추적' ;;
     security)                   printf '안전 한계선' ;;
     dev|researcher)             printf '개발' ;;

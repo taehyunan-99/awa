@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/tests/assert.sh"
 TMPDIR_T="$(mktemp -d)"; trap 'rm -rf "$TMPDIR_T"' EXIT
 
-FUNCS="vendor_boot_cmd vendor_wait_ready vendor_gen_settings vendor_inject_role vendor_lead_plan_directive vendor_default_model"
+FUNCS="vendor_boot_cmd vendor_wait_ready vendor_gen_settings vendor_inject_role vendor_orch_plan_directive vendor_default_model"
 
 check_funcs() {  # $1=adapter_path
   ( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
@@ -26,21 +26,21 @@ out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
   . "$ROOT/bin/vendors/claude.sh"; vendor_boot_cmd "opus" "/tmp/s.json" "abc-123" "/tmp/plan.md" )"
 assert_contains "$out" "--append-system-prompt-file" "A4 boot_cmd plan 주입"
 
-# P10(2026-05-30): vendor_lead_plan_directive 벤더중립 — claude=빈값(plan 이 이미 시스템
+# P10(2026-05-30): vendor_orch_plan_directive 벤더중립 — claude=빈값(plan 이 이미 시스템
 #   컨텍스트), codex=plan 경로 명시 Read 지시(--append-system-prompt-file 부재 보완, 결정적).
 out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
-  . "$ROOT/bin/vendors/claude.sh"; vendor_lead_plan_directive "/tmp/plan.md" )"
+  . "$ROOT/bin/vendors/claude.sh"; vendor_orch_plan_directive "/tmp/plan.md" )"
 assert_eq "" "$out" "A4b claude plan directive 빈값(시스템 컨텍스트 주입)"
 out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_lead_plan_directive "/tmp/x/.boot/plan.md" )"
+  . "$ROOT/bin/vendors/codex.sh"; vendor_orch_plan_directive "/tmp/x/.boot/plan.md" )"
 assert_contains "$out" "/tmp/x/.boot/plan.md" "A4c codex plan directive 경로 명시"
 assert_contains "$out" "Read" "A4d codex plan directive Read 지시"
 out="$( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_T"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_lead_plan_directive "" )"
+  . "$ROOT/bin/vendors/codex.sh"; vendor_orch_plan_directive "" )"
 assert_eq "" "$out" "A4e codex plan 빈값 → 빈 출력(plan 없으면 지시 없음)"
 
 out="$( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/vendors/claude.sh"
-  printf '%s/%s/%s/%s' "$(vendor_default_model lead)" "$(vendor_default_model pm)" \
+  printf '%s/%s/%s/%s' "$(vendor_default_model orch)" "$(vendor_default_model desk)" \
     "$(vendor_default_model reviewer-quality)" "$(vendor_default_model dev)" )"
 assert_eq "opus/sonnet/opus/sonnet" "$out" "A5 claude default model (reviewer=opus)"
 
@@ -70,11 +70,11 @@ assert_success "$?" "A9 codex auth.json 전파(로그인 화면 회피)"
 # A10 — config.toml 에 PROJECT_ROOT trusted 등록(trust 프롬프트 사전 제거).
 codex_cfg="$CODEX_PR/.agent-harness/.codex/config.toml"
 assert_success "$([ -f "$codex_cfg" ] && grep -q 'trust_level = "trusted"' "$codex_cfg"; echo $?)" "A10 codex trusted 등록"
-# A11 — effort 매핑: lead=high, dev=medium.
+# A11 — effort 매핑: orch=high, dev=medium.
 ( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$(mktemp -d)"; CODEX_HOME="$FAKE_HOME"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "lead" "lead" >/dev/null
+  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "orch" "orch" >/dev/null
   grep -q 'model_reasoning_effort = "high"' "$PROJECT_ROOT/.agent-harness/.codex/config.toml" )
-assert_success "$?" "A11 codex lead effort=high"
+assert_success "$?" "A11 codex orch effort=high"
 # A12 — wait_ready 본문 회귀 가드(grep): ready 우선 + 업데이트 Skip + trust 처리 패턴 존재.
 cx="$ROOT/bin/vendors/codex.sh"
 assert_success "$(grep -q 'OpenAI Codex' "$cx"; echo $?)" "A12a wait_ready ready 패턴(구버전 헤더)"
@@ -92,17 +92,17 @@ rm -rf "$CODEX_PR" "$FAKE_HOME"
 # A13 — 오케스트레이터 가드(2026-05-31): LEAD/PM 은 claude 전용. codex 등 비-claude 지정 시
 #   claude 로 강제(P17 회피 — codex 는 워커/리뷰어만). resolve_orchestrator_vendor 계약.
 ( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
-  [ "$(resolve_orchestrator_vendor "codex" "LEAD" 2>/dev/null)" = "claude" ] )
+  [ "$(resolve_orchestrator_vendor "codex" "ORCH" 2>/dev/null)" = "claude" ] )
 assert_success "$?" "A13a LEAD codex→claude 강제"
 ( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
-  [ "$(resolve_orchestrator_vendor "codex" "PM" 2>/dev/null)" = "claude" ] )
+  [ "$(resolve_orchestrator_vendor "codex" "DESK" 2>/dev/null)" = "claude" ] )
 assert_success "$?" "A13b PM codex→claude 강제"
 ( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
-  [ "$(resolve_orchestrator_vendor "claude" "LEAD" 2>/dev/null)" = "claude" ] )
+  [ "$(resolve_orchestrator_vendor "claude" "ORCH" 2>/dev/null)" = "claude" ] )
 assert_success "$?" "A13c LEAD claude 는 그대로"
 # 강제 시 stderr 경고가 나와야(사용자 인지) — 침묵 강등 금지.
 ( set +u; HARNESS_ROOT="$ROOT"; . "$ROOT/bin/lib.sh"
-  resolve_orchestrator_vendor "codex" "LEAD" 2>&1 1>/dev/null | grep -q '강제' )
+  resolve_orchestrator_vendor "codex" "ORCH" 2>&1 1>/dev/null | grep -q '강제' )
 assert_success "$?" "A13d 강제 시 경고 출력(침묵 강등 금지)"
 # awa-up 이 LEAD/PM 직전에 가드를 호출하는지(회귀 가드).
 assert_success "$(grep -q 'resolve_orchestrator_vendor.*LEAD' "$ROOT/bin/awa-up.sh"; echo $?)" "A13e awa-up LEAD 가드 호출"

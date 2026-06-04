@@ -59,16 +59,16 @@ vendor_inject_role() { :; }
 # LEAD 부트 입력에 덧붙일 plan 지시문. claude 는 plan 이 이미 시스템 컨텍스트에
 # 주입(--append-system-prompt-file)되어 LEAD 가 능동 탐색 불필요 → 빈 문자열.
 # $1=plan_file → echo directive(없으면 빈 출력).
-vendor_lead_plan_directive() { :; }
+vendor_orch_plan_directive() { :; }
 
 # 역할별 기본 모델. $1=role → echo model (claude CLI alias = 항상 최신 버전).
-# 품질 우선: haiku 미사용. lead·reviewer 는 최고 모델 opus, 그 외 sonnet.
+# 품질 우선: haiku 미사용. orch·reviewer 는 최고 모델 opus, 그 외 sonnet.
 vendor_default_model() {
   case "$1" in
-    lead|LEAD) echo "opus" ;;
+    orch|ORCH|lead|LEAD) echo "opus" ;;   # lead|LEAD = 구 역할명 하위호환
     reviewer-*|review-manager) echo "opus" ;;   # 리뷰어/리뷰 총괄 — 품질 우선 최고 모델
     researcher) echo "opus" ;;   # 조사 워커 — 대량 정보를 컨텍스트에 담아 종합하므로 최고 모델
-    pm|PM) echo "sonnet" ;;
+    desk|DESK|pm|PM) echo "sonnet" ;;   # pm|PM = 구 역할명 하위호환
     *) echo "sonnet" ;;   # engineer 포함 — 명세된 코드 구현은 sonnet 으로 충분
   esac
 }

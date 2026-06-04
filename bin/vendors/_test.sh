@@ -18,5 +18,5 @@ vendor_gen_settings() {
   printf '%s' "$out"
 }
 vendor_inject_role() { :; }
-vendor_lead_plan_directive() { :; }
+vendor_orch_plan_directive() { :; }
 vendor_default_model() { echo "sonnet"; }

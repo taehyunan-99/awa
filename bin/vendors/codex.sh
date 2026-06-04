@@ -82,11 +82,11 @@ vendor_gen_settings() {
       || cp "$_auth_src" "$ch/auth.json" 2>/dev/null \
       || echo "경고: auth.json 전파 실패 — codex 워커가 로그인 화면에 멈출 수 있음" >&2
   fi
-  # effort 매칭(품질 우선): lead·reviewer=high, 그 외=medium.
+  # effort 매칭(품질 우선): orch·reviewer=high, 그 외=medium.
   # model_reasoning_effort 허용값=minimal|low|medium|high|xhigh.
   local effort
   case "$role" in
-    lead|LEAD|reviewer-*|review-manager) effort="high" ;;
+    orch|ORCH|lead|LEAD|reviewer-*|review-manager) effort="high" ;;   # lead|LEAD = 구 역할명 하위호환
     *) effort="medium" ;;
   esac
   # ★ PreToolUse 권한 게이트 등록 (P12 수정 2026-05-31). 기존엔 hooks.json 을 만들었으나
@@ -166,9 +166,9 @@ vendor_inject_role() { :; }
 # --append-system-prompt-file 이 없어(─ [PROMPT] 위치인자+config+AGENTS.md 자동로드만)
 # plan 을 시스템 컨텍스트로 못 받는다 → LEAD 가 plan 을 능동 탐색해야 하나 비결정적이었음
 # (첫 부트는 rg 로 찾아 성공, 재부트는 헤더 못 찾아 BLOCKED). 해소: plan 파일 절대경로를
-# 부트 입력에 명시해 LEAD 가 반드시 Read 하게 → 결정적. plan 없으면 빈 출력.
+# 부트 입력에 명시해 ORCH 가 반드시 Read 하게 → 결정적. plan 없으면 빈 출력.
 # $1=plan_file → echo directive.
-vendor_lead_plan_directive() {
+vendor_orch_plan_directive() {
   local plan="${1:-}"
   [ -n "$plan" ] || return 0
   printf '확정 plan 파일 `%s` 를 먼저 Read 로 읽어라 — 그 내용이 이번 가동의 확정 plan 이다(시스템 컨텍스트엔 없으니 반드시 직접 읽어라). ' "$plan"
