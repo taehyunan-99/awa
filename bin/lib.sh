@@ -671,6 +671,17 @@ run_with_timeout() {
 # === bookmarks (15차) ===========================================================
 # 단일 출처 — wrapper 스크립트는 이 7개 함수만 호출.
 # 저장 형식: ~/.config/awa/bookmarks.tsv (TSV 5컬럼: path alias preset plan last_used).
+# 사용자 단위 상태 디렉토리 — stats/blocklist 등 학습 영속 상태가 산다.
+# 코드 위치(HARNESS_ROOT)와 분리: 재설치(코드 교체)해도 학습 보존.
+# BOOKMARKS_DIR 와 동일 XDG 베이스 (단일 출처). 디렉토리·시드 파일을 보장한다
+# (bump_stats_counter/append_to_yaml 은 파일 존재 가정 → 부재 시 silent drop 방지).
+_state_config_dir() {
+  local d="${XDG_CONFIG_HOME:-$HOME/.config}/awa"
+  mkdir -p "$d" 2>/dev/null || true
+  [ -f "$d/orch-auto-allow-stats.yaml" ] || printf '# 권한 학습 통계 — bump_stats_counter 누적\npatterns:\n' > "$d/orch-auto-allow-stats.yaml" 2>/dev/null || true
+  [ -f "$d/orch-auto-allow-blocklist.yaml" ] || printf '# 사용자 영구 거부 패턴 — confirm_allow_yaml never 누적\npatterns:\n' > "$d/orch-auto-allow-blocklist.yaml" 2>/dev/null || true
+  printf '%s' "$d"
+}
 BOOKMARKS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/awa"
 BOOKMARKS_FILE="$BOOKMARKS_DIR/bookmarks.tsv"
 
@@ -913,7 +924,7 @@ fi
 # I-9 정정 — 멀티 워커 동시 호출 시 lost update 차단 (add_to_allow 락 패턴 복제).
 bump_stats_counter() {
   local pattern="$1" field="$2"
-  local stats="${HARNESS_ROOT}/config/orch-auto-allow-stats.yaml"
+  local stats; stats="$(_state_config_dir)/orch-auto-allow-stats.yaml"
   [ -f "$stats" ] || return 1
 
   local lock="${stats}.lock"
@@ -1008,9 +1019,9 @@ append_to_yaml() {
 # $1=pattern, exit 0=block 매치, exit 1=매치 안 함
 blocklist_contains() {
   local pattern="$1"
-  local blocklist="${HARNESS_ROOT}/config/orch-auto-allow-blocklist.yaml"
+  local blocklist; blocklist="$(_state_config_dir)/orch-auto-allow-blocklist.yaml"
   [ -f "$blocklist" ] || return 1
-  grep -q "^  - \"$pattern\"$" "$blocklist" 2>/dev/null
+  grep -qxF "  - \"$pattern\"" "$blocklist" 2>/dev/null
 }
 
 # confirm_allow_yaml — 사용자 결정 후 yaml 영구 추가 + stats 갱신
@@ -1062,7 +1073,7 @@ confirm_allow_yaml() {
       ;;
     never)
       # 사용자 영구 거부 — blocklist 추가
-      append_to_yaml "${HARNESS_ROOT}/config/orch-auto-allow-blocklist.yaml" "$pattern" "patterns"
+      append_to_yaml "$(_state_config_dir)/orch-auto-allow-blocklist.yaml" "$pattern" "patterns"
       bump_stats_counter "$pattern" "never" || echo "[WARN] bump_stats_counter never failed for: $pattern" >&2
       ;;
     *)
