@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 
@@ -11,7 +12,7 @@ trap cleanup EXIT
 
 # dev 템플릿 치환 산출물 검증.
 OUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings dev dev
 ')"
 assert_success "$?" "dev settings 생성"
@@ -29,7 +30,7 @@ assert_contains "$DEVSET" "permission-gate.sh" "dev PreToolUse 게이트 보존"
 # 10차 라이브 검증: reviewer 정상 verdict/커서 Write 가 매번 USER-ASK 회색으로 잡히는 결함 수정.
 # 코드 경로 전체 Write(dev 의 Write({PROJ}/**))는 여전히 없어야 격리(코드 수정 lead 감지)가 유지된다.
 RVOUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings reviewer-quality quality-rev
 ')"
 assert_success "$?" "reviewer settings 생성"
@@ -61,10 +62,10 @@ TAB="$(printf '\t')"
 gate_verdict() {  # $1=role $2=tool $3=input_json → stdout: verdict 만
   PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
     set -uo pipefail
-    source '"$ROOT"'/bin/lib.sh
-    source '"$ROOT"'/bin/matrix-lookup.sh
-    source '"$ROOT"'/bin/danger-check.sh
-    source '"$ROOT"'/bin/classify.sh
+    source '"$HARNESS_BIN"'/lib.sh
+    source '"$HARNESS_BIN"'/matrix-lookup.sh
+    source '"$HARNESS_BIN"'/danger-check.sh
+    source '"$HARNESS_BIN"'/classify.sh
     classify "$1" "$2" "$3"
   ' _ "$1" "$2" "$3" | cut -f1
 }
@@ -102,27 +103,27 @@ assert_eq "1" "$([ "$v" != "matrix" ] && echo 1 || echo 0)" "dev Write traversal
 # ── I-1: 정규식 메타문자 미이스케이프 (10차 리뷰) — scope_match 직접 단위테스트 ──
 # pat 의 `+` 등 정규식 메타가 literal 로 이스케이프돼야 의도보다 넓게 매칭되지 않는다.
 SM_RC="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   if scope_match "/proj/ab.py" "/proj/a+b.py"; then echo 0; else echo 1; fi
 ')"
 assert_eq "1" "$SM_RC" "scope_match /proj/ab.py vs /proj/a+b.py → 불일치 (+ literal)"
 
 SM_RC2="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   if scope_match "/secret" "/secre+t"; then echo 0; else echo 1; fi
 ')"
 assert_eq "1" "$SM_RC2" "scope_match /secret vs /secre+t → 불일치 (+ literal)"
 
 # scope_match traversal 직접 단위테스트: path 의 `..` 세그먼트는 항상 불일치.
 SM_TR="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   if scope_match "/proj/../etc/x" "/proj/**"; then echo 0; else echo 1; fi
 ')"
 assert_eq "1" "$SM_TR" "scope_match /proj/../etc/x vs /proj/** → 불일치 (.. 세그먼트 거부)"
 
 # scope_match 정상 파일명 회귀: `..` 가 세그먼트 일부면(점 두개) 거부하지 않는다.
 SM_OK="$(PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   if scope_match "/proj/a..b/x.py" "/proj/**"; then echo 0; else echo 1; fi
 ')"
 assert_eq "0" "$SM_OK" "scope_match /proj/a..b/x.py vs /proj/** → 일치 (점 두개는 세그먼트 일부)"

@@ -41,7 +41,7 @@ cp "$HARNESS_CONFIG/orch-auto-allow-stats.yaml" "$TMPDIR/config/orch-auto-allow-
 cp "$HARNESS_CONFIG/orch-auto-allow-blocklist.yaml" "$TMPDIR/config/orch-auto-allow-blocklist.yaml"
 
 XDG_CONFIG_HOME="$TMPDIR/xdg" HARNESS_PROJECT="$TMPDIR/proj" bash -c '
-  source "'"$ROOT"'/bin/lib.sh"
+  source "'"$HARNESS_BIN"'/lib.sh"
   confirm_allow_yaml "Bash(testpattern:*)" "accepted"
   # learned 는 이제 PROJECT_ROOT/.agent-harness/learned-allow.yaml 에 누적.
   grep -q "Bash(testpattern:\*)" "'"$TMPDIR"'/proj/.agent-harness/learned-allow.yaml"
@@ -56,7 +56,7 @@ cp "$HARNESS_CONFIG/orch-auto-allow-stats.yaml" "$TMPDIR/c2/config/orch-auto-all
 cp "$HARNESS_CONFIG/orch-auto-allow-blocklist.yaml" "$TMPDIR/c2/config/orch-auto-allow-blocklist.yaml"
 
 XDG_CONFIG_HOME="$TMPDIR/c2/xdg" HARNESS_PROJECT="$TMPDIR/c2/proj" bash -c '
-  source "'"$ROOT"'/bin/lib.sh"
+  source "'"$HARNESS_BIN"'/lib.sh"
   confirm_allow_yaml "Bash(git push:*)" "accepted" 2>/dev/null
   # 위험 패턴 → rejected 로 전환 → learned 누적 안 됨 (파일 자체가 없거나 패턴 미포함).
   lf="'"$TMPDIR"'/c2/proj/.agent-harness/learned-allow.yaml"
@@ -84,7 +84,7 @@ cp "$HARNESS_CONFIG/orch-auto-allow-stats.yaml" "$TMPDIR/i8/config/orch-auto-all
 cp "$HARNESS_CONFIG/orch-auto-allow-blocklist.yaml" "$TMPDIR/i8/config/orch-auto-allow-blocklist.yaml"
 
 XDG_CONFIG_HOME="$TMPDIR/i8/xdg" bash -c '
-  source "'"$ROOT"'/bin/lib.sh"
+  source "'"$HARNESS_BIN"'/lib.sh"
   append_to_yaml "'"$TMPDIR"'/i8/config/orch-auto-allow.yaml" "Bash(ls:*)" "learned"
   # learned 카테고리 안에 Bash(ls:*) 있는지 확인
   awk -v c="learned" -v p="  - \"Bash(ls:*)\"" "
@@ -98,7 +98,7 @@ assert_success "$?" "I-8: 다른 카테고리에 있어도 대상 카테고리�
 # 8. I-9 검증 — bump_stats_counter 락 동시성 (락 디렉토리 정리 + 카운터 증가 확인)
 #   stats 는 Task 1 후 XDG(_state_config_dir) 에 기록 → 락도 거기 생김. 격리·검증 경로 모두 XDG.
 XDG_CONFIG_HOME="$TMPDIR/i9/xdg" bash -c '
-  source "'"$ROOT"'/bin/lib.sh"
+  source "'"$HARNESS_BIN"'/lib.sh"
   bump_stats_counter "Bash(test:*)" "confirm"
   # 락 정리 확인 (stats 파일 옆 .lock 디렉토리)
   test ! -d "$(_state_config_dir)/orch-auto-allow-stats.yaml.lock"

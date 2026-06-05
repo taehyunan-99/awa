@@ -7,8 +7,9 @@
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
+. "$SCRIPT_DIR/harness-paths.sh"   # 하니스 경로 단일 출처 — 이동 시 harness-paths.sh 만 수정
+HARNESS_ROOT="$HARNESS"
 
 # 임시 wrapper — awa-up.sh 끝부분의 SKIPPED_PANES 가시화 로직만 추출 모방.
 TMP_WRAP="$(mktemp)"

@@ -43,7 +43,7 @@ agenphony_hits="$(grep -rnE 'agenphony[^-]|agenphony-' \
 assert_eq "" "$agenphony_hits" "G4 agenphony 잔재 0건 — 엄격 모드 (잔존: $agenphony_hits)"
 
 echo "[G5] bin/agenphony-*.sh 부재 (파일명 리네이밍 완료)"
-old_bin_files="$(ls "$ROOT"/bin/agenphony-*.sh 2>/dev/null | wc -l | tr -d ' ')"
+old_bin_files="$(ls "$HARNESS_BIN"/agenphony-*.sh 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "0" "$old_bin_files" "G5 bin/agenphony-*.sh 파일 부재"
 
 echo "[G6] 폴더명 일관성 — basename(PROJECT_ROOT) == 'awa'"

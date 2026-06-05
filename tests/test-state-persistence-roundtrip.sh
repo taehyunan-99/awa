@@ -12,7 +12,7 @@ XDG="$TMPDIR/xdg"
 
 # R1 — never 결정으로 blocklist 학습 생성 (XDG 에 영속)
 XDG_CONFIG_HOME="$XDG" HARNESS_PROJECT="$TMPDIR/proj" bash -c '
-  source "'"$ROOT"'/bin/lib.sh"
+  source "'"$HARNESS_BIN"'/lib.sh"
   mkdir -p "$(_state_config_dir)"
   printf "patterns:\n" > "$(_state_config_dir)/orch-auto-allow-blocklist.yaml"
   printf "# stats\npatterns:\n" > "$(_state_config_dir)/orch-auto-allow-stats.yaml"

@@ -4,9 +4,10 @@
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
-. "$HARNESS_ROOT/bin/lib.sh"
+. "$SCRIPT_DIR/harness-paths.sh"   # 하니스 경로 단일 출처 — 이동 시 harness-paths.sh 만 수정
+HARNESS_ROOT="$HARNESS"
+. "$HARNESS_BIN/lib.sh"
 
 SESSION="t-timeout-$$"
 tmux new-session -d -s "$SESSION" -x 80 -y 24

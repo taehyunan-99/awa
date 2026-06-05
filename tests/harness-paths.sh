@@ -3,7 +3,7 @@
 # 테스트는 이 파일을 source 하고 $HARNESS_BIN 등으로 참조 → 하니스 이동 시 이 파일만 수정.
 # (이동 전: bin 등이 repo 루트. 이동 후: .claude/skills/awa/harness 로 이 한 줄만 변경.)
 _HP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HARNESS="$(cd "$_HP_DIR/.." && pwd)"        # 이동 후: "$_HP_DIR/../.claude/skills/awa/harness"
+HARNESS="$(cd "$_HP_DIR/../.claude/skills/awa/harness" && pwd)"
 HARNESS_BIN="$HARNESS/bin"
 HARNESS_PROFILES="$HARNESS/profiles"
 HARNESS_PROMPTS="$HARNESS/prompts"

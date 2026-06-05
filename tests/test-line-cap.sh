@@ -3,11 +3,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 cap=100
 
-for f in "$ROOT"/prompts/roles/*/*.md; do
+for f in "$HARNESS_PROMPTS"/roles/*/*.md; do
   [ -e "$f" ] || continue
   n="$(wc -l < "$f" | tr -d ' ')"
   rel="${f#$ROOT/}"

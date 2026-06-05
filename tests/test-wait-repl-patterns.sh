@@ -10,8 +10,9 @@
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
+. "$SCRIPT_DIR/harness-paths.sh"   # 하니스 경로 단일 출처 — 이동 시 harness-paths.sh 만 수정
+HARNESS_ROOT="$HARNESS"
 
 # vendor_wait_ready 의 ready/negative 패턴 (bin/vendors/claude.sh 와 동일 — 단일 진실원).
 # 변경 시 claude.sh 와 동시 갱신 필요. (ready 폴링은 wait_repl → vendor_wait_ready 로 이관됨.)

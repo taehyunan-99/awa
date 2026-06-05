@@ -37,8 +37,8 @@ assert_contains "${REVIEWERS[*]}" "reviewer-security:codex" "다벤더 — secur
 # 모든 역할이 resolve_role_file 로 해석되는지 (부팅 가능성 — fail-fast 방지)
 source "$HARNESS_BIN/lib.sh" >/dev/null 2>&1 || true
 for role in engineer researcher reviewer-alignment reviewer-quality reviewer-security review-manager; do
-  RF="$(bash -c 'source '"$ROOT"'/bin/lib.sh
-    resolve_role_file "'"$ROOT"'/prompts" "'"$role"'"')"
+  RF="$(bash -c 'source '"$HARNESS_BIN"'/lib.sh
+    resolve_role_file "'"$HARNESS_PROMPTS"'" "'"$role"'"')"
   assert_success "$?" "역할 $role resolve_role_file 성공"
   assert_contains "$RF" "$role" "역할 $role 파일 경로 해석"
 done

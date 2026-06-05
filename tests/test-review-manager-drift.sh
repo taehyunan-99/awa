@@ -27,9 +27,9 @@ assert_success "$?" "L1 reviewer-alignment 가 plan_alignment 출력 계약 보�
 # 나머지 리뷰어는 plan_alignment 출력을 *요구*하면 안 된다(렌즈 독립).
 #   "출력하지 않는다" 부정 문장은 허용 → "필드 필수/헤더에 기록" 같은 출력 지시 패턴만 위반으로 본다.
 leak=0
-for f in "$ROOT"/prompts/roles/03-quality/reviewer-quality.md \
-         "$ROOT"/prompts/roles/03-quality/reviewer-security.md \
-         "$ROOT"/prompts/roles/03-quality/reviewer-alternative.md; do
+for f in "$HARNESS_PROMPTS"/roles/03-quality/reviewer-quality.md \
+         "$HARNESS_PROMPTS"/roles/03-quality/reviewer-security.md \
+         "$HARNESS_PROMPTS"/roles/03-quality/reviewer-alternative.md; do
   if grep -qE 'plan_alignment: <0\.0~1\.0>.*필수' "$f"; then leak=1; echo "  누출: $(basename "$f")"; fi
 done
 assert_eq "0" "$leak" "L1 quality/security/alternative 는 plan_alignment 출력 안 함(렌즈 독립)"

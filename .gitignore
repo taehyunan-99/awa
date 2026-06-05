@@ -29,8 +29,6 @@ node_modules/
 .claude/*
 !.claude/skills/
 !.claude/skills/**
-config/.orch-auto-allow-marker
-config/*.bak
 
 # .awa/team.yaml 은 동적 팀 명세 — 기본 git 추적(팀 공유·구성 diff).
 # 개인 설정으로 추적 끄려면 아래 주석 해제:

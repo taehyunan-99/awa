@@ -69,7 +69,7 @@ assert_success "$?" "G5 emit JSON jq 파싱 가능"
 echo "[G5b] reason 특수문자 안전 (jq -n 이스케이프) — 라이브러리 모드 source"
 # PERM_GATE_LIB_ONLY=1 로 source 하면 main 미실행 → 함수만 로드 (stdin hang 회피).
 out="$(PERM_GATE_LIB_ONLY=1 WORKER=x ENTRY_ROLE=dev PROJECT_ROOT="$HARNESS_PROJECT" HARNESS_ROOT="$HARNESS" \
-  bash -c 'source "'"$ROOT"'/bin/permission-gate.sh"; emit_deny "danger:rm \"q\" \\back"')"
+  bash -c 'source "'"$HARNESS_BIN"'/permission-gate.sh"; emit_deny "danger:rm \"q\" \\back"')"
 printf '%s' "$out" | jq -e . >/dev/null 2>&1
 assert_success "$?" "G5b 따옴표·역슬래시 reason 도 유효 JSON"
 r="$(printf '%s' "$out" | jq -r '.hookSpecificOutput.permissionDecisionReason')"

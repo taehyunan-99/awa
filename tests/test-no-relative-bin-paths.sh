@@ -5,8 +5,9 @@
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HARNESS_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
+. "$SCRIPT_DIR/harness-paths.sh"   # 하니스 경로 단일 출처 — 이동 시 harness-paths.sh 만 수정
+HARNESS_ROOT="$HARNESS"
 
 # 검사 대상: boot 합본에 실제 들어가는 파일만 — _common.md, _partials/*.md,
 # roles/**/*.md. AGENTS.md / CLAUDE.md / LEARNED_CAUTIONS.md 같은 영역 가이드

@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 
@@ -12,7 +13,7 @@ trap cleanup EXIT
 
 # lib.sh 가 PROJECT_ROOT·HARNESS_ROOT 를 요구하므로 HARNESS_PROJECT 로 격리 후 source.
 OUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings desk desk
 ')"
 rc=$?

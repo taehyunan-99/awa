@@ -5,6 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 
@@ -17,7 +18,7 @@ trap cleanup EXIT
 #   ENTRY_NAME=quality-rev, ENTRY_ROLE=reviewer-quality.
 # generate_worker_settings 의 첫 인자(entry_role)=reviewer-quality 가 settings 파일명·classify 첫 인자.
 RVOUT="$(HARNESS_PROJECT="$TMP_PROJ" PROJECT_ROOT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings reviewer-quality quality-rev
 ')"
 assert_success "$?" "reviewer settings 생성"
@@ -32,10 +33,10 @@ assert_not_contains "$RVSET" "{{PROJECT_ROOT}}" "reviewer settings 토큰 치환
 gate_verdict() {  # $1=tool $2=input_json → stdout: verdict 만
   PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" bash -c '
     set -uo pipefail
-    source '"$ROOT"'/bin/lib.sh
-    source '"$ROOT"'/bin/matrix-lookup.sh
-    source '"$ROOT"'/bin/danger-check.sh
-    source '"$ROOT"'/bin/classify.sh
+    source '"$HARNESS_BIN"'/lib.sh
+    source '"$HARNESS_BIN"'/matrix-lookup.sh
+    source '"$HARNESS_BIN"'/danger-check.sh
+    source '"$HARNESS_BIN"'/classify.sh
     classify reviewer-quality "$1" "$2"
   ' _ "$1" "$2" | cut -f1
 }

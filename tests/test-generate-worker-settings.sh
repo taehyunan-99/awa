@@ -135,7 +135,7 @@ outl="$(generate_worker_settings orch ORCH)"
 TMP_PROJ="$TMP"
 # engineer → dev 군 (코드 쓰기 권한)
 ENG="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings engineer engineer
 ')"
 assert_success "$?" "engineer settings 생성"
@@ -143,7 +143,7 @@ assert_contains "$(cat "$ENG")" "Write($TMP_PROJ/**)" "engineer 는 dev 군(코�
 
 # researcher → readonly 군 (코드 쓰기 없음)
 RES="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings researcher researcher
 ')"
 assert_success "$?" "researcher settings 생성"
@@ -152,7 +152,7 @@ assert_contains "$(cat "$RES")" '"Read"' "researcher 읽기 권한 보유"
 
 # review-manager → readonly 군
 RVM="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings review-manager review-mgr
 ')"
 assert_success "$?" "review-manager settings 생성"
@@ -160,7 +160,7 @@ assert_not_contains "$(cat "$RVM")" "Write($TMP_PROJ/**)" "review-manager 읽기
 
 # 미지정 역할 → readonly fallback (최소권한, deny-bounded)
 UNK="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-  source '"$ROOT"'/bin/lib.sh
+  source '"$HARNESS_BIN"'/lib.sh
   generate_worker_settings some-unknown-role x
 ')"
 assert_success "$?" "미지정 역할도 settings 생성(fail-safe)"
@@ -170,7 +170,7 @@ assert_not_contains "$(cat "$UNK")" "Write($TMP_PROJ/**)" "미지정 역할 fall
 # frontend/backend/infra → dev 군 (코드 쓰기 권한, 결함12 선재 수정)
 for web_role in frontend backend infra; do
   WEB="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-    source '"$ROOT"'/bin/lib.sh
+    source '"$HARNESS_BIN"'/lib.sh
     generate_worker_settings '"$web_role"' '"$web_role"'-1
   ')"
   assert_success "$?" "$web_role settings 생성"

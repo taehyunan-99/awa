@@ -16,7 +16,7 @@ HARNESS_PROJECT="$TMP"
 # shellcheck disable=SC1091
 source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "$TMP" "$PROJECT_ROOT" "HARNESS_PROJECT 우선"
-assert_eq "$ROOT" "$HARNESS_ROOT" "HARNESS_ROOT 는 bin/lib.sh 부모"
+assert_eq "$HARNESS" "$HARNESS_ROOT" "HARNESS_ROOT 는 bin/lib.sh 부모"
 rm -rf "$TMP"
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT HARNESS_PROJECT
 

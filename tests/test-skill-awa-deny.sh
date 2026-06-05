@@ -25,7 +25,7 @@ trap cleanup EXIT
 
 for role in desk frontend reviewer-alignment; do
   OUT="$(HARNESS_PROJECT="$TMP_PROJ" bash -c '
-    source '"$ROOT"'/bin/lib.sh
+    source '"$HARNESS_BIN"'/lib.sh
     generate_worker_settings '"$role"' '"$role"'
   ')"
   gen_deny="$(cat "$OUT" | jq -r '.permissions.deny[]?' 2>/dev/null)"

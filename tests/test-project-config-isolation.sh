@@ -15,7 +15,7 @@ git -C "$PROJ" init -q 2>/dev/null || true
 # C1 — 부트 경로의 config 설치 블록(awa-up.sh:311-333 와 동일 경로)을 직접 실행해
 #   .agent-harness/config 에 생기고 PROJECT_ROOT/config 엔 안 생기는지 검증.
 HARNESS_PROJECT="$PROJ" bash -c '
-  source "'"$ROOT"'/bin/lib.sh"
+  source "'"$HARNESS_BIN"'/lib.sh"
   HARNESS_YAML="$HARNESS_ROOT/config/orch-auto-allow.yaml"
   PROJ_YAML="$PROJECT_ROOT/.agent-harness/config/orch-auto-allow.yaml"
   mkdir -p "$(dirname "$PROJ_YAML")"
