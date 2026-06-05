@@ -5,7 +5,8 @@
 
 set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HARNESS_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$SCRIPT_DIR/../harness-paths.sh"
+HARNESS_ROOT="$HARNESS"
 
 TMP_PROJ="$(mktemp -d -t p2-cold-start.XXXXXX)"
 
@@ -14,14 +15,14 @@ TMP_PROJ="$(mktemp -d -t p2-cold-start.XXXXXX)"
 _AGPN15_XDG="$(mktemp -d)"
 export XDG_CONFIG_HOME="$_AGPN15_XDG"
 
-trap "bash '$HARNESS_ROOT/bin/awa-down.sh' --project '$TMP_PROJ' 2>/dev/null || true; rm -rf '$TMP_PROJ'; rm -rf '$_AGPN15_XDG'" EXIT
+trap "bash '$HARNESS_BIN/awa-down.sh' --project '$TMP_PROJ' 2>/dev/null || true; rm -rf '$TMP_PROJ'; rm -rf '$_AGPN15_XDG'" EXIT
 
 cd "$TMP_PROJ"
 git init -q 2>/dev/null || true
 
 echo "awa-up 시작 — 측정 중..."
 START="$(date +%s)"
-HARNESS_PROJECT="$TMP_PROJ" bash "$HARNESS_ROOT/bin/awa-up.sh" default >/tmp/p2-awa-up.log 2>&1
+HARNESS_PROJECT="$TMP_PROJ" bash "$HARNESS_BIN/awa-up.sh" default >/tmp/p2-awa-up.log 2>&1
 RC=$?
 END="$(date +%s)"
 elapsed=$((END - START))

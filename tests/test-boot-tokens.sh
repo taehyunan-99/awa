@@ -5,6 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 SESSION="t-boot-tokens-$$"
@@ -27,7 +28,7 @@ cleanup() {
 trap cleanup EXIT
 
 # fixture: HARNESS_ROOT 의 prompts/ 복사 후 토큰 박힌 role 들 추가.
-cp -r "$ROOT/prompts" "$FIX_PROMPTS"
+cp -r "$HARNESS_PROMPTS" "$FIX_PROMPTS"
 
 # 워커용 test-role: {{HARNESS_ROOT}} 토큰 박기.
 mkdir -p "$FIX_PROMPTS/roles/02-development" && cat > "$FIX_PROMPTS/roles/02-development/test-role.md" <<'EOF'
@@ -63,7 +64,7 @@ export HARNESS_PROJECT="$TMP_PROJ"
 export AGENT_CMD="cat"
 export PROMPTS_DIR="$FIX_PROMPTS"
 
-bash "$ROOT/bin/awa-up.sh" "$PROF" >/tmp/_t-boot-tokens-out.log 2>/tmp/_t-boot-tokens-err.log
+bash "$HARNESS_BIN/awa-up.sh" "$PROF" >/tmp/_t-boot-tokens-out.log 2>/tmp/_t-boot-tokens-err.log
 rc=$?
 assert_eq "0" "$rc" "awa-up 성공 (rc=$rc, err=$(head -3 /tmp/_t-boot-tokens-err.log 2>/dev/null))"
 
@@ -80,7 +81,7 @@ else
   else
     assert_eq "no-tokens-remaining" "no-tokens-remaining" "워커 boot: 모든 예약 토큰 치환됨"
   fi
-  if grep -qF "$ROOT/bin/dispatch.sh" "$WORKER_BOOT"; then
+  if grep -qF "$HARNESS_BIN/dispatch.sh" "$WORKER_BOOT"; then
     assert_eq "abs-path-present" "abs-path-present" "워커 boot: 절대경로 dispatch.sh 등장"
   else
     assert_eq "abs-path-present" "abs-path-missing" "워커 boot: 절대경로 dispatch.sh 등장 — 첫 5줄: $(head -5 "$WORKER_BOOT")"
@@ -96,7 +97,7 @@ else
   else
     assert_eq "no-tokens-remaining" "no-tokens-remaining" "lead boot: 모든 예약 토큰 치환됨"
   fi
-  if grep -qF "$ROOT/bin/dispatch.sh" "$LEAD_BOOT"; then
+  if grep -qF "$HARNESS_BIN/dispatch.sh" "$LEAD_BOOT"; then
     assert_eq "abs-path-present" "abs-path-present" "lead boot: 절대경로 dispatch.sh 등장"
   else
     assert_eq "abs-path-present" "abs-path-missing" "lead boot: 절대경로 dispatch.sh 등장 — 첫 5줄: $(head -5 "$LEAD_BOOT")"
@@ -132,7 +133,7 @@ else
   else
     assert_eq "no-tokens-remaining" "no-tokens-remaining" "리뷰어 boot: 모든 예약 토큰 치환됨"
   fi
-  if grep -qF "$ROOT/bin/log-event.sh" "$REV_BOOT"; then
+  if grep -qF "$HARNESS_BIN/log-event.sh" "$REV_BOOT"; then
     assert_eq "abs-path-present" "abs-path-present" "리뷰어 boot: 절대경로 log-event.sh 등장"
   else
     assert_eq "abs-path-present" "abs-path-missing" "리뷰어 boot: 절대경로 log-event.sh 등장 — 첫 5줄: $(head -5 "$REV_BOOT")"

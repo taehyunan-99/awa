@@ -5,6 +5,9 @@
 set -uo pipefail
 
 HARNESS_ROOT="${HARNESS_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+# 하니스 디렉토리(bin/config/prompts/profiles/templates) 단일 출처 — 이동 후에도 $HARNESS_* 가 추종.
+# .claude/·tests/·README.md·docs/ 는 repo 루트에 잔류하므로 계속 $HARNESS_ROOT 사용.
+source "$(dirname "$0")/harness-paths.sh"
 SCRIPT_BIRTHDAY_FILE="${HARNESS_ROOT}/docs/differentiation-checkpoints/.birthday"
 
 PASS=0; FAIL=0; SKIP=0; GRACE=0
@@ -44,36 +47,36 @@ check A 1 "Plan 스키마 강제" \
   "grep -q '검증가능성.*abort\\|검증가능성.*FAIL.*abort' ${HARNESS_ROOT}/.claude/skills/awa/SKILL.md" \
   "test -f ${HARNESS_ROOT}/tests/test-awa-plan-review.sh"
 check A 2 "plan-defect 신호 채널" \
-  "grep -q '@plan-defect' ${HARNESS_ROOT}/prompts/roles/01-orchestration/orch.md" \
+  "grep -q '@plan-defect' $HARNESS_PROMPTS/roles/01-orchestration/orch.md" \
   "test -f ${HARNESS_ROOT}/tests/test-plan-defect-e2e.sh"
 check A 3 "ⓖ 섹션 — plan 결함 push" \
-  "grep -q '## ⓖ' ${HARNESS_ROOT}/prompts/roles/01-orchestration/orch.md"
+  "grep -q '## ⓖ' $HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 check A 4 "워커 _common.md plan-defect 한 줄" \
-  "grep -q '@plan-defect' ${HARNESS_ROOT}/prompts/_common.md"
+  "grep -q '@plan-defect' $HARNESS_PROMPTS/_common.md"
 
 # B. 감시 (리뷰 매니저)
 check B 1 "lead 게이트웨이 (사용자 단독 채널)" \
-  "grep -q '사용자 대화 진입 금지\\|desk 경유' ${HARNESS_ROOT}/prompts/roles/01-orchestration/orch.md"
+  "grep -q '사용자 대화 진입 금지\\|desk 경유' $HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 check B 2 "plan_alignment 필드 reviewer 출력" \
-  "grep -rq 'plan_alignment' ${HARNESS_ROOT}/prompts/roles/03-quality/"
+  "grep -rq 'plan_alignment' $HARNESS_PROMPTS/roles/03-quality/"
 check B 3 "worker_turn_count watcher 트리거" \
-  "grep -q 'worker_turn_count' ${HARNESS_ROOT}/bin/watcher.sh"
+  "grep -q 'worker_turn_count' $HARNESS_BIN/watcher.sh"
 check B 4 "리뷰어 verdict 시계열 집계" \
-  "grep -rq '시계열\\|plan-diff' ${HARNESS_ROOT}/prompts/roles/03-quality/review-manager.md"
+  "grep -rq '시계열\\|plan-diff' $HARNESS_PROMPTS/roles/03-quality/review-manager.md"
 check B 5 "review-manager 에이전트 존재 + profile 등록" \
-  "test -f ${HARNESS_ROOT}/prompts/roles/03-quality/review-manager.md" \
-  "grep -qE 'role:[[:space:]]*review-manager' ${HARNESS_ROOT}/profiles/feature-team.yaml"
+  "test -f $HARNESS_PROMPTS/roles/03-quality/review-manager.md" \
+  "grep -qE 'role:[[:space:]]*review-manager' $HARNESS_PROFILES/feature-team.yaml"
 
 # C. 권한 게이트 학습
 check C 1 "permission-gate 자동 허용 카탈로그" \
-  "test -f ${HARNESS_ROOT}/config/orch-auto-allow.yaml"
+  "test -f $HARNESS_CONFIG/orch-auto-allow.yaml"
 check C 2 "classify 분류" \
-  "test -f ${HARNESS_ROOT}/bin/classify.sh"
+  "test -f $HARNESS_BIN/classify.sh"
 check C 3 "danger-check deny 카탈로그" \
-  "test -f ${HARNESS_ROOT}/bin/danger-check.sh"
+  "test -f $HARNESS_BIN/danger-check.sh"
 check C 4 "yaml 영구 누적 (add_to_allow)" \
-  "grep -q 'orch-auto-allow.yaml' ${HARNESS_ROOT}/bin/lib.sh" \
-  "test -f ${HARNESS_ROOT}/config/orch-auto-allow-stats.yaml"
+  "grep -q 'orch-auto-allow.yaml' $HARNESS_BIN/lib.sh" \
+  "test -f $HARNESS_CONFIG/orch-auto-allow-stats.yaml"
 check C 5 "allow ∩ deny 충돌 검증" \
   "test -f ${HARNESS_ROOT}/tests/test-allow-deny-no-overlap.sh" \
   "bash ${HARNESS_ROOT}/tests/test-allow-deny-no-overlap.sh"

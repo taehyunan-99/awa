@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 ORIG_PWD="$PWD"
 
@@ -14,7 +15,7 @@ G="$(mktemp -d)"
 ( cd "$G" && git init -q )
 cd "$G"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "1" "$PROJECT_ROOT_VALID" "정상 경로 VALID=1"
 cd "$ORIG_PWD"
 rm -rf "$G"
@@ -27,7 +28,7 @@ mkdir -p "$B"
 cd "$B"
 set +e
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 rc=$?
 assert_eq "0" "$rc" "source 자체는 exit 0 (F1)"
 assert_eq "0" "$PROJECT_ROOT_VALID" "공백 포함 VALID=0"
@@ -41,7 +42,7 @@ H="$H_PARENT/has#hash"
 mkdir -p "$H"
 cd "$H"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "0" "$PROJECT_ROOT_VALID" "# 포함 VALID=0"
 cd "$ORIG_PWD"
 rm -rf "$H_PARENT"

@@ -4,11 +4,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/matrix-lookup.sh"
+source "$HARNESS_BIN/matrix-lookup.sh"
 
 echo "[P1] prefix_match 매칭 (끝/공백 경계)"
 prefix_match "git add" "git add";    assert_success "$?" "P1 정확일치(끝)"
@@ -52,7 +53,7 @@ echo "[P5] orch_auto_allow_lookup 통합 (실제 yaml 단어경계)"
 # Task 2 후 lookup 은 PROJECT_ROOT/.agent-harness/config 를 봄 — 시드를 거기로 cp(repo 안이라 trap 정리)
 trap 'rm -rf "$ROOT/.agent-harness/config"' EXIT
 mkdir -p "$ROOT/.agent-harness/config"
-cp "$ROOT/config/orch-auto-allow.yaml" "$ROOT/.agent-harness/config/orch-auto-allow.yaml"
+cp "$HARNESS_CONFIG/orch-auto-allow.yaml" "$ROOT/.agent-harness/config/orch-auto-allow.yaml"
 export PROJECT_ROOT="$ROOT"   # lookup 은 ROOT/.agent-harness/config 의 시드를 읽음
 out="$(orch_auto_allow_lookup Bash '{"command":"git add ."}')"
 assert_eq "git-write:Bash(git add:*)" "$out" "P5 git add . 통과"

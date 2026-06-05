@@ -3,10 +3,11 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 export HARNESS_PROJECT="$(mktemp -d)"
 export PROJECT_ROOT="$HARNESS_PROJECT"
-export HARNESS_ROOT="$ROOT"
+export HARNESS_ROOT="$HARNESS"
 ( cd "$HARNESS_PROJECT" && git init -q )
 
 BOOT="$HARNESS_PROJECT/.agent-harness/.boot-settings"
@@ -18,11 +19,11 @@ read-only:
   - "Bash(find:*)"
 YAML
 
-GATE="$ROOT/bin/permission-gate.sh"
+GATE="$HARNESS_BIN/permission-gate.sh"
 run_gate() {  # $1=tool $2=input_json ; stdin event 합성
   local tool="$1" input="$2"
   printf '{"tool_name":"%s","tool_input":%s,"tool_use_id":"tu_123"}' "$tool" "$input" \
-    | WORKER="dev-1" ENTRY_ROLE="dev" PROJECT_ROOT="$HARNESS_PROJECT" HARNESS_ROOT="$ROOT" bash "$GATE"
+    | WORKER="dev-1" ENTRY_ROLE="dev" PROJECT_ROOT="$HARNESS_PROJECT" HARNESS_ROOT="$HARNESS" bash "$GATE"
 }
 
 echo "[G1] matrix MATCH → permissionDecision=allow"
@@ -67,7 +68,7 @@ assert_success "$?" "G5 emit JSON jq 파싱 가능"
 
 echo "[G5b] reason 특수문자 안전 (jq -n 이스케이프) — 라이브러리 모드 source"
 # PERM_GATE_LIB_ONLY=1 로 source 하면 main 미실행 → 함수만 로드 (stdin hang 회피).
-out="$(PERM_GATE_LIB_ONLY=1 WORKER=x ENTRY_ROLE=dev PROJECT_ROOT="$HARNESS_PROJECT" HARNESS_ROOT="$ROOT" \
+out="$(PERM_GATE_LIB_ONLY=1 WORKER=x ENTRY_ROLE=dev PROJECT_ROOT="$HARNESS_PROJECT" HARNESS_ROOT="$HARNESS" \
   bash -c 'source "'"$ROOT"'/bin/permission-gate.sh"; emit_deny "danger:rm \"q\" \\back"')"
 printf '%s' "$out" | jq -e . >/dev/null 2>&1
 assert_success "$?" "G5b 따옴표·역슬래시 reason 도 유효 JSON"

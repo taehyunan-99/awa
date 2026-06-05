@@ -4,6 +4,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
 SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
@@ -20,13 +21,13 @@ trap cleanup EXIT
 
 YAML="$TMP/.agent-harness/config/orch-auto-allow.yaml"
 MARKER="$TMP/.agent-harness/config/.orch-auto-allow-marker"
-run_teamup() { HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team >/dev/null 2>&1; tmux kill-session -t "$SESSION" 2>/dev/null || true; }
+run_teamup() { HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1; tmux kill-session -t "$SESSION" 2>/dev/null || true; }
 
 echo "[YR1] 최초설치: yaml 없음 → 복사 + marker 생성"
 run_teamup
 [ -f "$YAML" ];   assert_success "$?" "YR1 yaml 생성됨"
 [ -f "$MARKER" ]; assert_success "$?" "YR1 marker 생성됨"
-cmp -s "$ROOT/config/orch-auto-allow.yaml" "$YAML"; assert_success "$?" "YR1 하네스와 동일"
+cmp -s "$HARNESS_CONFIG/orch-auto-allow.yaml" "$YAML"; assert_success "$?" "YR1 하네스와 동일"
 
 echo "[YR2] marker있음+같음: 재실행 → 백업 안 만듦(스킵)"
 run_teamup
@@ -38,13 +39,13 @@ printf 'read-only:\n  - "Bash(OLDVERSION:*)"\n' > "$YAML"   # 구버전으로 �
 run_teamup
 bak_count="$(ls "$TMP/.agent-harness/config/"*.bak 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "1" "$bak_count" "YR3 .bak 1개 생성"
-cmp -s "$ROOT/config/orch-auto-allow.yaml" "$YAML"; assert_success "$?" "YR3 하네스 최신으로 교체됨"
+cmp -s "$HARNESS_CONFIG/orch-auto-allow.yaml" "$YAML"; assert_success "$?" "YR3 하네스 최신으로 교체됨"
 grep -q OLDVERSION "$TMP/.agent-harness/config/"*.bak; assert_success "$?" "YR3 구버전이 .bak 에 보존"
 
 echo "[YR4] marker없음+있음: 사용자 작성 → 보존(불변) + 경고"
 rm -f "$TMP/.agent-harness/config/"*.bak "$MARKER"           # marker 제거 = 사용자 작성 취급
 printf 'read-only:\n  - "Bash(USERCUSTOM:*)"\n' > "$YAML"
-warn="$(HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team 2>&1 >/dev/null)"
+warn="$(HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team 2>&1 >/dev/null)"
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 grep -q USERCUSTOM "$YAML"; assert_success "$?" "YR4 사용자 yaml 보존(불변)"
 printf '%s' "$warn" | grep -qiE 'orch-auto-allow|marker|사용자'; assert_success "$?" "YR4 경고 출력"

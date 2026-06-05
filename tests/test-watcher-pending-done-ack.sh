@@ -8,23 +8,24 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/watcher-lib.sh"
+source "$HARNESS_BIN/watcher-lib.sh"
 
 # ── Layer 1: 함수/큐 디렉토리 계약 존재 (grep) ──────────────────────────────
 echo "[L1] watcher-lib.sh 에 큐 적재/재발화 함수 존재"
-assert_success "$(grep -q 'enqueue_pending_done' "$ROOT/bin/watcher-lib.sh"; echo $?)" \
+assert_success "$(grep -q 'enqueue_pending_done' "$HARNESS_BIN/watcher-lib.sh"; echo $?)" \
   "L1a enqueue_pending_done 정의"
-assert_success "$(grep -q 'requeue_pending_done' "$ROOT/bin/watcher-lib.sh"; echo $?)" \
+assert_success "$(grep -q 'requeue_pending_done' "$HARNESS_BIN/watcher-lib.sh"; echo $?)" \
   "L1b requeue_pending_done 정의"
 echo "[L1] watcher.sh 가 두 함수를 메인 루프에서 호출"
-assert_success "$(grep -q 'enqueue_pending_done' "$ROOT/bin/watcher.sh"; echo $?)" \
+assert_success "$(grep -q 'enqueue_pending_done' "$HARNESS_BIN/watcher.sh"; echo $?)" \
   "L1c watcher.sh enqueue 호출"
-assert_success "$(grep -q 'requeue_pending_done' "$ROOT/bin/watcher.sh"; echo $?)" \
+assert_success "$(grep -q 'requeue_pending_done' "$HARNESS_BIN/watcher.sh"; echo $?)" \
   "L1d watcher.sh requeue 호출"
 echo "[L1] orch.md ⓒ 가 종합 후 pending-done ack(rm) 의무 명시"
-assert_success "$(grep -q 'pending-done' "$ROOT/prompts/roles/01-orchestration/orch.md"; echo $?)" \
+assert_success "$(grep -q 'pending-done' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md"; echo $?)" \
   "L1e orch.md pending-done ack 명시"
 
 # ── Layer 2: 실제 동작 (큐 적재 → 재발화 → ack 소비) ────────────────────────

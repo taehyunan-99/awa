@@ -7,13 +7,14 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # 서브셸 안 assert 는 카운터 부모 전파 안 됨(3차 T1 교훈). 모두 메인 셸 평탄 호출.
 
 # lib.sh source 후 _validate_path_chars 함수 사용 가능.
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 
 # T1.1: 현재 HARNESS_ROOT 가 정상 (안전한 문자만) → VALID=1.
 assert_eq "1" "$HARNESS_ROOT_VALID" "정상 HARNESS_ROOT 는 VALID=1"

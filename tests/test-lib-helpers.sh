@@ -3,11 +3,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 export HARNESS_PROJECT="$(mktemp -d)"
 ( cd "$HARNESS_PROJECT" && git init -q )
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 echo "[H1] timestamp 는 epoch 정수"
 ts="$(timestamp)"

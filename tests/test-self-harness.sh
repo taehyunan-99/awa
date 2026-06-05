@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 ORIG_PWD="$PWD"
 
@@ -11,15 +12,15 @@ ORIG_PWD="$PWD"
 # T14.1 — cwd=HARNESS_ROOT 면 PROJECT_ROOT == HARNESS_ROOT (자기작업 대칭성)
 unset HARNESS_PROJECT
 unset PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT HARNESS_ROOT WORKSPACE
-cd "$ROOT"
+cd "$HARNESS"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "$HARNESS_ROOT" "$PROJECT_ROOT" "자기작업: 두 변수 동등"
-assert_eq "$ROOT" "$PROJECT_ROOT" "자기작업: 값은 harness repo"
+assert_eq "$HARNESS" "$PROJECT_ROOT" "자기작업: 값은 harness repo"
 
 # T14.2 — 자기작업 시 .agent-harness/ 가 HARNESS_ROOT 안에 위치
 # (위 source 부수효과 WORKSPACE 그대로 검증, 중복 source 회피)
-expected="$ROOT/.agent-harness"
+expected="$HARNESS/.agent-harness"
 assert_eq "$expected" "$WORKSPACE" "자기작업: WORKSPACE 가 HARNESS_ROOT 안"
 
 cd "$ORIG_PWD"

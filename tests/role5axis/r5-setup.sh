@@ -4,6 +4,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd ../.. && pwd)"
+source "$ROOT/tests/harness-paths.sh"
 SES="r5_$$"
 PROJ="$(mktemp -d)"; WS="$PROJ/.agent-harness"
 mkdir -p "$WS/tasks" "$WS/results"
@@ -23,9 +24,9 @@ EOF
 # (정식 경로: awa-up 이 워커 boot 를 만든다. 여기선 관측이라 dev 1개만 직접 기동.)
 DEV_BOOT="$WS/.boot-dev.md"
 # source 는 stdout/stderr 모두 막아 $() 오염 방지(lib.sh source-safe·stdout 빈 것 실측, 미래 방어).
-_dev_role="$(. "$ROOT/bin/lib.sh" >/dev/null 2>&1; resolve_role_file "$ROOT/prompts" dev)"
+_dev_role="$(. "$HARNESS_BIN/lib.sh" >/dev/null 2>&1; resolve_role_file "$HARNESS_PROMPTS" dev)"
 [ -n "$_dev_role" ] || { echo "오류: dev 역할파일 글롭 해석 실패 (Task1 적용됐나?)" >&2; exit 1; }
-cat "$ROOT/prompts/_common.md" "$_dev_role" \
+cat "$HARNESS_PROMPTS/_common.md" "$_dev_role" \
   | sed -e "s#{{WORKER_NAME}}#dev#g" -e "s#{{SESSION}}#$SES#g" -e "s#{{HARNESS_ROOT}}#$ROOT#g" > "$DEV_BOOT"
 
 tmux new-session -d -s "$SES" -c "$PROJ" -x 200 -y 50 -n team

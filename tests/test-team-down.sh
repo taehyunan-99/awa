@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="td_$$"
@@ -27,12 +28,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$ROOT/bin/awa-up.sh" default >/dev/null
+bash "$HARNESS_BIN/awa-up.sh" default >/dev/null
 sleep 0.2
 [ -f "$TMP_PROJ/.agent-harness/.boot/dev.md" ]; assert_eq "0" "$?" "boot 파일 사전 존재"
 
 # 정상 정리 (marker 있음)
-SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/awa-down.sh"
+SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$HARNESS_BIN/awa-down.sh"
 assert_eq "0" "$?" "awa-down 성공"
 
 tmux has-session -t "$SESSION_OVERRIDE" 2>/dev/null; assert_fail "$?" "세션 제거됨"
@@ -40,7 +41,7 @@ tmux has-session -t "$SESSION_OVERRIDE" 2>/dev/null; assert_fail "$?" "세션 �
 assert_eq "0" "$r" ".boot 비워짐"
 
 # 멱등: 세션 없어도 실패하지 않음 (marker 이미 제거됨 → marker-없음 분기, exit 0)
-SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/awa-down.sh"
+SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$HARNESS_BIN/awa-down.sh"
 assert_eq "0" "$?" "세션 없어도 멱등 성공"
 
 # T10.1 — marker 있을 때 정상 정리 (독립 임시 프로젝트)
@@ -51,7 +52,7 @@ touch "$TMP_PROJ2/.claude/.agent-harness-marker"
 echo '{}' > "$TMP_PROJ2/.claude/settings.json"
 echo "x" > "$TMP_PROJ2/.agent-harness/events.log"
 SESSION_OVERRIDE="td_test_$$" tmux new-session -d -s "td_test_$$" 2>/dev/null
-SESSION_OVERRIDE="td_test_$$" bash "$ROOT/bin/awa-down.sh"
+SESSION_OVERRIDE="td_test_$$" bash "$HARNESS_BIN/awa-down.sh"
 [ ! -f "$TMP_PROJ2/.agent-harness/events.log" ]; assert_success "$?" "events.log 정리됨 (marker 있음)"
 [ ! -f "$TMP_PROJ2/.claude/settings.json" ]; assert_success "$?" "settings.json 정리됨"
 [ ! -f "$TMP_PROJ2/.claude/.agent-harness-marker" ]; assert_success "$?" "marker 정리됨"
@@ -64,7 +65,7 @@ mkdir -p "$TMP_PROJ3/.claude" "$TMP_PROJ3/.agent-harness"
 # marker 일부러 없음
 echo '{"keep":true}' > "$TMP_PROJ3/.claude/settings.json"
 echo "user-data" > "$TMP_PROJ3/.agent-harness/events.log"
-SESSION_OVERRIDE="td_nomark_$$" bash "$ROOT/bin/awa-down.sh" >/dev/null 2>&1
+SESSION_OVERRIDE="td_nomark_$$" bash "$HARNESS_BIN/awa-down.sh" >/dev/null 2>&1
 assert_eq "0" "$?" "marker 없어도 exit 0"
 [ -f "$TMP_PROJ3/.agent-harness/events.log" ]; assert_success "$?" "events.log 보존됨 (marker 없음)"
 [ -f "$TMP_PROJ3/.claude/settings.json" ]; assert_success "$?" "settings.json 보존됨 (marker 없음)"

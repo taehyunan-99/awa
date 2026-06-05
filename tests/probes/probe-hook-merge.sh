@@ -22,6 +22,7 @@ set -uo pipefail
 [ "${RUN_LIVE:-0}" = "1" ] || { echo "SKIP (RUN_LIVE 미설정)"; exit 0; }
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
+source "$ROOT/tests/harness-paths.sh"
 
 PROBE_DIR="$(mktemp -d)"
 SES="probehm_$$"
@@ -32,7 +33,7 @@ trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-ki
 
 # ★ HARNESS_PROJECT export 필수: lib.sh:27 이 PROJECT_ROOT 를 resolve_project_root 로 무조건
 #   재대입 → HARNESS_PROJECT 우선. 안 주면 PROJECT_ROOT 가 ROOT(repo)로 덮어써짐.
-export HARNESS_PROJECT="$PROBE_DIR" PROJECT_ROOT="$PROBE_DIR" HARNESS_ROOT="$ROOT"
+export HARNESS_PROJECT="$PROBE_DIR" PROJECT_ROOT="$PROBE_DIR" HARNESS_ROOT="$HARNESS"
 ( cd "$PROBE_DIR" && git init -q )   # resolve_project_root 의 git toplevel 안정화
 mkdir -p "$PROBE_DIR/.agent-harness/state/pending-asks" \
          "$PROBE_DIR/config" \
@@ -45,13 +46,13 @@ read-only:
 YAML
 
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 # ── 스코프 1: project .claude/settings.json — awa-up 과 동일 (6차: 빈 {}, hook 은 워커로 이관) ──
 #   이게 빈 {} 인데도 events.log 가 찍혀야 함 = PostToolUse 가 워커 --settings 에서 산다는 증명.
 sed -e "s#{{PROJECT_ROOT}}#$PROBE_DIR#g" \
     -e "s#{{HARNESS_ROOT}}#$ROOT#g" \
-    "$ROOT/templates/settings.json.tpl" > "$PROBE_DIR/.claude/settings.json"
+    "$HARNESS_TEMPLATES/settings.json.tpl" > "$PROBE_DIR/.claude/settings.json"
 
 # ── 스코프 2: 워커 --settings — generate_worker_settings 로 실제 산출(PreToolUse + PostToolUse 공존) ──
 #   awa-up 과 동일 경로. dev 템플릿엔 Edit allow 가 없어 회색 → H1 게이트 걸림 방지 위해

@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="e2e_$$"
@@ -24,14 +25,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$ROOT/bin/awa-up.sh" default >/dev/null
+bash "$HARNESS_BIN/awa-up.sh" default >/dev/null
 sleep 0.5
 
 # 작업 파일 작성
 echo "# E1: E2E 더미 작업" > "$TMP_PROJ/.agent-harness/tasks/E1.md"
 
 # dispatch → wait → 결과 확인
-SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$ROOT/bin/dispatch.sh" engineer E1
+SESSION_OVERRIDE="$SESSION_OVERRIDE" bash "$HARNESS_BIN/dispatch.sh" engineer E1
 assert_eq "0" "$?" "E2E dispatch 성공"
 
 # P11 탈-tmux: dummy-worker 는 더 이상 wait-for -S 를 보내지 않고 events.log 에 done 라인을

@@ -3,22 +3,23 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
+source "$HARNESS_BIN/lib.sh" >/dev/null 2>&1 || true
 
 for f in dev tester; do
-  content="$(cat "$(resolve_role_file "$ROOT/prompts" "$f")")"
+  content="$(cat "$(resolve_role_file "$HARNESS_PROMPTS" "$f")")"
   assert_contains "$content" "권한 거부" "$f.md: 단락 존재"
   assert_contains "$content" "재시도 금지" "$f.md: 재시도 금지 명시"
   assert_contains "$content" "메인" "$f.md: 사용자/메인 보고 지시"
 done
 
-dev_c="$(cat "$(resolve_role_file "$ROOT/prompts" dev)")"
+dev_c="$(cat "$(resolve_role_file "$HARNESS_PROMPTS" dev)")"
 assert_contains "$dev_c" "budget" "dev.md ⑤ effort budget 명시"
 assert_contains "$dev_c" "EVIDENCE" "dev.md ③ evidence 구체화"
 
-test_c="$(cat "$(resolve_role_file "$ROOT/prompts" tester)")"
+test_c="$(cat "$(resolve_role_file "$HARNESS_PROMPTS" tester)")"
 assert_contains "$test_c" "budget" "tester.md ⑤ effort budget 명시"
 
 test_summary

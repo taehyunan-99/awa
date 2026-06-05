@@ -3,8 +3,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-content="$(cat "$ROOT/prompts/_common.md")"
+content="$(cat "$HARNESS_PROMPTS/_common.md")"
 
 assert_contains "$content" "권한·rm 정책" "섹션 제목"
 assert_contains "$content" "@orch: rm" "rm 위임 보고 형식"

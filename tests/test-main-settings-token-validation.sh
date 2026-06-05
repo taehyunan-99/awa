@@ -5,6 +5,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
@@ -23,7 +24,7 @@ trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
 echo "[M1] 정상 awa-up — 워커 settings 토큰 치환 완료 (PostToolUse log-event)"
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 rc=$?
 assert_eq "0" "$rc" "M1 awa-up 성공"
 # 6차: project settings.json 은 빈 {} — 토큰 치환 검증은 워커 settings 에서.
@@ -37,11 +38,11 @@ content="$(cat "$worker_settings" 2>/dev/null || true)"
 assert_eq "" "$(printf '%s' "$content" | grep -oE '\{\{[A-Z_]+\}\}')" "M1 토큰 잔존 없음"
 # 치환 결과에 실제 경로 포함 (PostToolUse log-event)
 assert_contains "$content" "$TMP/.agent-harness/events.log" "M1 PROJECT_ROOT 치환"
-assert_contains "$content" "$ROOT/bin/log-event.sh" "M1 HARNESS_ROOT 치환 (PostToolUse)"
+assert_contains "$content" "$HARNESS_BIN/log-event.sh" "M1 HARNESS_ROOT 치환 (PostToolUse)"
 # PreToolUse permission-gate 도 함께 (단일 --settings 공존 확인)
-assert_contains "$content" "$ROOT/bin/permission-gate.sh" "M1 PreToolUse permission-gate 공존"
+assert_contains "$content" "$HARNESS_BIN/permission-gate.sh" "M1 PreToolUse permission-gate 공존"
 
-bash "$ROOT/bin/awa-down.sh" --project "$TMP" >/dev/null 2>&1 || true
+bash "$HARNESS_BIN/awa-down.sh" --project "$TMP" >/dev/null 2>&1 || true
 
 echo "[M2] 손상된 템플릿 — 토큰 잔존 시 fail-fast"
 # fixture: harness 전체 사본 + 템플릿에 sed 가 못 잡는 화이트리스트 외 토큰 박기.
@@ -55,10 +56,10 @@ cleanup_m2() {
   rm -rf "$TMP2" "$FIX_HARNESS"
 }
 trap 'cleanup; cleanup_m2' EXIT
-cp -r "$ROOT/templates" "$FIX_HARNESS/templates"
-cp -r "$ROOT/bin" "$FIX_HARNESS/bin"
-cp -r "$ROOT/prompts" "$FIX_HARNESS/prompts"
-cp -r "$ROOT/profiles" "$FIX_HARNESS/profiles"
+cp -r "$HARNESS_TEMPLATES" "$FIX_HARNESS/templates"
+cp -r "$HARNESS_BIN" "$FIX_HARNESS/bin"
+cp -r "$HARNESS_PROMPTS" "$FIX_HARNESS/prompts"
+cp -r "$HARNESS_PROFILES" "$FIX_HARNESS/profiles"
 # 화이트리스트 외 토큰 박기 — sed 가 못 잡고 잔존 → 광범위 검증 grep 가 fail 시킴.
 cat > "$FIX_HARNESS/templates/settings.json.tpl" <<'TPL'
 {"hooks":{"PostToolUse":[{"matcher":"Write","hooks":[{"type":"command","command":"X={{UNKNOWN_TOKEN}} bash {{HARNESS_ROOT}}/bin/log-event.sh"}]}]}}

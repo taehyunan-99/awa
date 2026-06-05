@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 S="tuh_$$"
@@ -30,7 +31,7 @@ REVIEWERS=("qual:reviewer-quality:haiku")
 LEAD_MODEL="opus"
 EOF
 
-AGENT_CMD="cat" bash "$ROOT/bin/awa-up.sh" "$PROF" >/dev/null 2>&1
+AGENT_CMD="cat" bash "$HARNESS_BIN/awa-up.sh" "$PROF" >/dev/null 2>&1
 rc=$?
 assert_success "$rc" "awa-up 2윈도우 가동"
 

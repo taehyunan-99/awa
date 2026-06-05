@@ -6,13 +6,14 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/spec-parse.sh"
+source "$HARNESS_BIN/spec-parse.sh"
 
 echo "test-profile-reviewers.sh"
 
 # Layer 1: REVIEWERS 배열 4개 토큰 (yaml 파서로 로드)
-spec_parse_load "$ROOT/profiles/feature-team.yaml"
+spec_parse_load "$HARNESS_PROFILES/feature-team.yaml"
 
 assert_contains "${REVIEWERS[*]}" "spec-rev:reviewer-spec" "L1 spec-rev 토큰"
 assert_contains "${REVIEWERS[*]}" "quality-rev:reviewer-quality" "L1 quality-rev 토큰"
@@ -20,15 +21,15 @@ assert_contains "${REVIEWERS[*]}" "arch-rev:reviewer-arch" "L1 arch-rev 토큰"
 assert_contains "${REVIEWERS[*]}" "review-mgr:review-manager" "L1 review-mgr 토큰"
 
 # Layer 2: awa-up.sh 가 REVIEWERS 배열을 처리하는지
-grep -q 'REVIEWERS' "$ROOT/bin/awa-up.sh"
+grep -q 'REVIEWERS' "$HARNESS_BIN/awa-up.sh"
 assert_success "$?" "L2 awa-up.sh REVIEWERS 처리"
 
 # Layer 2: REVIEW_MANAGER_PANE env 주입 (I-3 정정 후)
-grep -q 'REVIEW_MANAGER_PANE' "$ROOT/bin/awa-up.sh"
+grep -q 'REVIEW_MANAGER_PANE' "$HARNESS_BIN/awa-up.sh"
 assert_success "$?" "L2 awa-up.sh REVIEW_MANAGER_PANE 주입"
 
 # Layer 2: watcher.sh REVIEW_MANAGER_PANE env 사용 (I-3 정정)
-grep -q 'REVIEW_MANAGER_PANE' "$ROOT/bin/watcher.sh"
+grep -q 'REVIEW_MANAGER_PANE' "$HARNESS_BIN/watcher.sh"
 assert_success "$?" "L2 watcher.sh REVIEW_MANAGER_PANE 사용"
 
 test_summary

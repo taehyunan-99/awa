@@ -11,6 +11,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ../assert.sh
+source ../harness-paths.sh
 source ./stress-lib.sh
 ROOT="$(cd ../.. && pwd)"
 
@@ -45,7 +46,7 @@ WORKERS="${WORKERS# }"
 # watcher 백그라운드 기동 (reviewer 없음 — done/gate 만 측정).
 SESSION="$SES" ORCH_PANE="$ORCH_PANE" REVIEWER_PANES="" \
 STATE_DIR="$TMP_STATE" EVENTS="$EVENTS" SEEN="$TMP_STATE/.watcher-seen" \
-  bash "$ROOT/bin/watcher.sh" &
+  bash "$HARNESS_BIN/watcher.sh" &
 WPID=$!
 sleep 2.5   # 첫 폴링 사이클 보장
 

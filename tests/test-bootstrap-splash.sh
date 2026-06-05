@@ -2,7 +2,8 @@
 # awa-up.sh splash 정적 검사 — 셸 splash 미주입(원복) + 팀 요약 append + 훅 설치.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/tests/assert.sh"
-UP="$ROOT/bin/awa-up.sh"
+. "$ROOT/tests/harness-paths.sh"
+UP="$HARNESS_BIN/awa-up.sh"
 
 # B1: 셸 splash 주입 제거 — bootstrap_pane 의 send-keys 줄에 awa-splash.sh 가 없어야 함.
 splash_in_sendkeys="$(grep -n 'awa-splash.sh' "$UP" | grep -E 'send-keys' || true)"
@@ -39,7 +40,7 @@ assert_contains "$hook_line" "SPLASH_POPUP" "B5f 훅이 SPLASH_POPUP 사용"
 assert_contains "$hook_line" "-t \"\$SESSION\"" "B5g 세션 스코프 set-hook"
 
 # B5h: splash 가 커서를 숨긴다 — popup 100% 여도 하드웨어 커서가 비치므로.
-assert_contains "$(cat "$ROOT/bin/awa-splash.sh")" '\033[?25l' "B5h 커서 숨김(splash)"
+assert_contains "$(cat "$HARNESS_BIN/awa-splash.sh")" '\033[?25l' "B5h 커서 숨김(splash)"
 
 # B6: 팀 요약 파일 경로가 splash 와 awa-up 에서 동일 기본값(HOME/.cache/awa/team-summary.txt).
 assert_contains "$(cat "$UP")" "team-summary.txt" "B6 팀 요약 파일 경로"

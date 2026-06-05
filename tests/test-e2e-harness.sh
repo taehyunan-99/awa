@@ -6,8 +6,9 @@ set -uo pipefail
 # E2E PASS = "메커니즘 배선 정상" ≠ "하네스 전체 동작 보장". 의도된 한계.
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 export WORKSPACE="$TMP"

@@ -7,6 +7,7 @@ set -uo pipefail
 [ "${RUN_LIVE:-0}" = "1" ] || { echo "SKIP (RUN_LIVE 미설정)"; exit 0; }
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
+source "$ROOT/tests/harness-paths.sh"
 
 # REPL 준비 대기 — ★ 확정 신호로 판정 (probe-hook-merge 교훈: '❯' 단독은 부팅 중 빈
 #   입력선을 ready 로 오인 → 지시가 REPL 에 안 들어가 위양성). 상태줄/박스 신호로 강화.
@@ -100,13 +101,13 @@ rm -rf "$P7_DIR"
 #     그 이름을 추가하는 후속 정정 (Task 5 의 matcher 문자열). docs 가 Agent 라 했으나 버전차 대비.
 # ============================================================================
 P8_DIR="$(mktemp -d)"; P8_SES="probeP8_$$"
-export HARNESS_PROJECT="$P8_DIR" PROJECT_ROOT="$P8_DIR" HARNESS_ROOT="$ROOT"
+export HARNESS_PROJECT="$P8_DIR" PROJECT_ROOT="$P8_DIR" HARNESS_ROOT="$HARNESS"
 ( cd "$P8_DIR" && git init -q )
 mkdir -p "$P8_DIR/.agent-harness/state/pending-asks" "$P8_DIR/config" "$P8_DIR/.agent-harness/.boot-settings"
 echo '{"permissions":{"allow":[]}}' > "$P8_DIR/.agent-harness/.boot-settings/dev.json"
 echo 'read-only:' > "$P8_DIR/config/orch-auto-allow.yaml"   # 빈 카테고리 (Agent 가 gray 로)
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 P8_SET="$(generate_worker_settings dev dev-1)"
 tmux kill-session -t "$P8_SES" 2>/dev/null || true
 tmux new-session -d -s "$P8_SES" -c "$P8_DIR" -x 200 -y 50

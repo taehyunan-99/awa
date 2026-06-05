@@ -3,6 +3,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
@@ -12,12 +13,12 @@ export XDG_CONFIG_HOME="$_AGPN15_XDG"
 trap 'rm -rf "$_AGPN15_XDG"' EXIT
 
 echo "[P1] 소스에 set-option @awa-project 존재"
-assert_contains "$(cat "$ROOT/bin/awa-up.sh")" '@awa-project' "P1 옵션 기록 코드"
+assert_contains "$(cat "$HARNESS_BIN/awa-up.sh")" '@awa-project' "P1 옵션 기록 코드"
 
 echo "[P2] cat 더미 가동 후 @awa-project = PROJECT_ROOT"
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; SESSION="awa-$SAFE"
 ( cd "$TMP" && git init -q )
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 got="$(tmux show-options -t "$SESSION" -v @awa-project 2>/dev/null || true)"
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 rm -rf "$TMP"

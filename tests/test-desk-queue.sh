@@ -6,6 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="desk_$$"
@@ -23,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-bash "$ROOT/bin/awa-up.sh" default >/dev/null
+bash "$HARNESS_BIN/awa-up.sh" default >/dev/null
 sleep 0.5
 
 # orch 페인 찾기 (pane_title=ORCH).

@@ -7,11 +7,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # deny 블록을 갖는 모든 역할군 템플릿이 Skill(awa) 를 차단해야 한다.
 for tpl in desk orch dev test readonly reviewer; do
-  f="$ROOT/templates/settings.${tpl}.json.tpl"
+  f="$HARNESS_TEMPLATES/settings.${tpl}.json.tpl"
   [ -f "$f" ] || { assert_eq "1" "0" "$tpl 템플릿 존재"; continue; }
   deny="$(sed -e 's|{{[^}]*}}|null|g' "$f" | jq -r '.permissions.deny[]?' 2>/dev/null)"
   assert_contains "$deny" "Skill(awa)" "$tpl 템플릿 deny 에 Skill(awa) (재귀 가동 차단)"

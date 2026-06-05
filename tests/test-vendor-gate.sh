@@ -3,7 +3,8 @@
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/tests/assert.sh"
-BRIDGE="$ROOT/bin/vendors/codex-gate-bridge.sh"
+. "$ROOT/tests/harness-paths.sh"
+BRIDGE="$HARNESS_BIN/vendors/codex-gate-bridge.sh"
 TMPDIR_G="$(mktemp -d)"; trap 'rm -rf "$TMPDIR_G"' EXIT
 mkdir -p "$TMPDIR_G/.agent-harness/state"
 mkdir -p "$TMPDIR_G/.agent-harness/review"   # apply_patch verdict 경로 특례 검증용
@@ -16,7 +17,7 @@ run_bridge() {  # stdin=codex hook JSON → stdout. GATE_SKIP_WAIT=1 로 gray �
   #   HARNESS_PROJECT 고정: lib.sh source 시 resolve_project_root 가 PROJECT_ROOT 를 cwd
   #   toplevel(=하니스 레포)로 덮어쓰는 걸 차단. bridge 가 이제 HARNESS_PROJECT 를 전파하므로
   #   실제 codex hook 경로(cwd=PROJECT_ROOT)와 동형. ENTRY_ROLE 인자(기본 dev)로 역할 가변.
-  PROJECT_ROOT="$TMPDIR_G" HARNESS_PROJECT="$TMPDIR_G" HARNESS_ROOT="$ROOT" \
+  PROJECT_ROOT="$TMPDIR_G" HARNESS_PROJECT="$TMPDIR_G" HARNESS_ROOT="$HARNESS" \
     WORKER="${1:-dev}" ENTRY_ROLE="${1:-dev}" \
     GATE_SKIP_WAIT=1 bash "$BRIDGE"
 }

@@ -6,9 +6,10 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/watcher-lib.sh"
+source "$HARNESS_BIN/watcher-lib.sh"
 
 # ── L2: scan_verdict_quorum 함수 동작 (fixture review/ + mktemp -d 격리) ──────
 WORK="$(mktemp -d)"
@@ -78,20 +79,20 @@ out="$(scan_verdict_quorum "$WORK/nonexistent" "$STATE" 2)"
 assert_eq "" "$out" "S9: review/ 없으면 무해 빈 emit"
 
 # ── L1: watcher.sh 배선 (grep 구조) ──────────────────────────────────────────
-WSH="$(cat "$ROOT/bin/watcher.sh")"
+WSH="$(cat "$HARNESS_BIN/watcher.sh")"
 assert_contains "$WSH" "scan_verdict_quorum" "L1-watcher: scan_verdict_quorum 호출"
 assert_contains "$WSH" "@verdict-arrived:" "L1-watcher: @verdict-arrived 발화"
 assert_contains "$WSH" 'EXPECTED_VOTERS' "L1-watcher: EXPECTED_VOTERS env 수신"
 assert_contains "$WSH" 'dirname "$EVENTS"' "L1-watcher: review_dir 를 EVENTS 에서 도출"
 
 # ── L1: awa-up.sh 배선 (grep 구조) ───────────────────────────────────────────
-AUP="$(cat "$ROOT/bin/awa-up.sh")"
+AUP="$(cat "$HARNESS_BIN/awa-up.sh")"
 assert_contains "$AUP" "EXPECTED_VOTERS=0" "L1-awaup: EXPECTED_VOTERS 초기화"
 assert_contains "$AUP" "reviewer-alignment|reviewer-quality|reviewer-security" "L1-awaup: 투표 리뷰어 카운트 case"
 assert_contains "$AUP" 'EXPECTED_VOTERS=\"$EXPECTED_VOTERS\"' "L1-awaup: watcher env 주입"
 
 # ── L1: orch.md 규약 (grep 구조) ─────────────────────────────────────────────
-ORCH="$(cat "$ROOT/prompts/roles/01-orchestration/orch.md")"
+ORCH="$(cat "$HARNESS_PROMPTS/roles/01-orchestration/orch.md")"
 assert_contains "$ORCH" "@verdict-arrived:" "L1-orch: @verdict-arrived 신호 등록"
 assert_contains "$ORCH" "신호 9종" "L1-orch: 신호 8종→9종 갱신"
 assert_contains "$ORCH" ".verdict-fired" "L1-orch: 마커 ack 규약"

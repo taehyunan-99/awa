@@ -3,12 +3,13 @@
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/tests/assert.sh"
+. "$ROOT/tests/harness-paths.sh"
 TMPDIR_F="$(mktemp -d)"; trap 'rm -rf "$TMPDIR_F"' EXIT
 
 # F1: codex gen_settings 가 쓰기 불가 CODEX_HOME 경로에서 rc1.
 ( set +u
-  HARNESS_ROOT="$ROOT"; PROJECT_ROOT="/dev/null/awa-nodir"
-  . "$ROOT/bin/vendors/codex.sh"
+  HARNESS_ROOT="$HARNESS"; PROJECT_ROOT="/dev/null/awa-nodir"
+  . "$HARNESS_BIN/vendors/codex.sh"
   vendor_gen_settings "dev" >/dev/null 2>&1 )
 assert_fail "$?" "F1 codex gen_settings rc1 on 쓰기불가"
 
@@ -17,30 +18,30 @@ assert_fail "$?" "F1 codex gen_settings rc1 on 쓰기불가"
 # source *이후* HARNESS_ROOT 를 빈 디렉토리로 덮어써 재현한다(L7 우회).
 ( set +u
   PROJECT_ROOT="$TMPDIR_F/proj"; mkdir -p "$PROJECT_ROOT"
-  . "$ROOT/bin/lib.sh"; . "$ROOT/bin/vendors/claude.sh"
+  . "$HARNESS_BIN/lib.sh"; . "$HARNESS_BIN/vendors/claude.sh"
   HARNESS_ROOT="$TMPDIR_F/no-templates"
   vendor_gen_settings "dev" >/dev/null 2>&1 )
 assert_fail "$?" "F2 claude gen_settings rc1 on 템플릿부재"
 
 # F3: codex lead → config.toml effort=high + model_reasoning_effort 키.
-( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_F/cx-lead"; mkdir -p "$PROJECT_ROOT"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "orch" "ORCH" >/dev/null 2>&1 )
+( set +u; HARNESS_ROOT="$HARNESS"; PROJECT_ROOT="$TMPDIR_F/cx-lead"; mkdir -p "$PROJECT_ROOT"
+  . "$HARNESS_BIN/vendors/codex.sh"; vendor_gen_settings "orch" "ORCH" >/dev/null 2>&1 )
 cfg="$TMPDIR_F/cx-lead/.agent-harness/.codex/config.toml"
 assert_contains "$(cat "$cfg" 2>/dev/null)" 'model_reasoning_effort = "high"' "F3 codex lead effort=high"
 
 # F4: codex dev → effort=medium. reviewer 도 high(품질 우선).
-( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_F/cx-dev"; mkdir -p "$PROJECT_ROOT"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "dev" "d" >/dev/null 2>&1 )
+( set +u; HARNESS_ROOT="$HARNESS"; PROJECT_ROOT="$TMPDIR_F/cx-dev"; mkdir -p "$PROJECT_ROOT"
+  . "$HARNESS_BIN/vendors/codex.sh"; vendor_gen_settings "dev" "d" >/dev/null 2>&1 )
 assert_contains "$(cat "$TMPDIR_F/cx-dev/.agent-harness/.codex/config.toml" 2>/dev/null)" \
   'model_reasoning_effort = "medium"' "F4 codex dev effort=medium"
-( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_F/cx-rev"; mkdir -p "$PROJECT_ROOT"
-  . "$ROOT/bin/vendors/codex.sh"; vendor_gen_settings "reviewer-quality" "r" >/dev/null 2>&1 )
+( set +u; HARNESS_ROOT="$HARNESS"; PROJECT_ROOT="$TMPDIR_F/cx-rev"; mkdir -p "$PROJECT_ROOT"
+  . "$HARNESS_BIN/vendors/codex.sh"; vendor_gen_settings "reviewer-quality" "r" >/dev/null 2>&1 )
 assert_contains "$(cat "$TMPDIR_F/cx-rev/.agent-harness/.codex/config.toml" 2>/dev/null)" \
   'model_reasoning_effort = "high"' "F4b codex reviewer effort=high(품질우선)"
 
 # F5: ready 오탐 차단 — boot 명령 자체가 wait_ready 의 ready 패턴(OpenAI Codex|❯)을 포함하면
 #   pane 의 명령 echo 가 TUI 로드 전 ready 로 오판된다. boot_cmd 가 ready 패턴 미포함이어야 함.
-bootcmd="$( set +u; PROJECT_ROOT="$TMPDIR_F/p"; . "$ROOT/bin/vendors/codex.sh"
+bootcmd="$( set +u; PROJECT_ROOT="$TMPDIR_F/p"; . "$HARNESS_BIN/vendors/codex.sh"
   vendor_boot_cmd "gpt-5.5" "" "" "" )"
 printf '%s' "$bootcmd" | grep -qE 'OpenAI Codex|❯'
 assert_fail "$?" "F5 codex boot 명령이 ready 패턴 미포함(echo 오탐 차단)"
@@ -49,8 +50,8 @@ assert_fail "$?" "F5 codex boot 명령이 ready 패턴 미포함(echo 오탐 차
 #   등록되는지 (P12 2026-05-31: codex 는 hooks.json 을 안 읽음 → config.toml 인라인 + trust 필수).
 #   이게 없으면 codex 워커 권한 게이트(danger-check 포함)가 미발화 → 위험명령 우회.
 if command -v python3 >/dev/null 2>&1; then
-  ( set +u; HARNESS_ROOT="$ROOT"; PROJECT_ROOT="$TMPDIR_F/cx-hook"
-    mkdir -p "$PROJECT_ROOT"; . "$ROOT/bin/vendors/codex.sh"
+  ( set +u; HARNESS_ROOT="$HARNESS"; PROJECT_ROOT="$TMPDIR_F/cx-hook"
+    mkdir -p "$PROJECT_ROOT"; . "$HARNESS_BIN/vendors/codex.sh"
     vendor_gen_settings "dev" "d" >/dev/null 2>&1 )
   cfg="$(cat "$TMPDIR_F/cx-hook/.agent-harness/.codex/config.toml" 2>/dev/null)"
   assert_contains "$cfg" "[[hooks.PreToolUse]]" "F6 config.toml 에 PreToolUse hook 등록(P12)"
@@ -67,7 +68,7 @@ fi
 #   codex TUI 는 hook 실행 시 이 env 를 주지 않는다 → 기존 `${PROJECT_ROOT:?}` unbound 즉사 →
 #   codex 가 hook 실패(exit 1)를 "통과"로 처리 → 위험명령 우회(deny-bounded 무력화, 실측).
 #   해소: bridge 가 HARNESS_ROOT 를 자기위치(BASH_SOURCE)에서, PROJECT_ROOT 를 stdin cwd 에서 도출.
-BR="$ROOT/bin/vendors/codex-gate-bridge.sh"
+BR="$HARNESS_BIN/vendors/codex-gate-bridge.sh"
 # F7a: env 전혀 없이(HARNESS_ROOT/PROJECT_ROOT 미설정) rm -rf → deny (danger). HOME/PATH 만 유지.
 out7a="$(env -i PATH="$PATH" HOME="$HOME" GATE_SKIP_WAIT=1 bash "$BR" \
   <<<'{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf /"},"cwd":"'"$TMPDIR_F"'"}' 2>/dev/null)"
@@ -85,7 +86,7 @@ assert_contains "$out7b" '"permissionDecision":"deny"' "F7b bridge cwd없으면 
 #   → timeout deny → F8a/F9a FAIL). 이전엔 lib.sh L27 이 HARNESS_PROJECT 부재로 PROJECT_ROOT
 #   를 git toplevel(하니스 본체)로 덮어써 우연히 통과했을 뿐 — 격리 환경 의도와 어긋난 의존.
 mkdir -p "$TMPDIR_F/.agent-harness/config"
-cp "$ROOT/config/orch-auto-allow.yaml" "$TMPDIR_F/.agent-harness/config/orch-auto-allow.yaml"
+cp "$HARNESS_CONFIG/orch-auto-allow.yaml" "$TMPDIR_F/.agent-harness/config/orch-auto-allow.yaml"
 
 # F8: sed -n(읽기) 자동허용 + sed -i(수정) 게이트 분리 (P15 2026-05-31). codex 는 파일을
 #   sed -n/cat 으로 읽는다(claude 의 Read 도구와 다름) → sed 가 read-only 화이트리스트에 없으면

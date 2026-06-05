@@ -5,12 +5,13 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 # lib.sh source (STATE_DIR 을 TMPDIR 로 격리)
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 STATE_DIR="$TMPDIR/state"   # 운영 state 오염 차단
 
 # Layer 2-a: 차단 없으면 is_worker_blocked = 1 (비차단=rc 1)
@@ -59,20 +60,20 @@ assert_eq "1" "$?" "L2 격리된 워커는 blocked-workers 비어 비차단 (다
 assert_eq "2" "$BLOCK_RETRY_LIMIT" "L2 BLOCK_RETRY_LIMIT=2 상수"
 
 # Layer 1: dispatch.sh 가 send 전 is_worker_blocked 가드를 호출하는가
-grep -q 'is_worker_blocked' "$ROOT/bin/dispatch.sh"
+grep -q 'is_worker_blocked' "$HARNESS_BIN/dispatch.sh"
 assert_success "$?" "L1 dispatch.sh 가 is_worker_blocked 가드 호출"
 # 가드가 write_harness_task/send_prompt *앞* 에 와야 차단이 dispatch 를 막는다
-guard_ln="$(grep -n 'is_worker_blocked' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
-send_ln="$(grep -n 'send_prompt' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
+guard_ln="$(grep -n 'is_worker_blocked' "$HARNESS_BIN/dispatch.sh" | head -1 | cut -d: -f1)"
+send_ln="$(grep -n 'send_prompt' "$HARNESS_BIN/dispatch.sh" | head -1 | cut -d: -f1)"
 [ -n "$guard_ln" ] && [ -n "$send_ln" ] && [ "$guard_ln" -lt "$send_ln" ]
 assert_success "$?" "L1 가드가 send_prompt 앞에 위치 (차단이 송신을 막음)"
 # 가드가 TARGET 페인 탐색(TASK_FILE 확인 포함) *앞* 이어야 차단이 페인 존재와 독립 (통지 루프 방지)
-taskfile_ln="$(grep -n 'TASK_FILE=' "$ROOT/bin/dispatch.sh" | head -1 | cut -d: -f1)"
+taskfile_ln="$(grep -n 'TASK_FILE=' "$HARNESS_BIN/dispatch.sh" | head -1 | cut -d: -f1)"
 [ -n "$guard_ln" ] && [ -n "$taskfile_ln" ] && [ "$guard_ln" -lt "$taskfile_ln" ]
 assert_success "$?" "L1 가드가 TASK_FILE/페인 탐색 앞 (차단이 페인 존재와 독립)"
 
 # Layer 1: watcher.sh 가 dispatch exit 2(차단)를 @dispatch-fail 로 오인하지 않는가
-grep -qE '_dq_rc.*=.*2|= "2"' "$ROOT/bin/watcher.sh"
+grep -qE '_dq_rc.*=.*2|= "2"' "$HARNESS_BIN/watcher.sh"
 assert_success "$?" "L1 watcher 가 exit 2(차단)를 별도 분기로 skip"
 
 # Layer 2-g: 전체 흐름 — 차단 → 재판정 OK 해소 → 다시 차단 누적 → 격리
@@ -93,11 +94,11 @@ test -f "$TMPDIR/state/quarantine/bob.json"
 assert_success "$?" "L2 흐름: 격리 task 는 quarantine 에 보존 (LEAD 가 사용자 push)"
 
 # Layer 1: orch.md ⓒ 가 합의 게이트(만장일치 record_block / 불일치 push)를 명시
-grep -q 'record_block' "$ROOT/prompts/roles/01-orchestration/orch.md"
+grep -q 'record_block' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 assert_success "$?" "L1 orch.md 가 record_block 호출 명시"
-grep -qE '만장일치|전원 blocking|투표인단' "$ROOT/prompts/roles/01-orchestration/orch.md"
+grep -qE '만장일치|전원 blocking|투표인단' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 assert_success "$?" "L1 orch.md 가 합의 게이트(만장일치) 분기 명시"
-grep -q 'clear_block' "$ROOT/prompts/roles/01-orchestration/orch.md"
+grep -q 'clear_block' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 assert_success "$?" "L1 orch.md 가 재판정 OK 해소(clear_block) 명시"
 
 
@@ -126,7 +127,7 @@ esac
 
 # Layer 1: orch.md ⓒ 가 실제 리뷰어 파일명 규약(.alignment-rev/.quality-rev/.security-rev)을 명시
 # (모호한 <리뷰어> 토큰으로 되돌리면 blocking 집계 0건→만장일치 차단 영원히 미발동 — 회로 무력화 회귀 방지)
-LEAD_F="$ROOT/prompts/roles/01-orchestration/orch.md"
+LEAD_F="$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 grep -q 'alignment-rev' "$LEAD_F"
 assert_success "$?" "L1 orch.md 가 .alignment-rev 파일명 규약 명시(토큰 되돌림 회귀 방지)"
 grep -q 'quality-rev' "$LEAD_F"
@@ -148,7 +149,7 @@ if command -v tmux >/dev/null 2>&1; then
     _rc=0
     # SESSION_OVERRIDE 로 resolve_session 을 격리 세션명에 고정 → 세션 확인 통과 → 차단 가드 도달.
     SESSION_OVERRIDE="$_sess" \
-      bash "$ROOT/bin/dispatch.sh" --project "$DT" blkw BT >/dev/null 2>&1 || _rc=$?
+      bash "$HARNESS_BIN/dispatch.sh" --project "$DT" blkw BT >/dev/null 2>&1 || _rc=$?
     tmux kill-session -t "$_sess" 2>/dev/null
     # 차단 파일이 있는데 통과(exit 0)면 명백한 가드 실패. exit 2 가 정상 차단 종료코드.
     assert_eq "2" "$_rc" "L2 차단 워커 dispatch 가 정확히 exit 2 (exit 1 회귀 직접 탐지)"
@@ -229,7 +230,7 @@ if command -v tmux >/dev/null 2>&1; then
     SESSION="$_wsess" ORCH_PANE="$_worch" \
       STATE_DIR="$WDIR/.agent-harness/state" EVENTS="$_wevents" \
       HARNESS_PROJECT="$WDIR" \
-      bash "$ROOT/bin/watcher.sh" >/dev/null 2>&1 &
+      bash "$HARNESS_BIN/watcher.sh" >/dev/null 2>&1 &
     _wpid=$!
     # 두 큐 파일 *모두* 소멸을 폴링(watcher sleep 1 주기 + 처리 여유). 무한 sleep 금지.
     # 비차단 대조 추가로 watcher 가 두 큐를 처리할 시간 필요 → 타임아웃 여유(20→30).

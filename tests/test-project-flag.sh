@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 ORIG_PWD="$PWD"
 
@@ -14,7 +15,7 @@ trap 'cd "$ORIG_PWD"; rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/projectA"
 unset HARNESS_PROJECT PROJECT_ROOT PROJECT_ROOT_VALID PROJECT_ROOT_IS_GIT 2>/dev/null || true
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 
 cd "$TMP"
 result="$(_normalize_project "projectA")"

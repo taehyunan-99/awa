@@ -13,7 +13,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 . "$SCRIPT_DIR/assert.sh"
-. "$ROOT/bin/lib.sh" 2>/dev/null || true
+. "$SCRIPT_DIR/harness-paths.sh"
+. "$HARNESS_BIN/lib.sh" 2>/dev/null || true
 
 # T1: boot_directive 함수 존재.
 type boot_directive >/dev/null 2>&1
@@ -54,7 +55,7 @@ assert_success "$([ -n "$SENT" ]; echo $?)" "T7b: codex 벤더는 send_prompt �
 unset -f send_prompt
 
 # T8: claude vendor_boot_cmd — 역할파일이 --append-system-prompt-file 로 주입되는지.
-. "$ROOT/bin/vendors/claude.sh" 2>/dev/null
+. "$HARNESS_BIN/vendors/claude.sh" 2>/dev/null
 WCMD="$(vendor_boot_cmd sonnet /x/settings.json abc-123 /x/.boot/engineer.md 2>/dev/null)"
 echo "$WCMD" | grep -q -- '--append-system-prompt-file "/x/.boot/engineer.md"'
 assert_success "$?" "T8: claude 부트에 역할파일 시스템프롬프트 주입"
@@ -65,11 +66,11 @@ echo "$WCMD_EMPTY" | grep -q -- '--append-system-prompt-file' && HAS=1 || HAS=0
 assert_eq "0" "$HAS" "T8b: 4번째 인자 빈값이면 시스템프롬프트 플래그 미포함"
 
 # T9: awa-up 에 옛 부트 문구 하드코딩 잔존 없음 (DRY·드리프트 방지).
-OLD_HARDCODE="$(grep -c '를 읽고 그 규약을 그대로 따르라' "$ROOT/bin/awa-up.sh")"
+OLD_HARDCODE="$(grep -c '를 읽고 그 규약을 그대로 따르라' "$HARNESS_BIN/awa-up.sh")"
 assert_eq "0" "$OLD_HARDCODE" "T9: awa-up 에 옛 부트 문구 하드코딩 잔존 없음"
 
 # T10: awa-up 이 claude_systemprompt_boot 헬퍼로 통일 호출 (워커/리뷰어/PM/LEAD 분기).
-HELPER_CALLS="$(grep -c 'claude_systemprompt_boot' "$ROOT/bin/awa-up.sh")"
+HELPER_CALLS="$(grep -c 'claude_systemprompt_boot' "$HARNESS_BIN/awa-up.sh")"
 assert_success "$([ "$HELPER_CALLS" -ge 3 ]; echo $?)" "T10: awa-up 이 claude_systemprompt_boot 3회+ 호출 (워커/리뷰어/PM)"
 
 test_summary

@@ -10,8 +10,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-CM="$ROOT/prompts/_common.md"
+CM="$HARNESS_PROMPTS/_common.md"
 
 echo "[C1] assume-and-flag 절: criteria 간 모순은 자율 해소 금지 → @plan-defect"
 # assume-and-flag(가역·scope내 자율 가정 허용)의 *예외* 로 criteria 모순을 명시해야

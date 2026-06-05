@@ -4,22 +4,23 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 echo "[G1] 옛 이름 잔존 0건 (docs 제외, .claude/skills 포함 — P12)"
 # .claude/skills 도 범위에 (스킬 파일 오타로 옛 이름 유입 방지). 존재 안 하면 grep 이 무시.
 hits="$(grep -rln 'agents-\|team-up\|team-down\|tmux-agent-team' \
-  "$ROOT/bin" "$ROOT/prompts" "$ROOT/tests" "$ROOT/profiles" "$ROOT/config" "$ROOT/templates" "$ROOT/README.md" \
+  "$HARNESS_BIN" "$HARNESS_PROMPTS" "$ROOT/tests" "$HARNESS_PROFILES" "$HARNESS_CONFIG" "$HARNESS_TEMPLATES" "$ROOT/README.md" \
   "$ROOT/.claude/skills" \
   2>/dev/null | grep -v '/test-rename-guard.sh$' || true)"
 assert_eq "" "$hits" "G1 옛 이름 잔존 0건 (잔존: $hits)"
 
 echo "[G2] awa-up.sh 존재, team-up.sh 부재"
-assert_eq "1" "$([ -f "$ROOT/bin/awa-up.sh" ] && echo 1 || echo 0)" "G2a awa-up.sh 존재"
-assert_eq "0" "$([ -f "$ROOT/bin/team-up.sh" ] && echo 1 || echo 0)" "G2b team-up.sh 부재"
+assert_eq "1" "$([ -f "$HARNESS_BIN/awa-up.sh" ] && echo 1 || echo 0)" "G2a awa-up.sh 존재"
+assert_eq "0" "$([ -f "$HARNESS_BIN/team-up.sh" ] && echo 1 || echo 0)" "G2b team-up.sh 부재"
 
 echo "[G3] resolve_session 이 awa- prefix"
-assert_contains "$(cat "$ROOT/bin/lib.sh")" "awa-%s" "G3 세션 prefix awa-"
+assert_contains "$(cat "$HARNESS_BIN/lib.sh")" "awa-%s" "G3 세션 prefix awa-"
 
 echo "[G4] agenphony 잔재 0건 (엄격 모드 — exclusion 0)"
 # 이전 사이클 spec §13.8 의 '디렉토리 리네이밍 기각' 결정을 본 사이클(2026-05-28)이 명시적으로 뒤집음

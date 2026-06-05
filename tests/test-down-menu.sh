@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
@@ -20,7 +21,7 @@ echo "[D1] N=0: 안내 메시지 + exit 0"
 # 6차 리뷰 [CRIT-1]: grep -c + || echo 0 도 0 매치 시 '0\n0' → 직접 count
 live=$(tmux ls -F '#{session_name}' 2>/dev/null | grep -c '^awa-' 2>/dev/null) || live=0
 if [ "$live" = 0 ]; then
-  out="$(bash "$ROOT/bin/awa-down-menu.sh" 2>&1)"
+  out="$(bash "$HARNESS_BIN/awa-down-menu.sh" 2>&1)"
   assert_contains "$out" "No live sessions" "D1 안내"
 else
   echo "  (SKIP D1 — 외부 awa-* 세션 $live 개 존재)"
@@ -33,7 +34,7 @@ S="awa-$SAFE"
 tmux new-session -d -s "$S"
 tmux set-option -t "$S" @awa-project "$TMP"
 # y 입력 → down.sh 가 marker 없어 거부하겠지만 메뉴 자체는 결정만
-out="$(echo y | bash "$ROOT/bin/awa-down-menu.sh" 2>&1)"
+out="$(echo y | bash "$HARNESS_BIN/awa-down-menu.sh" 2>&1)"
 assert_contains "$out" "$S" "D2a 세션명 표시"
 # 단일 케이스라서 외부 N=1 가정 — 다른 awa-* 있으면 multi 분기
 rm -rf "$TMP"

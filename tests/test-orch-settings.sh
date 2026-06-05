@@ -3,8 +3,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-tpl="$ROOT/templates/settings.orch.json.tpl"
+tpl="$HARNESS_TEMPLATES/settings.orch.json.tpl"
 
 [ -f "$tpl" ]; assert_success "$?" "orch 템플릿 존재"
 content="$(cat "$tpl")"

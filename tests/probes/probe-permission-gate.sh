@@ -5,6 +5,7 @@ set -uo pipefail
 [ "${RUN_LIVE:-0}" = "1" ] || { echo "SKIP (RUN_LIVE 미설정)"; exit 0; }
 cd "$(dirname "$0")/../.."
 ROOT="$(pwd)"
+source "$ROOT/tests/harness-paths.sh"
 
 PROBE_DIR="$(mktemp -d)"
 SES="probe6_$$"
@@ -16,7 +17,7 @@ trap cleanup EXIT INT TERM   # TERM 필수 — EXIT 만으론 SIGTERM(timeout-ki
 # ★ HARNESS_PROJECT export 필수 (3차 리뷰): lib.sh:27 이 PROJECT_ROOT 를 resolve_project_root
 #   로 무조건 재대입 → HARNESS_PROJECT 우선. 안 주면 PROJECT_ROOT 가 ROOT(repo)로 덮어써져
 #   settings 가 엉뚱한 곳에 생성됨. 다른 단위 테스트도 전부 HARNESS_PROJECT 사용.
-export HARNESS_PROJECT="$PROBE_DIR" PROJECT_ROOT="$PROBE_DIR" HARNESS_ROOT="$ROOT"
+export HARNESS_PROJECT="$PROBE_DIR" PROJECT_ROOT="$PROBE_DIR" HARNESS_ROOT="$HARNESS"
 ( cd "$PROBE_DIR" && git init -q )   # resolve_project_root 의 git toplevel 안정화
 mkdir -p "$PROBE_DIR/.agent-harness/state/pending-asks" "$PROBE_DIR/config" "$PROBE_DIR/.agent-harness/.boot-settings"
 cat > "$PROBE_DIR/config/orch-auto-allow.yaml" <<'YAML'
@@ -24,7 +25,7 @@ read-only:
   - "Bash(find:*)"
 YAML
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 SET="$(generate_worker_settings dev dev-1)"
 # ★ matrix-allow(E1) 용 학습 패턴 주입: generate_worker_settings 가 dev.json 을 통째로
 #   재생성하므로 *생성 후* 에 allow 를 넣어야 한다 (먼저 echo 하면 덮여 사라짐 — 실측 확인).

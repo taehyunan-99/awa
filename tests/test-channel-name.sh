@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 ORIG_PWD="$PWD"
 
@@ -18,7 +19,7 @@ mkdir -p "$PA"
 ( cd "$PA" && git init -q )
 cd "$PA"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 SESS_A="$(resolve_session)"
 CH_A="done-$SESS_A-dev-T1"
 assert_eq "done-awa-projectA-dev-T1" "$CH_A" "projectA 채널"
@@ -33,7 +34,7 @@ mkdir -p "$PB"
 ( cd "$PB" && git init -q )
 cd "$PB"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 SESS_B="$(resolve_session)"
 CH_B="done-$SESS_B-dev-T1"
 assert_eq "done-awa-projectB-dev-T1" "$CH_B" "projectB 채널"

@@ -2,8 +2,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 # 기본: 인자 없고 env 없으면 자동명 (awa-<basename of PROJECT_ROOT>) — T3.
 # repo basename 이 'awa' 이므로 'awa-awa'.

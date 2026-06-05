@@ -4,6 +4,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
@@ -24,7 +25,7 @@ trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
 # feature-team 프로파일: dev/test/researcher 워커 + 3 reviewer.
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1
 rc=$?
 assert_eq "0" "$rc" "awa-up 성공"
 

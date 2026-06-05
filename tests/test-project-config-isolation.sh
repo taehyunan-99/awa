@@ -3,6 +3,7 @@
 set -u
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 TMPDIR="$(mktemp -d)"
@@ -24,11 +25,11 @@ assert_eq "1" "$([ -f "$PROJ/.agent-harness/config/orch-auto-allow.yaml" ] && ec
 assert_eq "0" "$([ -d "$PROJ/config" ] && echo 1 || echo 0)" "C1b PROJECT_ROOT/config 비오염"
 
 # C2 — matrix-lookup 이 .agent-harness/config 를 읽는지 (경로 정합)
-hits="$(grep -c 'agent-harness/config' "$ROOT/bin/matrix-lookup.sh" 2>/dev/null || echo 0)"
+hits="$(grep -c 'agent-harness/config' "$HARNESS_BIN/matrix-lookup.sh" 2>/dev/null || echo 0)"
 assert_eq "1" "$hits" "C2 matrix-lookup 읽기경로 .agent-harness/config"
 
 # C3 — awa-up 의 gitignore 자동추가에 config 패턴 잔재 없음
-hits="$(grep -cE '"config/(\.orch-auto-allow-marker|\*\.bak)"' "$ROOT/bin/awa-up.sh" 2>/dev/null || true)"
+hits="$(grep -cE '"config/(\.orch-auto-allow-marker|\*\.bak)"' "$HARNESS_BIN/awa-up.sh" 2>/dev/null || true)"
 assert_eq "0" "$hits" "C3 gitignore 자동추가 config 패턴 정리됨"
 
 test_summary

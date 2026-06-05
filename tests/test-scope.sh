@@ -2,8 +2,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 # scope_match <path> <pattern> → 0(매치)/1(불일치)
 scope_match "src/auth/login.ts" "src/auth/**"; assert_success "$?" "** 재귀 매치"

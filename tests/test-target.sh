@@ -2,8 +2,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 unset SESSION_OVERRIDE PROFILE_SESSION SESSION 2>/dev/null || true
 

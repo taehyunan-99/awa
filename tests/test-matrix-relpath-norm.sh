@@ -7,11 +7,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/matrix-lookup.sh"
+source "$HARNESS_BIN/matrix-lookup.sh"
 
 PT="$(mktemp -d)"
 mkdir -p "$PT/.agent-harness/.boot-settings"

@@ -2,11 +2,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/spec-parse.sh"
+source "$HARNESS_BIN/spec-parse.sh"
 
 # feature-team 프로파일: 형식 검증 (yaml 파서로 로드)
-spec_parse_load "$ROOT/profiles/feature-team.yaml"
+spec_parse_load "$HARNESS_PROFILES/feature-team.yaml"
 [ "${#WORKERS[@]}" -ge 1 ] && out_w="W_OK" || out_w="W_FAIL"
 [ "${#REVIEWERS[@]}" -ge 1 ] && out_r="R_OK" || out_r="R_FAIL"
 
@@ -27,7 +28,7 @@ done
 assert_eq "1" "$found_reviewer_prefix" "리뷰어 역할명이 reviewer-<관점> 형식"
 
 # 워커 풀에 reviewer 역할 워커 없음 (감시 리뷰어로 일원화)
-spec_parse_load "$ROOT/profiles/default.yaml"
+spec_parse_load "$HARNESS_PROFILES/default.yaml"
 found_reviewer_worker=0
 for entry in "${WORKERS[@]}"; do
   case "$entry" in *:reviewer) found_reviewer_worker=1 ;; esac

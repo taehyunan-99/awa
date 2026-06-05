@@ -4,6 +4,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
@@ -23,7 +24,7 @@ cleanup() {
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1
 
 # awa-up 후 권한 산출물 + 사용자 흔적 만들기.
 WS="$TMP/.agent-harness"
@@ -41,7 +42,7 @@ echo '{}' > "$WS/state/incidents/i1.json"
 echo "ts dev - PRE Bash" > "$WS/state/permission-gate.log"   # 6차 게이트 로그 정리 검증
 
 # awa-down 실행
-HARNESS_PROJECT="$TMP" bash "$ROOT/bin/awa-down.sh" >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" bash "$HARNESS_BIN/awa-down.sh" >/dev/null 2>&1
 
 [ ! -d "$WS/.boot-settings" ]; assert_success "$?" ".boot-settings 제거"
 

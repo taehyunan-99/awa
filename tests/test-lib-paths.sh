@@ -2,11 +2,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
-assert_eq "$ROOT" "$HARNESS_ROOT" "HARNESS_ROOT 가 하네스 루트"
+assert_eq "$HARNESS" "$HARNESS_ROOT" "HARNESS_ROOT 가 하네스 루트"
 assert_eq "$PROJECT_ROOT/.agent-harness" "$WORKSPACE" "WORKSPACE 경로"
 assert_eq "agents" "$SESSION_DEFAULT" "기본 세션명"
 

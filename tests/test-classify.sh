@@ -3,18 +3,19 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 export HARNESS_PROJECT="$(mktemp -d)"
 export PROJECT_ROOT="$HARNESS_PROJECT"
 ( cd "$HARNESS_PROJECT" && git init -q )
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/matrix-lookup.sh"
+source "$HARNESS_BIN/matrix-lookup.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/danger-check.sh"
+source "$HARNESS_BIN/danger-check.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/classify.sh"
+source "$HARNESS_BIN/classify.sh"
 
 BOOT="$HARNESS_PROJECT/.agent-harness/.boot-settings"
 mkdir -p "$BOOT"

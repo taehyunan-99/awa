@@ -4,9 +4,10 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/danger-check.sh"
+source "$HARNESS_BIN/danger-check.sh"
 
 # helper: danger_check 호출 → "카테고리" 또는 "SAFE".
 dc() {  # $1=command

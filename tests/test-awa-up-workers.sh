@@ -3,8 +3,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-src="$(cat "$ROOT/bin/awa-up.sh")"
+src="$(cat "$HARNESS_BIN/awa-up.sh")"
 
 # 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
@@ -18,7 +19,7 @@ assert_contains "$src" '--workers)' "W1 --workers 파서 case"
 
 echo "[W2] --workers 와 profile 상호배타 (둘 다 오면 오류)"
 TMP="$(mktemp -d)"; ( cd "$TMP" && git init -q )
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" --workers "dev:dev:sonnet" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" --workers "dev:dev:sonnet" default >/dev/null 2>&1
 rc=$?
 tmux kill-session -t "awa-$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')" 2>/dev/null || true
 rm -rf "$TMP"
@@ -27,7 +28,7 @@ assert_eq "1" "$rc" "W2 --workers+profile 동시 → 비0 종료"
 echo "[W3] --workers 단독 가동 성공 (LAYOUT unbound 사망 안 함)"
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; SESSION="awa-$SAFE"
 ( cd "$TMP" && git init -q )
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" --workers "dev:dev:sonnet,test:tester:haiku" >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" --workers "dev:dev:sonnet,test:tester:haiku" >/dev/null 2>&1
 rc=$?
 np="$(tmux list-panes -s -t "$SESSION" 2>/dev/null | wc -l | tr -d ' ')"
 tmux kill-session -t "$SESSION" 2>/dev/null || true

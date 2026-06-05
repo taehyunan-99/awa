@@ -2,13 +2,14 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # 격리: XDG_CONFIG_HOME 을 임시 디렉터리로
 export XDG_CONFIG_HOME="$(mktemp -d)"
 trap 'rm -rf "$XDG_CONFIG_HOME"' EXIT
 
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 echo "[B1] bookmarks_init: 디렉터리·파일 생성"
 bookmarks_init
@@ -89,7 +90,7 @@ rm -rf /tmp/proj-c-real
 echo "[B9] wrapper: bash awa-bookmarks.sh list"
 mkdir -p /tmp/proj-w
 bookmarks_upsert "/tmp/proj-w" "default" ""
-out="$(bash "$ROOT/bin/awa-bookmarks.sh" list 2>&1)"
+out="$(bash "$HARNESS_BIN/awa-bookmarks.sh" list 2>&1)"
 assert_contains "$out" "/tmp/proj-w" "B9 wrapper list"
 rm -rf /tmp/proj-w
 
@@ -99,7 +100,7 @@ echo "[B10] awa-up.sh 발진 시 bookmarks 자동 등록 (정적 검증)"
 # 따라서 실제 BOOKMARKS_FILE 갱신을 단위테스트로 직접 검증할 수는 없고,
 # 호출 코드가 정상 위치(성공 echo 직후)에 박혀있는지 정적으로 확인한다.
 # 실 발진의 자동 등록은 라이브 e2e 에서 별도 검증(README/도커 시나리오 참고).
-grep -q "bookmarks_upsert" "$ROOT/bin/awa-up.sh" && echo "  ok: B10 호출 박힘" || {
+grep -q "bookmarks_upsert" "$HARNESS_BIN/awa-up.sh" && echo "  ok: B10 호출 박힘" || {
   echo "  FAIL: B10 호출 누락"; _TESTS_FAIL=$((_TESTS_FAIL+1))
 }
 _TESTS_RUN=$((_TESTS_RUN+1))

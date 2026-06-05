@@ -3,6 +3,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # Scenario (a) — 검증가능성 FAIL plan → 1차 abort
@@ -16,7 +17,7 @@ assert_contains "$hits_b" "proceed despite gaps" "(b) SKILL.md proceed despite g
 
 # Scenario (c) — acceptance criteria 누락 task → lead push (Task 5 책임)
 # Task 5 완료 후 PASS 자연 전환. 현 시점 매치 여부는 정보 출력만 (테스트 카운트에 미반영).
-if grep -q 'acceptance criteria\|acceptance_criteria' "$ROOT/prompts/roles/01-orchestration/orch.md" 2>/dev/null; then
+if grep -q 'acceptance criteria\|acceptance_criteria' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md" 2>/dev/null; then
   echo "  info: (c) lead.md ⓑ acceptance criteria push — 매치 (Task 5 PASS 상태)"
 else
   echo "  info: (c) lead.md ⓑ acceptance criteria push — Task 5 책임 (SKIP 정상)"

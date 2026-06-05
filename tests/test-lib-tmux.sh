@@ -2,9 +2,10 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 TS="libtest_$$"
 
@@ -43,10 +44,10 @@ rm -f "$OUT"
 # === send_prompt 미전송 안전망 마커 회귀 (라이브 결함: claude REPL ❯ 미검출) ===
 # Layer 1 — 잔류 검사 grep 이 claude 실제 입력 프롬프트 마커 '❯'(U+276F)를 포함해야 한다.
 #   기존엔 '[›>]' 만 있어 claude 입력창 잔류를 못 잡아 Enter 재전송 미발동 → 부트지시 박힘.
-assert_success "$(grep -q "grep -E '\^\[\[:space:\]\]\*\[❯›>\]'" "$ROOT/bin/lib.sh" && echo 0 || echo 1)" \
+assert_success "$(grep -q "grep -E '\^\[\[:space:\]\]\*\[❯›>\]'" "$HARNESS_BIN/lib.sh" && echo 0 || echo 1)" \
   "send_prompt 잔류 검사에 ❯ 마커 포함 (claude REPL 박힘 방지)"
 # Layer 1 — 1회가 아닌 폴링 재시도 루프 (느린 Opus REPL 대비).
-assert_success "$(grep -q 'SEND_PROMPT_RETRY_MAX' "$ROOT/bin/lib.sh" && echo 0 || echo 1)" \
+assert_success "$(grep -q 'SEND_PROMPT_RETRY_MAX' "$HARNESS_BIN/lib.sh" && echo 0 || echo 1)" \
   "send_prompt Enter 재전송이 폴링 재시도 (1회→N회)"
 
 # Layer 2 — ❯ 프롬프트 라인에 잔류한 텍스트를 send_prompt 가 감지해 Enter 재전송하는가.

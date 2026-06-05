@@ -3,10 +3,11 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # lib.sh 는 source-safe (line 37~38: source 파일이라 exit 금지, 변수로 결과 전달 — 실측 확인).
 # source 해도 안 죽고, lib.sh 는 ROOT 전역을 안 건드림(HARNESS_ROOT/PROJECT_ROOT/WORKSPACE 만) → 충돌 0.
-source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
+source "$HARNESS_BIN/lib.sh" >/dev/null 2>&1 || true
 
 FIX="$(mktemp -d)"
 mkdir -p "$FIX/roles/01-a" "$FIX/roles/02-b"

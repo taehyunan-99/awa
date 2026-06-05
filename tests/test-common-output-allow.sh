@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 TMP_PROJ="$(mktemp -d)"; ( cd "$TMP_PROJ" && git init -q )
@@ -20,8 +21,8 @@ run_gate() {
   # toplevel 로 덮어써진다. test-dev-write-allow.sh 와 동일하게 HARNESS_PROJECT 로 격리 고정.
   printf '%s' "$event" | \
     WORKER="research1" ENTRY_ROLE="researcher" \
-    PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" HARNESS_ROOT="$ROOT" \
-    GATE_SKIP_WAIT=1 bash "$ROOT/bin/permission-gate.sh"
+    PROJECT_ROOT="$TMP_PROJ" HARNESS_PROJECT="$TMP_PROJ" HARNESS_ROOT="$HARNESS" \
+    GATE_SKIP_WAIT=1 bash "$HARNESS_BIN/permission-gate.sh"
 }
 
 # 1) results/ 쓰기 → allow (읽기전용 역할이라도)

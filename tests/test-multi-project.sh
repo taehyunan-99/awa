@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 TMP1="$(mktemp -d)/projectA"; mkdir -p "$TMP1" && ( cd "$TMP1" && git init -q )
@@ -20,9 +21,9 @@ trap '
 ' EXIT
 
 # A·B 동시 가동
-HARNESS_PROJECT="$TMP1" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP1" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 sleep 0.3
-HARNESS_PROJECT="$TMP2" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP2" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 sleep 0.3
 
 # T16.1 — 두 SESSION 공존
@@ -48,14 +49,14 @@ grep -q "A task" "$TMP1/.agent-harness/tasks/1.md"; assert_success "$?" "A task 
 grep -q "B task" "$TMP2/.agent-harness/tasks/1.md"; assert_success "$?" "B task 1.md"
 
 # T16.5 — A awa-down 이 B 영향 없음
-HARNESS_PROJECT="$TMP1" bash "$ROOT/bin/awa-down.sh" >/dev/null 2>&1
+HARNESS_PROJECT="$TMP1" bash "$HARNESS_BIN/awa-down.sh" >/dev/null 2>&1
 sleep 0.3
 ! tmux has-session -t awa-projectA 2>/dev/null; assert_success "$?" "A 세션 종료됨"
 tmux has-session -t awa-projectB 2>/dev/null; assert_success "$?" "B 세션 여전히 살아있음"
 [ -d "$TMP2/.agent-harness" ]; assert_success "$?" "B .agent-harness/ 여전히"
 
 # T16.6 — B 도 정리
-HARNESS_PROJECT="$TMP2" bash "$ROOT/bin/awa-down.sh" >/dev/null 2>&1
+HARNESS_PROJECT="$TMP2" bash "$HARNESS_BIN/awa-down.sh" >/dev/null 2>&1
 sleep 0.3
 ! tmux has-session -t awa-projectB 2>/dev/null; assert_success "$?" "B 세션 종료됨"
 

@@ -3,13 +3,14 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."   # tests/ 로 이동
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 export HARNESS_PROJECT="$(mktemp -d)"
 ( cd "$HARNESS_PROJECT" && git init -q )
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/matrix-lookup.sh"
+source "$HARNESS_BIN/matrix-lookup.sh"
 
 BOOTSET="$HARNESS_PROJECT/.agent-harness/.boot-settings"
 mkdir -p "$BOOTSET"

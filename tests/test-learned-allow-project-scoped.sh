@@ -6,6 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # ── 격리: HARNESS_PROJECT 로만 (export PROJECT_ROOT 은 lib.sh 가 무시) ──
@@ -13,15 +14,15 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 # Task 2 후 lookup 카탈로그는 PROJECT_ROOT/.agent-harness/config 에서 읽음.
 mkdir -p "$TMP/.agent-harness/config"
-cp "$ROOT/config/orch-auto-allow.yaml" "$TMP/.agent-harness/config/"
+cp "$HARNESS_CONFIG/orch-auto-allow.yaml" "$TMP/.agent-harness/config/"
 # Task 1 후 stats/blocklist 는 XDG_CONFIG_HOME/awa 로 이전 — XDG 를 TMP 로 격리해 본체 오염 방지.
 #   (_state_config_dir 가 없으면 자동 생성하므로 별도 cp 불필요.)
 export XDG_CONFIG_HOME="$TMP"
 export HARNESS_PROJECT="$TMP"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/matrix-lookup.sh"
+source "$HARNESS_BIN/matrix-lookup.sh"
 
 # 격리 sanity — PROJECT_ROOT 가 실제 TMP 인지 (export PROJECT_ROOT 무시 함정 회귀)
 assert_eq "$TMP" "$PROJECT_ROOT" "L0 HARNESS_PROJECT 격리 적용 (PROJECT_ROOT=TMP)"
@@ -48,7 +49,7 @@ assert_eq "learned:$PAT" "$out" "L3 학습 후 myproject-tool → learned 매칭
 
 echo "[L4] 본체 yaml 무오염 (P6 — config/orch-auto-allow.yaml learned 비어있음)"
 # 본체 yaml 의 learned: 카테고리에 방금 학습한 패턴이 들어가지 않아야 함.
-grep -q "^  - \"$PAT\"$" "$ROOT/config/orch-auto-allow.yaml"
+grep -q "^  - \"$PAT\"$" "$HARNESS_CONFIG/orch-auto-allow.yaml"
 assert_fail "$?" "L4 본체 orch-auto-allow.yaml 에 학습 패턴 미기록 (오염 없음)"
 [ ! -f "$ROOT/.agent-harness/learned-allow.yaml" ] || \
   grep -q "^  - \"$PAT\"$" "$ROOT/.agent-harness/learned-allow.yaml" && \

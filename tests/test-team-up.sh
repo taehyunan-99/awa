@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 export SESSION_OVERRIDE="tu_$$"
@@ -26,7 +27,7 @@ cleanup() {
 trap cleanup EXIT
 
 # 1) 정상 생성
-bash "$ROOT/bin/awa-up.sh" default
+bash "$HARNESS_BIN/awa-up.sh" default
 rc=$?
 assert_eq "0" "$rc" "awa-up default 성공 종료"
 
@@ -78,7 +79,7 @@ if printf '%s' "$BOOT" | grep -qF '{{WORKER_NAME}}'; then r=0; else r=1; fi
 assert_eq "1" "$r" "미치환 토큰 없음"
 
 # 2) 중복 실행 거부
-bash "$ROOT/bin/awa-up.sh" default
+bash "$HARNESS_BIN/awa-up.sh" default
 assert_fail "$?" "기존 세션 존재 시 중복 생성 거부"
 
 # 케이스 간 tmux 세션만 정리 — TMP_PROJ 는 EXIT trap 까지 살려둔다
@@ -86,7 +87,7 @@ assert_fail "$?" "기존 세션 존재 시 중복 생성 거부"
 tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
 
 # 3) 없는 프로파일 → 실패
-bash "$ROOT/bin/awa-up.sh" nonexistent_profile
+bash "$HARNESS_BIN/awa-up.sh" nonexistent_profile
 assert_fail "$?" "없는 프로파일 → 실패"
 tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
 # TMP_PROJ 정리는 EXIT trap 이 일괄 수행.
@@ -94,7 +95,7 @@ tmux kill-session -t "$SESSION_OVERRIDE" 2>/dev/null || true
 # 4) 12차: .gitignore 부재 git repo → 하네스 산출물 자동추가 (구 "안내" → "자동").
 #    상세 멱등/항목 커버는 test-gitignore-autosetup.sh. 여기선 가동 경로 회귀만 확인.
 TMP_GI="$(mktemp -d)"; ( cd "$TMP_GI" && git init -q )
-HARNESS_PROJECT="$TMP_GI" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP_GI" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 gi_out="$(cat "$TMP_GI/.gitignore" 2>/dev/null || true)"
 assert_contains "$gi_out" ".agent-harness/" ".gitignore 부재 git repo → 산출물 자동추가"
 # cleanup: awa-* 세션 (HARNESS_PROJECT 가 SESSION_OVERRIDE 없는 호출이므로 autoname 사용)
@@ -108,7 +109,7 @@ rm -rf "$TMP_GI"
 TMP_BR="$(mktemp -d)"; ( cd "$TMP_BR" && git init -q )
 _pf_br="$(mktemp -d)/profile_bad.sh"
 printf 'WORKERS=("worker1:bad#role")\nREVIEWERS=()\nLEAD_MODEL="sonnet"\n' > "$_pf_br"
-err_br="$(unset SESSION_OVERRIDE; HARNESS_PROJECT="$TMP_BR" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" "$_pf_br" 2>&1 >/dev/null)"; rc_br=$?
+err_br="$(unset SESSION_OVERRIDE; HARNESS_PROJECT="$TMP_BR" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" "$_pf_br" 2>&1 >/dev/null)"; rc_br=$?
 _safe_br="$(printf '%s' "$(basename "$TMP_BR")" | sed 's/[^A-Za-z0-9_-]/_/g')"
 tmux kill-session -t "awa-$_safe_br" 2>/dev/null || true
 rm -f "$_pf_br"; rm -rf "$TMP_BR"

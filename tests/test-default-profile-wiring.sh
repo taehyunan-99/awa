@@ -2,11 +2,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/spec-parse.sh"
+source "$HARNESS_BIN/spec-parse.sh"
 
-spec_parse_load "$ROOT/profiles/default.yaml"
+spec_parse_load "$HARNESS_PROFILES/default.yaml"
 
 # 워커: engineer + researcher (더미 dev/test 제거)
 assert_contains "${WORKERS[*]}" "engineer:engineer" "default 워커에 engineer"
@@ -34,7 +35,7 @@ assert_eq "3" "$VOTERS" "투표인단 N=3 (다벤더 회로① 자동차단 정�
 assert_contains "${REVIEWERS[*]}" "reviewer-security:codex" "다벤더 — security 리뷰어 벤더=codex"
 
 # 모든 역할이 resolve_role_file 로 해석되는지 (부팅 가능성 — fail-fast 방지)
-source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
+source "$HARNESS_BIN/lib.sh" >/dev/null 2>&1 || true
 for role in engineer researcher reviewer-alignment reviewer-quality reviewer-security review-manager; do
   RF="$(bash -c 'source '"$ROOT"'/bin/lib.sh
     resolve_role_file "'"$ROOT"'/prompts" "'"$role"'"')"

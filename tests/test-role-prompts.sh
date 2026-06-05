@@ -2,9 +2,10 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
-rf() { cat "$(resolve_role_file "$ROOT/prompts" "$1")"; }   # 역할명 → 내용
+source "$HARNESS_BIN/lib.sh" >/dev/null 2>&1 || true
+rf() { cat "$(resolve_role_file "$HARNESS_PROMPTS" "$1")"; }   # 역할명 → 내용
 
 orch_content="$(rf orch)"
 assert_contains "$orch_content" "단계" "orch 단계전이 금지 규약"
@@ -17,7 +18,7 @@ assert_contains "$orch_content" "forbidden_paths 불변식" "orch P3 forbidden �
 assert_contains "$orch_content" "벤더중립" "orch P8 게이트 벤더중립 규약"
 assert_contains "$orch_content" "텍스트 응답을 대기" "orch P8 텍스트 폴백 명시"
 # P3 워커측·리뷰어측 예외 정합 (3곳 동시 갱신 보증).
-common_c="$(cat "$ROOT/prompts/_common.md")"
+common_c="$(cat "$HARNESS_PROMPTS/_common.md")"
 assert_contains "$common_c" "산출은 하니스 규약상 항상 허용" "_common P3 워커측 산출 예외"
 revc_c="$(rf reviewer-common)"
 assert_contains "$revc_c" "scope VIOLATION 으로 판정하지 마라" "reviewer-common P3 오탐 차단"
@@ -30,21 +31,21 @@ orch_loop="$(rf orch)"
 assert_contains "$orch_loop" "review/" "orch 가 review/ 감시"
 
 for r in spec quality arch; do
-  if resolve_role_file "$ROOT/prompts" "reviewer-$r" >/dev/null 2>&1; then
+  if resolve_role_file "$HARNESS_PROMPTS" "reviewer-$r" >/dev/null 2>&1; then
     assert_eq "ok" "ok" "reviewer-$r.md 존재"
   else
     assert_eq "exists" "missing" "reviewer-$r.md 존재해야 함"
   fi
 done
 
-if resolve_role_file "$ROOT/prompts" reviewer >/dev/null 2>&1; then
+if resolve_role_file "$HARNESS_PROMPTS" reviewer >/dev/null 2>&1; then
   assert_eq "deleted" "still-exists" "1차 roles/reviewer.md 삭제돼야 함"
 else
   assert_eq "ok" "ok" "1차 roles/reviewer.md 삭제됨"
 fi
 
 # 9차: reviewer-common.md 런타임 단일출처 존재 (부트 합본 의존)
-resolve_role_file "$ROOT/prompts" reviewer-common >/dev/null 2>&1
+resolve_role_file "$HARNESS_PROMPTS" reviewer-common >/dev/null 2>&1
 assert_success "$?" "reviewer-common.md 존재 (reviewer 부트 합본 의존)"
 
 # --- orch 구조 (승자=A 6절; 신호→반응) ---
@@ -77,7 +78,7 @@ assert_contains "$DESK" "사용자" "desk 은 사용자 창구"
 assert_not_contains "$DESK" "dispatch.sh" "desk 은 dispatch 안 함(orch 의 일)"
 
 # --- 5축 공통 토대 (_common.md) ---
-COMMON="$(cat "$ROOT/prompts/_common.md")"
+COMMON="$(cat "$HARNESS_PROMPTS/_common.md")"
 assert_contains "$COMMON" 'status: DONE|PARTIAL|BLOCKED' "_common ②출력계약 status 헤더"
 assert_contains "$COMMON" 'EVIDENCE' "_common ③ EVIDENCE 섹션"
 assert_contains "$COMMON" 'HYPOTHESIS' "_common ③ HYPOTHESIS 섹션"
@@ -88,11 +89,11 @@ assert_contains "$COMMON" 'ASSUMED:' "_common ⑤ assume-and-flag"
 assert_contains "$COMMON" 'done 라인' "_common 완료신호=events.log done 라인(회귀)"
 case "$COMMON" in *"tmux wait-for -S done-"*) assert_eq 1 0 "_common 에 워커 wait-for 잔존(P11 위반)";; *) assert_eq 0 0 "_common 워커 wait-for 제거 확인";; esac
 
-res_c="$(cat "$(resolve_role_file "$ROOT/prompts" researcher)")"
+res_c="$(cat "$(resolve_role_file "$HARNESS_PROMPTS" researcher)")"
 assert_contains "$res_c" "budget" "researcher.md ⑤ budget"
 assert_contains "$res_c" "추측" "researcher.md ① 추측 단정 금지"
 
-sec_c="$(cat "$(resolve_role_file "$ROOT/prompts" security)")"
+sec_c="$(cat "$(resolve_role_file "$HARNESS_PROMPTS" security)")"
 assert_contains "$sec_c" "budget" "security.md ⑤ budget"
 assert_contains "$sec_c" "file:line" "security.md ③ 취약점 위치 file:line"
 

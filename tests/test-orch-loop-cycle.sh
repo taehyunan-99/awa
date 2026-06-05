@@ -3,9 +3,10 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh" >/dev/null 2>&1 || true
-content="$(cat "$(resolve_role_file "$ROOT/prompts" orch)")"
+source "$HARNESS_BIN/lib.sh" >/dev/null 2>&1 || true
+content="$(cat "$(resolve_role_file "$HARNESS_PROMPTS" orch)")"
 
 # 6차 게이트 3단계 (보존·핵심)
 assert_contains "$content" "pending-asks" "1단계 pending-asks"

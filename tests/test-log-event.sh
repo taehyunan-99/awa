@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 TMP="$(mktemp -d)"
@@ -12,7 +13,7 @@ EV="$TMP/events.log"; : > "$EV"
 # 워커명은 HARNESS_WORKER env. 경로는 REPO_ROOT 기준 상대경로화.
 echo '{"tool_input":{"file_path":"'"$ROOT"'/src/auth/login.ts"}}' \
   | HARNESS_WORKER=dev HARNESS_TASK=101 EVENTS_LOG="$EV" REPO_ROOT="$ROOT" \
-    bash "$ROOT/bin/log-event.sh"
+    bash "$HARNESS_BIN/log-event.sh"
 
 line="$(cat "$EV")"
 assert_contains "$line" "dev" "워커명 기록"
@@ -28,24 +29,24 @@ EVENTS_LOG="$TMP/.agent-harness/events.log"
 REPO_ROOT="$TMP"
 HARNESS_WORKER=worker1
 input='{"tool_input":{"file_path":"'"$TMP"'/.agent-harness/events.log"}}'
-out="$(printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$ROOT/bin/log-event.sh")"
+out="$(printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$HARNESS_BIN/log-event.sh")"
 assert_eq "" "$(cat "$EVENTS_LOG" 2>/dev/null)" "events.log 자기변경 skip"
 
 # T7.2 — tasks/results 변경은 기록됨
 input='{"tool_input":{"file_path":"'"$TMP"'/.agent-harness/results/1.md"}}'
-printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$ROOT/bin/log-event.sh"
+printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$HARNESS_BIN/log-event.sh"
 grep -q "results/1.md" "$EVENTS_LOG"; assert_success "$?" "results/ 는 기록됨"
 
 # T7.3 — .review-cursor.* 는 skip
 : > "$EVENTS_LOG"
 input='{"tool_input":{"file_path":"'"$TMP"'/.agent-harness/.review-cursor.spec-rev"}}'
-printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$ROOT/bin/log-event.sh"
+printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$HARNESS_BIN/log-event.sh"
 assert_eq "" "$(cat "$EVENTS_LOG")" ".review-cursor.* skip"
 
 # T7.4 — review/ 는 skip (verdict 산출은 events.log 오염 금지)
 : > "$EVENTS_LOG"
 input='{"tool_input":{"file_path":"'"$TMP"'/.agent-harness/review/frontend-todo.security-rev.md"}}'
-printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$ROOT/bin/log-event.sh"
+printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$REPO_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$HARNESS_BIN/log-event.sh"
 assert_eq "" "$(cat "$EVENTS_LOG")" "review/ verdict skip"
 
 # T7.5 — /private 심볼릭링크 정규화: REPO_ROOT=/tmp 별칭인데 file_path 가 /private/tmp 절대경로로
@@ -56,7 +57,7 @@ if [ "$(cd /tmp 2>/dev/null && pwd -P)" = "/private/tmp" ]; then
   mkdir -p "$ALIAS_ROOT/.agent-harness/review"
   EVENTS_LOG="$ALIAS_ROOT/.agent-harness/events.log"; : > "$EVENTS_LOG"
   input='{"tool_input":{"file_path":"'"$REAL_ROOT"'/.agent-harness/review/frontend-todo.reviewer-quality.md"}}'
-  printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$ALIAS_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$ROOT/bin/log-event.sh"
+  printf '%s' "$input" | EVENTS_LOG="$EVENTS_LOG" REPO_ROOT="$ALIAS_ROOT" HARNESS_WORKER="$HARNESS_WORKER" bash "$HARNESS_BIN/log-event.sh"
   assert_eq "" "$(cat "$EVENTS_LOG")" "review/ skip — /private 정규화(결함 F)"
   rm -rf "$ALIAS_ROOT"
 else

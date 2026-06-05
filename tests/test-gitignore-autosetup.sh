@@ -3,6 +3,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
@@ -13,7 +14,7 @@ trap 'rm -rf "$_AGPN15_XDG"' EXIT
 
 run_up() { # $1=프로젝트경로
   local p="$1" safe; safe="$(basename "$p" | sed 's/[^A-Za-z0-9_-]/_/g')"
-  HARNESS_PROJECT="$p" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+  HARNESS_PROJECT="$p" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
   tmux kill-session -t "awa-$safe" 2>/dev/null || true
 }
 

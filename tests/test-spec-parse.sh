@@ -2,8 +2,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/spec-parse.sh"
+source "$HARNESS_BIN/spec-parse.sh"
 
 echo "[P1] 평면 평탄화 — workers/reviewers TSV"
 OUT="$(spec_parse_flatten "$ROOT/tests/fixtures/team-basic.yaml")"

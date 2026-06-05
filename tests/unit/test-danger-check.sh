@@ -3,9 +3,10 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/danger-check.sh"
+source "$HARNESS_BIN/danger-check.sh"
 
 pos() {  # $1=tool $2=cmd_or_path $3=기대카테고리 $4=msg
   local out; out="$(danger_check "$1" "$2")"; local rc=$?

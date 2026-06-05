@@ -3,6 +3,7 @@
 set -u
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 TMPDIR="$(mktemp -d)"
@@ -23,11 +24,11 @@ assert_eq "1" "$([ -f "$XDG/awa/orch-auto-allow-blocklist.yaml" ] && echo 1 || e
 #   재설치는 코드 디렉토리만 교체. XDG 학습은 안 건드림.
 NEW_HARNESS="$TMPDIR/new-harness"
 mkdir -p "$NEW_HARNESS/bin" "$NEW_HARNESS/config"
-cp "$ROOT/bin/lib.sh" "$NEW_HARNESS/bin/"
+cp "$HARNESS_BIN/lib.sh" "$NEW_HARNESS/bin/"
 # lib.sh 가 source 하는 의존 스크립트도 복사(같은 _LIB_DIR/HARNESS_ROOT 기준) — danger-check,
 #   spec-parse(lib.sh 말미 무조건 source). 재설치=코드 디렉토리 전체 교체 모의.
-cp "$ROOT/bin/danger-check.sh" "$NEW_HARNESS/bin/" 2>/dev/null || true
-cp "$ROOT/bin/spec-parse.sh" "$NEW_HARNESS/bin/" 2>/dev/null || true
+cp "$HARNESS_BIN/danger-check.sh" "$NEW_HARNESS/bin/" 2>/dev/null || true
+cp "$HARNESS_BIN/spec-parse.sh" "$NEW_HARNESS/bin/" 2>/dev/null || true
 
 # R3 — 새 코드 위치에서 같은 XDG 를 보고 학습이 보존됐는지 (contains 매치)
 match="$(XDG_CONFIG_HOME="$XDG" bash -c '

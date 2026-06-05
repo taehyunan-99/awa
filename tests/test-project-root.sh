@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 ORIG_PWD="$PWD"
 
@@ -13,7 +14,7 @@ unset HARNESS_PROJECT
 TMP="$(mktemp -d)"
 HARNESS_PROJECT="$TMP"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "$TMP" "$PROJECT_ROOT" "HARNESS_PROJECT 우선"
 assert_eq "$ROOT" "$HARNESS_ROOT" "HARNESS_ROOT 는 bin/lib.sh 부모"
 rm -rf "$TMP"
@@ -25,7 +26,7 @@ G="$(mktemp -d)"
 ( cd "$G" && git init -q && mkdir -p deep/nested )
 cd "$G/deep/nested"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 # macOS mktemp 가 /var/folders/... 와 /private/var/folders/... 양쪽으로 해석되는 케이스 대응
 pr_real="$(cd "$PROJECT_ROOT" && pwd -P)"
 g_real="$(cd "$G" && pwd -P)"
@@ -42,7 +43,7 @@ cd "$N"
 # stderr 는 임시파일로 캡처, 본 셸의 PROJECT_ROOT 는 source 부수효과로 그대로 검사.
 STDERR_FILE="$(mktemp)"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>"$STDERR_FILE"
+source "$HARNESS_BIN/lib.sh" 2>"$STDERR_FILE"
 warn="$(cat "$STDERR_FILE")"
 rm -f "$STDERR_FILE"
 echo "$warn" | grep -q "git repo 아님"; assert_success "$?" "PWD 폴백 경고"

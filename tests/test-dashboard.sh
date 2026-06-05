@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 # 사용자 실 _DASHBOARD 보호 — 격리 세션명.
@@ -45,7 +46,7 @@ dump_grid() {
 
 echo "[D1] Merge 2 프로젝트 → grid-1 에 2행×2열, 좌=lead 우=pm"
 mk_src _S_A_$$ ; mk_src _S_B_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
 assert_eq "1" "$(tmux has-session -t "$DASH" 2>/dev/null && echo 1)" "D1a \$DASH 존재"
 n="$(tmux list-panes -t "${DASH}:grid-1" -F '#{pane_id}' 2>/dev/null | wc -l | tr -d ' ')"
 assert_eq "4" "$n" "D1b grid-1 에 4 pane"
@@ -64,7 +65,7 @@ assert_eq "" "$(printf '%s\n' "$pm_lefts" | awk '$1==0{print "BAD"}')" "D1e 모�
 echo "[D2] 페이지네이션: 4 프로젝트 → grid-1(3행) + grid-2(1행)"
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$ ; mk_src _S_B_$$ ; mk_src _S_C_$$ ; mk_src _S_D_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" "_S_C_$$" "_S_D_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" "_S_C_$$" "_S_D_$$" >/dev/null 2>&1
 wins="$(tmux list-windows -t "$DASH" -F '#W' 2>/dev/null)"
 assert_contains "$wins" "grid-1" "D2a grid-1 존재"
 assert_contains "$wins" "grid-2" "D2b grid-2 존재 (4번째 프로젝트)"
@@ -76,8 +77,8 @@ assert_eq "2" "$n2" "D2d grid-2 = 2 pane (1 프로젝트)"
 echo "[D3] 재패킹: 3 프로젝트 중 중간 detach → 남은 2개 grid-1 연속, grid-2 없음"
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$ ; mk_src _S_B_$$ ; mk_src _S_C_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" "_S_C_$$" >/dev/null 2>&1
-bash "$ROOT/bin/awa-dashboard.sh" detach "_S_B_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" "_S_C_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" detach "_S_B_$$" >/dev/null 2>&1
 # B 원세션 team 복원
 winb="$(tmux list-windows -t "_S_B_$$" -F '#W' 2>/dev/null)"
 assert_contains "$winb" "team" "D3a B 원세션 team 복원"
@@ -93,7 +94,7 @@ echo "[D4] 최상단: _DASHBOARD 이름순 + switch 가능"
 # list-sessions 이름순에서 _DASHBOARD_TEST 가 임의 awa- 보다 앞 (실측 prefix '_')
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$ ; mk_src _S_B_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
 # _DASHBOARD_TEST_$$ 와 가짜 awa- 세션 중 이름순 첫째가 _ 로 시작하는지
 tmux new-session -d -s "awa-zz_$$" 2>/dev/null || true
 firstname="$(tmux list-sessions -F '#{session_name}' 2>/dev/null | sort | head -1)"
@@ -107,9 +108,9 @@ echo "[D5] 마지막 1개 자동정리: 2→1 detach → \$DASH kill"
 # 자기완결화 — D4 상태에 의존하지 않고 새로 구성 (테스트 간 누수 방지).
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$ ; mk_src _S_B_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
 # A detach → 1 남음 → 자동 detach + kill
-bash "$ROOT/bin/awa-dashboard.sh" detach "_S_A_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" detach "_S_A_$$" >/dev/null 2>&1
 assert_eq "" "$(tmux has-session -t "$DASH" 2>/dev/null && echo alive)" "D5a \$DASH kill"
 winb="$(tmux list-windows -t "_S_B_$$" -F '#W' 2>/dev/null)"
 assert_contains "$winb" "team" "D5b B auto-detach 복원"
@@ -121,7 +122,7 @@ mk_src _S_A_$$
 orch_p="$(tmux list-panes -t "_S_A_$$:team" -F '#{@awa-role} #{pane_id}' | awk '$1=="orch"{print $2}')"
 tmux select-pane -t "$orch_p" -T "ZZZ_NOT_LEAD" 2>/dev/null || true
 mk_src _S_B_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
 # A 가 grid 에 정상 들어갔는지 (lead 식별 성공)
 projs="$(dump_grid grid-1 | awk '{print $3}' | sort -u | grep -v '^$')"
 assert_contains "$projs" "_S_A_$$" "D6 title 변경에도 @awa-role 로 A 식별 성공"
@@ -135,14 +136,14 @@ assert_contains "$roles" "desk" "D7b @awa-role desk 보존"
 echo "[D8] 자기참조/부재 스킵 (계승)"
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$
-out="$(bash "$ROOT/bin/awa-dashboard.sh" merge "$DASH" "_S_A_$$" 2>&1)"
+out="$(bash "$HARNESS_BIN/awa-dashboard.sh" merge "$DASH" "_S_A_$$" 2>&1)"
 assert_contains "$out" "자신을 대상" "D8a 자기참조 거부 메시지"
 # 부재 세션 스킵 — D8a 가 _S_A 유효로 $DASH 를 생성하며 _S_A 의 lead/pm pane 을 grid 로
 # swap 해 가져갔다(원세션엔 빈 골격만 남음). 따라서 kill 후 _S_A 를 fixture 로 재생성해야
 # D8b 가 "부재(_NOPE) 스킵 + 유효(_S_A) 생성" 경로를 실제로 탄다 (자기완결 격리).
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$
-out="$(bash "$ROOT/bin/awa-dashboard.sh" merge "_NOPE_$$" "_S_A_$$" 2>&1)"
+out="$(bash "$HARNESS_BIN/awa-dashboard.sh" merge "_NOPE_$$" "_S_A_$$" 2>&1)"
 assert_eq "1" "$(tmux has-session -t "$DASH" 2>/dev/null && echo 1)" "D8b 부재 스킵 후에도 유효 세션으로 생성"
 
 echo "[D9] 원세션 부재 재생성 시 @awa-project 세션옵션 복원 (down-menu 경로 조회 보전)"
@@ -150,10 +151,10 @@ echo "[D9] 원세션 부재 재생성 시 @awa-project 세션옵션 복원 (down
 # detach 의 대화형 read 2개(y/n, 경로)를 stdin 으로 주입. 경로 입력 시 @awa-project 가 박혀야 함.
 tmux kill-session -t "$DASH" 2>/dev/null
 mk_src _S_A_$$ ; mk_src _S_B_$$
-bash "$ROOT/bin/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
+bash "$HARNESS_BIN/awa-dashboard.sh" merge "_S_A_$$" "_S_B_$$" >/dev/null 2>&1
 tmux kill-session -t "_S_A_$$" 2>/dev/null   # 원세션 부재 상태 — grid 의 A pane 은 생존
 # detach _S_A → 부재 감지 → "y"(재생성) + "/tmp/restored_A_$$"(경로) 주입
-printf 'y\n/tmp/restored_A_%s\n' "$$" | bash "$ROOT/bin/awa-dashboard.sh" detach "_S_A_$$" >/dev/null 2>&1
+printf 'y\n/tmp/restored_A_%s\n' "$$" | bash "$HARNESS_BIN/awa-dashboard.sh" detach "_S_A_$$" >/dev/null 2>&1
 restored="$(tmux show-options -t "_S_A_$$" -v @awa-project 2>/dev/null || echo "")"
 assert_eq "/tmp/restored_A_$$" "$restored" "D9a 재생성 세션에 @awa-project(경로) 복원"
 rname="$(tmux show-options -t "_S_A_$$" -v @awa-project-name 2>/dev/null || echo "")"

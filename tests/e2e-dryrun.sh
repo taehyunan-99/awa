@@ -10,6 +10,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
+source "$ROOT/tests/harness-paths.sh"
 PROFILE="${1:-feature-team}"   # 가장 풍부한 편성 (워커3+리뷰어3)
 PROJ="$(mktemp -d)"
 ( cd "$PROJ" && git init -q )
@@ -86,10 +87,10 @@ has "$PROJ/config/orch-auto-allow.yaml" "orch-auto-allow.yaml 설치"
 has "$PROJ/.agent-harness/state/pending-asks" "state/pending-asks 디렉터리"
 
 # 5.5) 9차 아키텍처 전환: /loop 프롬프트·wait-worker.sh 부재 + watcher.sh 존재
-[ -f "$ROOT/prompts/loop/lead.md" ] && chk no yes "loop/lead.md 잔존(실패)" || chk yes yes "loop/lead.md 삭제됨"
-[ -f "$ROOT/prompts/loop/reviewer.md" ] && chk no yes "loop/reviewer.md 잔존(실패)" || chk yes yes "loop/reviewer.md 삭제됨"
-[ -f "$ROOT/bin/wait-worker.sh" ] && chk no yes "wait-worker.sh 잔존(실패)" || chk yes yes "wait-worker.sh 삭제됨"
-[ -f "$ROOT/bin/watcher.sh" ] && chk yes yes "watcher.sh 존재" || chk yes no "watcher.sh 없음(실패)"
+[ -f "$HARNESS_PROMPTS/loop/lead.md" ] && chk no yes "loop/lead.md 잔존(실패)" || chk yes yes "loop/lead.md 삭제됨"
+[ -f "$HARNESS_PROMPTS/loop/reviewer.md" ] && chk no yes "loop/reviewer.md 잔존(실패)" || chk yes yes "loop/reviewer.md 삭제됨"
+[ -f "$HARNESS_BIN/wait-worker.sh" ] && chk no yes "wait-worker.sh 잔존(실패)" || chk yes yes "wait-worker.sh 삭제됨"
+[ -f "$HARNESS_BIN/watcher.sh" ] && chk yes yes "watcher.sh 존재" || chk yes no "watcher.sh 없음(실패)"
 
 # 6) awa-down 정리
 echo "=== awa-down ==="

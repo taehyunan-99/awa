@@ -4,6 +4,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 TMP="$(mktemp -d)"
@@ -32,7 +33,7 @@ T15_SAFE="$(printf '%s' "$(basename "$TMP")" | sed 's/[^A-Za-z0-9_-]/_/g')"
 echo "[T15.1] marker 없는 settings.json — awa-up 거부 + 사용자 데이터 보존"
 echo '{"existing":"user_setting"}' > "$TMP/.claude/settings.json"
 # marker 없음 (의도적)
-out="$(HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default 2>&1)"
+out="$(HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default 2>&1)"
 rc=$?
 assert_fail "$rc" "awa-up 거부 (rc != 0)"
 assert_contains "$out" "이미 존재" "거부 메시지"
@@ -49,7 +50,7 @@ rm -rf "$TMP/.agent-harness"
 echo "[T15.2] marker 있을 때 awa-up 정상 — settings.json 덮어쓰기, marker 유지"
 echo '{"old":"harness_made"}' > "$TMP/.claude/settings.json"
 touch "$TMP/.claude/.agent-harness-marker"
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 rc=$?
 assert_success "$rc" "awa-up 성공 (marker 있음)"
 sleep 0.3
@@ -63,7 +64,7 @@ echo "[T15.3] marker 없는 awa-down — 정리 skip + 안내, 사용자 데이�
 echo '{"user":"setting"}' > "$TMP/.claude/settings.json"
 mkdir -p "$TMP/.agent-harness"
 echo "user_data" > "$TMP/.agent-harness/important.txt"
-out="$(HARNESS_PROJECT="$TMP" bash "$ROOT/bin/awa-down.sh" 2>&1)"
+out="$(HARNESS_PROJECT="$TMP" bash "$HARNESS_BIN/awa-down.sh" 2>&1)"
 rc=$?
 assert_success "$rc" "awa-down rc=0 (멱등)"
 assert_contains "$out" "marker 없음" "marker 없음 경고"
@@ -74,7 +75,7 @@ rm -rf "$TMP/.agent-harness"
 
 echo "[T15.4] 살아있는 awa-* 세션 안내 (F8)"
 tmux new-session -d -s "awa-otherproj" 2>/dev/null
-out="$(HARNESS_PROJECT="$TMP" bash "$ROOT/bin/awa-down.sh" 2>&1)"
+out="$(HARNESS_PROJECT="$TMP" bash "$HARNESS_BIN/awa-down.sh" 2>&1)"
 rc=$?
 assert_success "$rc" "awa-down rc=0"
 assert_contains "$out" "awa-otherproj" "다른 살아있는 세션 안내"

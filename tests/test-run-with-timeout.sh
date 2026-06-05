@@ -3,11 +3,12 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 export HARNESS_PROJECT="$(mktemp -d)"
 ( cd "$HARNESS_PROJECT" && git init -q )
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 echo "[RT1] 즉시 끝나는 명령 → rc 0"
 run_with_timeout 5 true; assert_success "$?" "RT1 자연완료 rc0"

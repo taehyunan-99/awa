@@ -5,7 +5,8 @@
 # 렌더는 /usr/bin/python3(시스템 stdlib)에 의존 — 표시폭(한글 2칸/블록 1칸) 정확 계산.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/tests/assert.sh"
-SP="$ROOT/bin/awa-splash.sh"
+. "$ROOT/tests/harness-paths.sh"
+SP="$HARNESS_BIN/awa-splash.sh"
 
 # ANSI 제거 헬퍼 — 색코드 섞인 출력에서 텍스트만 검증.
 strip_ansi() { sed 's/\x1b\[[0-9;]*m//g'; }

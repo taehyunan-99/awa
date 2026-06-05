@@ -21,6 +21,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 ROOT="$(cd ../.. && pwd)"
+source "$ROOT/tests/harness-paths.sh"
 
 N=6
 SES="m3_$$"
@@ -103,7 +104,7 @@ sleep 3   # LEAD 가 브리핑 수신·idle 진입 여유
 # --- watcher 백그라운드 기동 (실경로) ---
 SESSION="$SES" ORCH_PANE="$ORCH_PANE" REVIEWER_PANES="" \
 STATE_DIR="$WS/state" EVENTS="$EVENTS" SEEN="$WS/state/.watcher-seen" \
-  bash "$ROOT/bin/watcher.sh" &
+  bash "$HARNESS_BIN/watcher.sh" &
 WPID=$!
 # WPID 를 파일로 남겨 score/teardown 이 정리 (이 스크립트는 사용자 ! 로 떠서 곧 종료).
 echo "$WPID" > "$WS/.watcher.pid"

@@ -4,6 +4,7 @@
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+source "$ROOT/tests/harness-paths.sh"
 TMP1="/tmp/probe_mp_$$/projectA"; mkdir -p "$TMP1" && ( cd "$TMP1" && git init -q )
 TMP2="/tmp/probe_mp_$$/projectB"; mkdir -p "$TMP2" && ( cd "$TMP2" && git init -q )
 
@@ -21,8 +22,8 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[probe-multi-project] A·B 동시 awa-up..."
-HARNESS_PROJECT="$TMP1" bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
-HARNESS_PROJECT="$TMP2" bash "$ROOT/bin/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP1" bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
+HARNESS_PROJECT="$TMP2" bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 sleep 30  # claude REPL 준비
 
 echo "[probe-multi-project] A 의 dev 페인에 Write 지시..."

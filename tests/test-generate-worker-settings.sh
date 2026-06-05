@@ -3,6 +3,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 TMP="$(mktemp -d)"
@@ -12,7 +13,7 @@ trap 'rm -rf "$TMP"' EXIT
 ( cd "$TMP" && git init -q )
 export HARNESS_PROJECT="$TMP"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 echo "[G1] 매핑 dev → settings.dev.json.tpl (2인자)"
 out="$(generate_worker_settings dev devbot)"
@@ -22,7 +23,7 @@ assert_eq "$TMP/.agent-harness/.boot-settings/dev.json" "$out" "G1 경로"
 [ -f "$out" ]; assert_success "$?" "G1 파일 생성"
 content="$(cat "$out")"
 assert_contains "$content" "PROJECT_ROOT=\\\"$TMP\\\"" "G1 PROJECT_ROOT 치환"
-assert_contains "$content" "$ROOT/bin/permission-gate.sh" "G1 HARNESS_ROOT 치환"
+assert_contains "$content" "$HARNESS_BIN/permission-gate.sh" "G1 HARNESS_ROOT 치환"
 assert_contains "$content" "Bash(git push *)" "G1 dev deny 포함"
 assert_contains "$content" 'WORKER=\"devbot\"' "G1 ENTRY_NAME 토큰 치환 (WORKER env)"
 
@@ -78,21 +79,21 @@ assert_contains "$content" "Bash(ls:*)" "G5c readonly allow ls"
 assert_contains "$content" 'WORKER=\"somebot\"' "G5c readonly ENTRY_NAME 토큰"
 
 echo "[G6] 템플릿 부재 — return 1 + stderr (2인자)"
-mv "$ROOT/templates/settings.dev.json.tpl" "$ROOT/templates/settings.dev.json.tpl.bak"
+mv "$HARNESS_TEMPLATES/settings.dev.json.tpl" "$HARNESS_TEMPLATES/settings.dev.json.tpl.bak"
 err="$(generate_worker_settings dev devbot 2>&1 >/dev/null)"
 rc=$?
-mv "$ROOT/templates/settings.dev.json.tpl.bak" "$ROOT/templates/settings.dev.json.tpl"
+mv "$HARNESS_TEMPLATES/settings.dev.json.tpl.bak" "$HARNESS_TEMPLATES/settings.dev.json.tpl"
 assert_fail "$rc" "G6 rc!=0"
 assert_contains "$err" "settings 템플릿 없음" "G6 stderr"
 
 echo "[G7] 토큰 잔존 (손상된 템플릿) — return 1 + stderr (2인자)"
-mv "$ROOT/templates/settings.dev.json.tpl" "$ROOT/templates/settings.dev.json.tpl.bak"
-cat > "$ROOT/templates/settings.dev.json.tpl" <<'EOF'
+mv "$HARNESS_TEMPLATES/settings.dev.json.tpl" "$HARNESS_TEMPLATES/settings.dev.json.tpl.bak"
+cat > "$HARNESS_TEMPLATES/settings.dev.json.tpl" <<'EOF'
 {"permissions":{"deny":["Bash(rm *)"]},"hooks":{"x":"{{UNKNOWN_TOKEN}}"}}
 EOF
 err="$(generate_worker_settings dev devbot 2>&1 >/dev/null)"
 rc=$?
-mv "$ROOT/templates/settings.dev.json.tpl.bak" "$ROOT/templates/settings.dev.json.tpl"
+mv "$HARNESS_TEMPLATES/settings.dev.json.tpl.bak" "$HARNESS_TEMPLATES/settings.dev.json.tpl"
 assert_fail "$rc" "G7 rc!=0 (광범위 토큰 검증)"
 assert_contains "$err" "토큰 미치환 잔존" "G7 stderr"
 assert_contains "$err" "{{UNKNOWN_TOKEN}}" "G7 stderr 에 잔존 토큰 명시"

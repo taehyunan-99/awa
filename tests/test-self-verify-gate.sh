@@ -13,29 +13,30 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 # Task 2 후 lookup 은 PROJECT_ROOT/.agent-harness/config 를 봄 — 시드를 거기로 cp(repo 안이라 trap 정리)
 trap 'rm -rf "$ROOT/.agent-harness/config"' EXIT
 mkdir -p "$ROOT/.agent-harness/config"
-cp "$ROOT/config/orch-auto-allow.yaml" "$ROOT/.agent-harness/config/orch-auto-allow.yaml"
+cp "$HARNESS_CONFIG/orch-auto-allow.yaml" "$ROOT/.agent-harness/config/orch-auto-allow.yaml"
 # shellcheck disable=SC1091
-source "$ROOT/bin/danger-check.sh"
+source "$HARNESS_BIN/danger-check.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/matrix-lookup.sh"
+source "$HARNESS_BIN/matrix-lookup.sh"
 # shellcheck disable=SC1091
-source "$ROOT/bin/classify.sh"
+source "$HARNESS_BIN/classify.sh"
 
 # ── Layer 1: grep 토큰 (정의 존재) ────────────────────────────────────────
 echo "[L1] danger-check exec-sensitive 가드 + orch-auto-allow self-verify 카테고리 정의"
-assert_success "$(grep -q 'exec-sensitive' "$ROOT/bin/danger-check.sh"; echo $?)" \
+assert_success "$(grep -q 'exec-sensitive' "$HARNESS_BIN/danger-check.sh"; echo $?)" \
   "L1-a danger-check.sh 에 exec-sensitive 카테고리"
-assert_success "$(grep -q '^self-verify:' "$ROOT/config/orch-auto-allow.yaml"; echo $?)" \
+assert_success "$(grep -q '^self-verify:' "$HARNESS_CONFIG/orch-auto-allow.yaml"; echo $?)" \
   "L1-b orch-auto-allow.yaml 에 self-verify 카테고리"
-assert_success "$(grep -qE 'Bash\(\. :\*\)' "$ROOT/config/orch-auto-allow.yaml"; echo $?)" \
+assert_success "$(grep -qE 'Bash\(\. :\*\)' "$HARNESS_CONFIG/orch-auto-allow.yaml"; echo $?)" \
   "L1-c self-verify 에 Bash(. :*) 패턴"
-assert_success "$(grep -qE 'Bash\(bash :\*\)' "$ROOT/config/orch-auto-allow.yaml"; echo $?)" \
+assert_success "$(grep -qE 'Bash\(bash :\*\)' "$HARNESS_CONFIG/orch-auto-allow.yaml"; echo $?)" \
   "L1-d self-verify 에 Bash(bash :*) 패턴"
 
 # ── Layer 2: 동작 (danger_check + classify) ──────────────────────────────

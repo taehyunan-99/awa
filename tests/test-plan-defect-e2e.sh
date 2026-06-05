@@ -6,22 +6,23 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 # Layer 1: orch.md ⓖ 섹션 + 신호 N종 (I-2 정정 후 @drift: 추가, Task 7 후 @allow-confirm: 추가 → 7종)
-grep -q '## ⓖ' "$ROOT/prompts/roles/01-orchestration/orch.md"
+grep -q '## ⓖ' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 assert_success "$?" "L1 orch.md ⓖ 섹션 존재"
-grep -qE '신호 [0-9]+종' "$ROOT/prompts/roles/01-orchestration/orch.md"
+grep -qE '신호 [0-9]+종' "$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 assert_success "$?" "L1 orch.md 신호 N종 헤더 반영"
 
 # Layer 1: _common.md 한 줄 존재
-grep -q '@plan-defect' "$ROOT/prompts/_common.md"
+grep -q '@plan-defect' "$HARNESS_PROMPTS/_common.md"
 assert_success "$?" "L1 _common.md @plan-defect 반영"
 
 # Layer 1: watcher.sh 분기 존재 (events.log action=plan-defect 인식)
-grep -q '"plan-defect"' "$ROOT/bin/watcher.sh"
+grep -q '"plan-defect"' "$HARNESS_BIN/watcher.sh"
 assert_success "$?" "L1 watcher.sh plan-defect 분기 존재"
 
 # Layer 2: watcher awk 분기 실제 추출 검증 — events.log fake line → worker/task + 설명 분리

@@ -4,8 +4,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-source "$ROOT/bin/lib.sh"
+source "$HARNESS_BIN/lib.sh"
 
 # 15th: bookmarks 격리 — awa-up.sh 가 ~/.config/awa/bookmarks.tsv 에 기록.
 # 테스트 fixture 가 사용자 실 경로를 더럽히지 않도록 임시 dir 로 redirect.
@@ -45,7 +46,7 @@ PROF_EOF
 SAFE2="$(basename "$TMP2" | sed 's/[^A-Za-z0-9_-]/_/g')"; S2="awa-$SAFE2"
 trap 'tmux kill-session -t "$S2" 2>/dev/null || true; rm -rf "$TMP2"; _agpn15_xdg_cleanup' EXIT INT TERM
 SESSION_OVERRIDE="$S2" HARNESS_PROJECT="$TMP2" AGENT_CMD=cat \
-  bash "$ROOT/bin/awa-up.sh" "$PROF" >/dev/null 2>&1 || true
+  bash "$HARNESS_BIN/awa-up.sh" "$PROF" >/dev/null 2>&1 || true
 
 # W2a: 윈도우 이름 = team, workers, reviewers (REVIEWERS 있으니 3개)
 got_windows="$(tmux list-windows -t "$S2" -F '#{window_name}' 2>/dev/null | tr '\n' ',' | sed 's/,$//')"

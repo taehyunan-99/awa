@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 
 ROOT="$(cd .. && pwd)"
 SES="watch_$$"
@@ -36,7 +37,7 @@ STATE_DIR="$TMP_STATE" \
 EVENTS="$EVENTS" \
 SEEN="$TMP_STATE/.watcher-seen" \
 REV_DEBOUNCE=2 \
-  bash "$ROOT/bin/watcher.sh" &
+  bash "$HARNESS_BIN/watcher.sh" &
 WPID=$!
 sleep 2.5  # 첫 폴링 사이클 보장 (여유 — CI 부하 대비, OLD 재발화 검증 엄격화)
 

@@ -4,8 +4,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-tpl="$ROOT/templates/settings.readonly.json.tpl"
+tpl="$HARNESS_TEMPLATES/settings.readonly.json.tpl"
 
 [ -f "$tpl" ]; assert_success "$?" "readonly 템플릿 존재"
 content="$(cat "$tpl")"

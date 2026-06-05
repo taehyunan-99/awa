@@ -2,6 +2,7 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 ORIG_PWD="$PWD"
 
@@ -16,7 +17,7 @@ mkdir -p "$G"
 ( cd "$G" && git init -q )
 cd "$G"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "awa-projectA" "$(resolve_session)" "자동명 폴백"
 cd "$ORIG_PWD"
 rm -rf "$G_PARENT"
@@ -30,7 +31,7 @@ mkdir -p "$G"
 ( cd "$G" && git init -q )
 cd "$G"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 assert_eq "awa-proj_A-1" "$(resolve_session)" "sanitize . → _"
 cd "$ORIG_PWD"
 rm -rf "$G_PARENT"
@@ -44,7 +45,7 @@ mkdir -p "$G"
 ( cd "$G" && git init -q )
 cd "$G"
 # shellcheck disable=SC1091
-source "$ROOT/bin/lib.sh" 2>/dev/null
+source "$HARNESS_BIN/lib.sh" 2>/dev/null
 export SESSION_OVERRIDE="custom_x"
 assert_eq "custom_x" "$(resolve_session)" "resolve_session OVERRIDE 우선"
 unset SESSION_OVERRIDE

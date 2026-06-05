@@ -3,6 +3,7 @@
 set -u
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 
 TMPDIR="$(mktemp -d)"
@@ -46,7 +47,7 @@ matchb="$(XDG_CONFIG_HOME="$TMPDIR/xdgb" bash -c '
 assert_eq "MATCH" "$matchb" "S3b 험한 메타패턴(슬래시/점/별표) contains 매치"
 
 # S4 — stats 가 HARNESS_ROOT/config 가 아닌 XDG 에 쓰임 (본체 비오염)
-seeded="$ROOT/config/orch-auto-allow-stats.yaml"
+seeded="$HARNESS_CONFIG/orch-auto-allow-stats.yaml"
 before="$(grep -c . "$seeded" 2>/dev/null || echo 0)"
 XDG_CONFIG_HOME="$TMPDIR/xdg2" HARNESS_PROJECT="$TMPDIR/proj2" bash -c '
   source "'"$ROOT"'/bin/lib.sh"

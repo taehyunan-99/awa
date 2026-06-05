@@ -4,8 +4,9 @@
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
+source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
-ORCH="$ROOT/prompts/roles/01-orchestration/orch.md"
+ORCH="$HARNESS_PROMPTS/roles/01-orchestration/orch.md"
 
 # criterion 입자도 게이트 — 게이트 의미(criterion + budget/done 가능 크기)를 좁혀 검증.
 # 느슨한 '입자도' 단독 매치(무관 문맥, M10)나 주석화(HTML 주석, M6b)로 무력화되는 것 방지.
