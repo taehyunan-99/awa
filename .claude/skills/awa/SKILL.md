@@ -33,12 +33,16 @@ SKILL collects info via chat (AskUserQuestion or natural prompts), then dispatch
 if [ -n "${AWA_HARNESS_ROOT:-}" ]; then
   HARNESS_ROOT="$AWA_HARNESS_ROOT"
 elif [ -L ~/.claude/skills/awa ]; then
-  # global install via symlink: ~/.claude/skills/awa → <repo>/.claude/skills/awa
-  _link="$(readlink ~/.claude/skills/awa)"
-  HARNESS_ROOT="$(cd "$(dirname "$_link")/../.." && pwd)"
-elif [ -d ~/.claude/skills/awa ] && [ -f ~/.claude/skills/awa/SKILL.md ]; then
-  # global install via copy: search up for repo root marker (bin/awa-main.sh)
-  HARNESS_ROOT=""  # fallback to user prompt
+  # 심링크 설치 — 상대/절대 심링크 모두 방어 후 harness/ 한 겹 추가.
+  #   상대 readlink 는 *링크 디렉토리* 기준이므로, 먼저 링크 디렉토리(~/.claude/skills)로
+  #   cd 한 뒤 readlink 결과를 그 기준으로 절대화한다 (cwd 기준 해석 시 상대 심링크가 깨짐).
+  _raw=~/.claude/skills/awa
+  _t="$(readlink "$_raw")"
+  _link="$(cd "$(dirname "$_raw")" && cd "$(dirname "$_t")" && pwd -P)/$(basename "$_t")"
+  HARNESS_ROOT="$(cd "$_link/harness" && pwd)"
+elif [ -d ~/.claude/skills/awa ] && [ -f ~/.claude/skills/awa/harness/bin/lib.sh ]; then
+  # 복사 설치 — 스킬 디렉토리 아래 harness/
+  HARNESS_ROOT="$(cd ~/.claude/skills/awa/harness && pwd)"
 else
   HARNESS_ROOT=""  # last resort — ask user for harness path
 fi
@@ -61,7 +65,7 @@ fi
      - (PROJECT_ROOT 는 Step 3 에서 결정되므로, Step 0.5 체크는 Step 3 직후 Step 4 직전에 수행한다.)
 
 2. **Step 1 — Plan (SKILL chat):**
-   - **Auto-discover** (9th review [CRIT-22]): `bash -c "ls -t \"$HARNESS_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip.
+   - **Auto-discover** (9th review [CRIT-22]): plan 은 사용자 프로젝트 산출물이므로 PROJECT_ROOT(Step 3 에서 결정) 기준으로 검색한다 — `bash -c "ls -t \"$PROJECT_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip. plan 없으면 사용자에게 경로 입력을 요청한다.
    - If user provides plan → Agent tool 4-axis review:
      - prompt: `references/review-prompt.md` + plan body
      - subagent_type: `general-purpose`
