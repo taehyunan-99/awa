@@ -32,16 +32,16 @@ assert_eq "1" "$rc" "yaml 미존재 → abort"
 
 # 4. confirm_allow_yaml 함수 동작 — accepted 시 프로젝트 learned 파일 누적
 # P2/P6 수정(2026-05-30): learned 쓰기가 PROJECT_ROOT/.agent-harness/learned-allow.yaml 로 분리됨.
-#   격리: HARNESS_PROJECT(쓰기·읽기 기준 PROJECT_ROOT) + HARNESS_ROOT(stats/blocklist 기준) 둘 다.
+#   격리: HARNESS_PROJECT(learned 쓰기·읽기 기준 PROJECT_ROOT) + XDG_CONFIG_HOME(stats/blocklist
+#   기준 — Task 1 후 _state_config_dir 가 XDG 를 봄, HARNESS_ROOT override 만으로는 stats 안 격리).
 mkdir -p "$TMPDIR/config" "$TMPDIR/proj"
 cp "$ROOT/config/orch-auto-allow.yaml" "$TMPDIR/config/orch-auto-allow.yaml"
 cp "$ROOT/config/orch-auto-allow-stats.yaml" "$TMPDIR/config/orch-auto-allow-stats.yaml"
 cp "$ROOT/config/orch-auto-allow-blocklist.yaml" "$TMPDIR/config/orch-auto-allow-blocklist.yaml"
 
-HARNESS_ROOT="$TMPDIR" HARNESS_PROJECT="$TMPDIR/proj" bash -c '
+XDG_CONFIG_HOME="$TMPDIR/xdg" HARNESS_PROJECT="$TMPDIR/proj" bash -c '
   source "'"$ROOT"'/bin/lib.sh"
-  # source 직후 HARNESS_ROOT 가 lib.sh 에서 재계산되므로 override (stats/blocklist 기준).
-  HARNESS_ROOT="'"$TMPDIR"'" confirm_allow_yaml "Bash(testpattern:*)" "accepted"
+  confirm_allow_yaml "Bash(testpattern:*)" "accepted"
   # learned 는 이제 PROJECT_ROOT/.agent-harness/learned-allow.yaml 에 누적.
   grep -q "Bash(testpattern:\*)" "'"$TMPDIR"'/proj/.agent-harness/learned-allow.yaml"
 '
@@ -54,9 +54,9 @@ cp "$ROOT/config/orch-auto-allow.yaml" "$TMPDIR/c2/config/orch-auto-allow.yaml"
 cp "$ROOT/config/orch-auto-allow-stats.yaml" "$TMPDIR/c2/config/orch-auto-allow-stats.yaml"
 cp "$ROOT/config/orch-auto-allow-blocklist.yaml" "$TMPDIR/c2/config/orch-auto-allow-blocklist.yaml"
 
-HARNESS_ROOT="$TMPDIR/c2" HARNESS_PROJECT="$TMPDIR/c2/proj" bash -c '
+XDG_CONFIG_HOME="$TMPDIR/c2/xdg" HARNESS_PROJECT="$TMPDIR/c2/proj" bash -c '
   source "'"$ROOT"'/bin/lib.sh"
-  HARNESS_ROOT="'"$TMPDIR"'/c2" confirm_allow_yaml "Bash(git push:*)" "accepted" 2>/dev/null
+  confirm_allow_yaml "Bash(git push:*)" "accepted" 2>/dev/null
   # 위험 패턴 → rejected 로 전환 → learned 누적 안 됨 (파일 자체가 없거나 패턴 미포함).
   lf="'"$TMPDIR"'/c2/proj/.agent-harness/learned-allow.yaml"
   if [ -f "$lf" ] && grep -q "Bash(git push:\*)" "$lf"; then exit 1; else exit 0; fi
@@ -82,9 +82,9 @@ cp "$ROOT/config/orch-auto-allow.yaml" "$TMPDIR/i8/config/orch-auto-allow.yaml"
 cp "$ROOT/config/orch-auto-allow-stats.yaml" "$TMPDIR/i8/config/orch-auto-allow-stats.yaml"
 cp "$ROOT/config/orch-auto-allow-blocklist.yaml" "$TMPDIR/i8/config/orch-auto-allow-blocklist.yaml"
 
-HARNESS_ROOT="$TMPDIR/i8" bash -c '
+XDG_CONFIG_HOME="$TMPDIR/i8/xdg" bash -c '
   source "'"$ROOT"'/bin/lib.sh"
-  HARNESS_ROOT="'"$TMPDIR"'/i8" append_to_yaml "'"$TMPDIR"'/i8/config/orch-auto-allow.yaml" "Bash(ls:*)" "learned"
+  append_to_yaml "'"$TMPDIR"'/i8/config/orch-auto-allow.yaml" "Bash(ls:*)" "learned"
   # learned 카테고리 안에 Bash(ls:*) 있는지 확인
   awk -v c="learned" -v p="  - \"Bash(ls:*)\"" "
     \$0 ~ \"^\" c \":\" { in_cat=1; next }
@@ -95,11 +95,12 @@ HARNESS_ROOT="$TMPDIR/i8" bash -c '
 assert_success "$?" "I-8: 다른 카테고리에 있어도 대상 카테고리에 추가 (멱등성 카테고리 분리)"
 
 # 8. I-9 검증 — bump_stats_counter 락 동시성 (락 디렉토리 정리 + 카운터 증가 확인)
-HARNESS_ROOT="$TMPDIR/i8" bash -c '
+#   stats 는 Task 1 후 XDG(_state_config_dir) 에 기록 → 락도 거기 생김. 격리·검증 경로 모두 XDG.
+XDG_CONFIG_HOME="$TMPDIR/i9/xdg" bash -c '
   source "'"$ROOT"'/bin/lib.sh"
-  HARNESS_ROOT="'"$TMPDIR"'/i8" bump_stats_counter "Bash(test:*)" "confirm"
-  # 락 정리 확인
-  test ! -d "'"$TMPDIR"'/i8/config/orch-auto-allow-stats.yaml.lock"
+  bump_stats_counter "Bash(test:*)" "confirm"
+  # 락 정리 확인 (stats 파일 옆 .lock 디렉토리)
+  test ! -d "$(_state_config_dir)/orch-auto-allow-stats.yaml.lock"
 '
 assert_success "$?" "I-9: bump_stats_counter 락 획득·정리 정상"
 
