@@ -23,11 +23,11 @@ Claude Code 는 같은 폴더의 CLAUDE.md(= `@./AGENTS.md` 한 줄) 를 통해 
 
 작업 영역에 해당하는 AGENTS.md 를 먼저 읽고 진행한다.
 
-- **bin/** — 하니스 실행 스크립트 (awa-up/down, watcher, dispatch, classify, permission-gate) → [`bin/AGENTS.md`](bin/AGENTS.md)
-- **profiles/** — 팀 구성 정의 (default/feature-team/code-review/research) → [`profiles/AGENTS.md`](profiles/AGENTS.md)
-- **prompts/** — 워커 부트 프롬프트 (`_common.md` + `roles/NN-part/*.md`) → [`prompts/AGENTS.md`](prompts/AGENTS.md)
-- **templates/** — Claude `settings.json` 권한 템플릿 군 → [`templates/AGENTS.md`](templates/AGENTS.md)
-- **config/** — permission-gate 자동 허용 카탈로그 (`orch-auto-allow.yaml`) → [`config/AGENTS.md`](config/AGENTS.md)
+- **harness/bin/** — 하니스 실행 스크립트 (awa-up/down, watcher, dispatch, classify, permission-gate) → [`.claude/skills/awa/harness/bin/AGENTS.md`](.claude/skills/awa/harness/bin/AGENTS.md)
+- **harness/profiles/** — 팀 구성 정의 (default/feature-team/code-review/research) → [`.claude/skills/awa/harness/profiles/AGENTS.md`](.claude/skills/awa/harness/profiles/AGENTS.md)
+- **harness/prompts/** — 워커 부트 프롬프트 (`_common.md` + `roles/NN-part/*.md`) → [`.claude/skills/awa/harness/prompts/AGENTS.md`](.claude/skills/awa/harness/prompts/AGENTS.md)
+- **harness/templates/** — Claude `settings.json` 권한 템플릿 군 → [`.claude/skills/awa/harness/templates/AGENTS.md`](.claude/skills/awa/harness/templates/AGENTS.md)
+- **harness/config/** — permission-gate 자동 허용 카탈로그 (`orch-auto-allow.yaml`) → [`.claude/skills/awa/harness/config/AGENTS.md`](.claude/skills/awa/harness/config/AGENTS.md)
 - **tests/** — bash 테스트 + 통합 probe + 시나리오(lead-arena/m3/probes/role5axis/stress) → [`tests/AGENTS.md`](tests/AGENTS.md)
 - **docs/** — 설계 노트·E2E 시나리오·probe 결과·superpowers 11차 plan/specs → [`docs/AGENTS.md`](docs/AGENTS.md)
 
@@ -52,15 +52,15 @@ HOW/HOW NOT/WHY 는 placeholder. 본격 작성은 베이스라인 완성 즈음 
 
 - 전체 테스트: `bash tests/run-all.sh`
 - 통합 probe 포함: `RUN_INTEGRATION=1 bash tests/run-all.sh` <!-- claude CLI 필요 -->
-- 팀 가동: `bin/awa-up.sh <profile>` (cwd=프로젝트 또는 `--project /path <profile>`)
-- 팀 정리: `bin/awa-down.sh`
+- 팀 가동: `.claude/skills/awa/harness/bin/awa-up.sh <profile>` (cwd=프로젝트 또는 `--project /path <profile>`)
+- 팀 정리: `.claude/skills/awa/harness/bin/awa-down.sh`
 - 세션 목록: `/agpn` (Step 0 resume) 또는 `/agpn bookmarks list`
 
 **공통 명령어 가드** (모든 영역에 적용):
 
 - `git commit --no-verify` / `git push --force` 금지 — 검증 우회·공유 히스토리 손실
 - `.agent-harness/` 런타임 파일(tasks/results/events.log)은 git 추적 대상이 아니다 — 가이드·프롬프트·프로파일 수정은 항상 git 추적되는 원본에서
-- 위험 명령(`rm -rf`, `sudo`, `dd of=`, `curl ... | sh`)은 `bin/permission-gate.sh` + `bin/danger-check.sh`가 자동 거부 — 다른 방식으로 진행
+- 위험 명령(`rm -rf`, `sudo`, `dd of=`, `curl ... | sh`)은 `harness/bin/permission-gate.sh` + `harness/bin/danger-check.sh`가 자동 거부 — 다른 방식으로 진행
 
 ## 메모리 기록 위치 (영속 사실)
 
