@@ -149,7 +149,7 @@ EOF
 # $1=tool $2=input_json
 orch_auto_allow_lookup() {
   local tool="$1" input="$2"
-  local yaml="${PROJECT_ROOT}/config/orch-auto-allow.yaml"
+  local yaml="${PROJECT_ROOT}/.agent-harness/config/orch-auto-allow.yaml"
   # P2 수정(2026-05-30) — 기본 카탈로그 + 프로젝트 학습 파일을 함께 매칭 대상으로.
   #   learned 쓰기가 .agent-harness/learned-allow.yaml 로 분리됐으므로(lib.sh confirm_allow_yaml)
   #   읽기도 둘 다 평탄화해야 학습 패턴이 게이트에 즉시 반영된다.
