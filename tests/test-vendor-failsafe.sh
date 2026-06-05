@@ -79,13 +79,13 @@ assert_contains "$out7b" '"permissionDecision":"deny"' "F7b bridge cwd없으면 
 
 # ★ F8/F9 셋업 (회귀 봉쇄 2026-06-03): bridge 는 stdin cwd 를 PROJECT_ROOT 로 도출하고
 #   permission-gate 가 HARNESS_PROJECT=PROJECT_ROOT 로 고정(dcb4a18 격리 정확성) → auto-allow
-#   카탈로그를 ${PROJECT_ROOT}/config/orch-auto-allow.yaml 에서 읽는다. 운영에서는 awa-up Step
-#   (L285~)이 이 yaml 을 PROJECT/config 로 설치하므로 read-only(sed -n/echo) 가 auto-allow.
+#   카탈로그를 ${PROJECT_ROOT}/.agent-harness/config/orch-auto-allow.yaml 에서 읽는다(Task 2 이전).
+#   운영에선 awa-up 이 이 yaml 을 PROJECT/.agent-harness/config 로 설치 → read-only(sed -n/echo) auto-allow.
 #   테스트도 그 설치를 재현해야 sed -n/echo 가 gray 로 안 떨어진다(미설치 시 lookup rc1 → gray
 #   → timeout deny → F8a/F9a FAIL). 이전엔 lib.sh L27 이 HARNESS_PROJECT 부재로 PROJECT_ROOT
 #   를 git toplevel(하니스 본체)로 덮어써 우연히 통과했을 뿐 — 격리 환경 의도와 어긋난 의존.
-mkdir -p "$TMPDIR_F/config"
-cp "$ROOT/config/orch-auto-allow.yaml" "$TMPDIR_F/config/orch-auto-allow.yaml"
+mkdir -p "$TMPDIR_F/.agent-harness/config"
+cp "$ROOT/config/orch-auto-allow.yaml" "$TMPDIR_F/.agent-harness/config/orch-auto-allow.yaml"
 
 # F8: sed -n(읽기) 자동허용 + sed -i(수정) 게이트 분리 (P15 2026-05-31). codex 는 파일을
 #   sed -n/cat 으로 읽는다(claude 의 Read 도구와 다름) → sed 가 read-only 화이트리스트에 없으면

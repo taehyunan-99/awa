@@ -21,8 +21,8 @@ mkdir -p "$BOOT"
 # matrix: dev settings 에 ls allow
 echo '{"permissions":{"allow":["Bash(ls:*)"]}}' > "$BOOT/dev.json"
 # orch-auto-allow.yaml: read-only 카테고리에 find
-mkdir -p "$HARNESS_PROJECT/config"
-cat > "$HARNESS_PROJECT/config/orch-auto-allow.yaml" <<'YAML'
+mkdir -p "$HARNESS_PROJECT/.agent-harness/config"
+cat > "$HARNESS_PROJECT/.agent-harness/config/orch-auto-allow.yaml" <<'YAML'
 read-only:
   - "Bash(find:*)"
 YAML

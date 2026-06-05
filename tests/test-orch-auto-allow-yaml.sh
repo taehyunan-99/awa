@@ -4,6 +4,10 @@ set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
+# Task 2 후 lookup 은 PROJECT_ROOT/.agent-harness/config 를 봄 — 시드를 거기로 cp(repo 안이라 trap 정리)
+trap 'rm -rf "$ROOT/.agent-harness/config"' EXIT
+mkdir -p "$ROOT/.agent-harness/config"
+cp "$ROOT/config/orch-auto-allow.yaml" "$ROOT/.agent-harness/config/orch-auto-allow.yaml"
 export HARNESS_PROJECT="$ROOT"   # config/orch-auto-allow.yaml 이 ROOT/config 에 있음
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh"

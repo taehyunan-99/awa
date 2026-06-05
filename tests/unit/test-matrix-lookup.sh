@@ -45,8 +45,8 @@ matched="$(matrix_lookup dev Bash '{"command":"git push origin"}')"
 assert_eq "Bash(git push *)" "$matched" "M5b space-glob"
 
 echo "[M6] orch_auto_allow_lookup safe-test 매칭"
-mkdir -p "$HARNESS_PROJECT/config"
-cat > "$HARNESS_PROJECT/config/orch-auto-allow.yaml" <<'EOF'
+mkdir -p "$HARNESS_PROJECT/.agent-harness/config"
+cat > "$HARNESS_PROJECT/.agent-harness/config/orch-auto-allow.yaml" <<'EOF'
 read-only:
   - "Bash(ls:*)"
 safe-test:

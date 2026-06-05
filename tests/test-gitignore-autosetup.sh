@@ -21,9 +21,8 @@ echo "[GI1] git repo: .gitignore 에 하네스 산출물 전부 추가"
 T1="$(mktemp -d)"; ( cd "$T1" && git init -q ); run_up "$T1"
 g="$(cat "$T1/.gitignore" 2>/dev/null || true)"
 assert_contains "$g" ".agent-harness/" "GI1a .agent-harness"
-assert_contains "$g" ".claude/" "GI1b .claude"
-assert_contains "$g" "config/.orch-auto-allow-marker" "GI1c yaml marker"
-assert_contains "$g" "config/*.bak" "GI1d yaml 백업"; rm -rf "$T1"
+assert_contains "$g" ".claude/" "GI1b .claude"; rm -rf "$T1"
+# Task 2: config marker·.bak 은 .agent-harness/ 하위로 이전돼 .gitignore 개별 추가 불필요(상위 디렉토리가 커버).
 
 echo "[GI2] 멱등: 이미 있으면 중복 추가 안 함"
 T2="$(mktemp -d)"; ( cd "$T2" && git init -q )

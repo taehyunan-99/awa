@@ -11,14 +11,12 @@ ROOT="$(cd .. && pwd)"
 # ── 격리: HARNESS_PROJECT 로만 (export PROJECT_ROOT 은 lib.sh 가 무시) ──
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/config"
-cp "$ROOT/config/orch-auto-allow.yaml" "$TMP/config/"
-cp "$ROOT/config/orch-auto-allow-stats.yaml" "$TMP/config/" 2>/dev/null || printf 'patterns:\n' > "$TMP/config/orch-auto-allow-stats.yaml"
-printf 'patterns:\n' > "$TMP/config/orch-auto-allow-blocklist.yaml"
-
-# HARNESS_ROOT 도 TMP 로 격리 — bump_stats_counter/blocklist 가 HARNESS_ROOT/config 를 쓰므로
-#   본체 stats.yaml 오염 방지. lib.sh 가 source 시 _LIB_DIR 기준으로 HARNESS_ROOT 재계산하나,
-#   confirm_allow_yaml 호출 시 subshell 에서 override 해 stats 쓰기 경로를 TMP 로 강제.
+# Task 2 후 lookup 카탈로그는 PROJECT_ROOT/.agent-harness/config 에서 읽음.
+mkdir -p "$TMP/.agent-harness/config"
+cp "$ROOT/config/orch-auto-allow.yaml" "$TMP/.agent-harness/config/"
+# Task 1 후 stats/blocklist 는 XDG_CONFIG_HOME/awa 로 이전 — XDG 를 TMP 로 격리해 본체 오염 방지.
+#   (_state_config_dir 가 없으면 자동 생성하므로 별도 cp 불필요.)
+export XDG_CONFIG_HOME="$TMP"
 export HARNESS_PROJECT="$TMP"
 # shellcheck disable=SC1091
 source "$ROOT/bin/lib.sh"
@@ -38,8 +36,8 @@ orch_auto_allow_lookup Bash "$CMD" >/dev/null
 assert_fail "$?" "L1 학습 전 myproject-tool 미매칭"
 
 echo "[L2] confirm_allow_yaml accepted → 프로젝트 learned 파일 생성"
-# HARNESS_ROOT override 로 stats/blocklist 쓰기를 TMP/config 로 격리 (본체 stats 오염 방지).
-HARNESS_ROOT="$TMP" confirm_allow_yaml "$PAT" "accepted" >/dev/null 2>&1
+# stats/blocklist 쓰기는 XDG_CONFIG_HOME=TMP 격리로 본체 오염 방지 (Task 1 XDG 이전).
+confirm_allow_yaml "$PAT" "accepted" >/dev/null 2>&1
 assert_success "$?" "L2 accepted 성공"
 [ -f "$TMP/.agent-harness/learned-allow.yaml" ]
 assert_success "$?" "L2 프로젝트 .agent-harness/learned-allow.yaml 생성됨"
