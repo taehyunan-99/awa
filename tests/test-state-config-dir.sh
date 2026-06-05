@@ -34,6 +34,17 @@ match="$(XDG_CONFIG_HOME="$TMPDIR/xdg" bash -c '
 ')"
 assert_eq "MATCH" "$match" "S3 never→append 후 contains 매치 (읽기·쓰기 단일베이스)"
 
+# S3b — 더 험한 메타문자 패턴(슬래시·공백·점·괄호·별표)도 contains 매치 (grep -qxF 회귀 가드)
+XDG_CONFIG_HOME="$TMPDIR/xdgb" HARNESS_PROJECT="$TMPDIR/projb" bash -c '
+  source "'"$ROOT"'/bin/lib.sh"
+  confirm_allow_yaml "Bash(rm -rf /tmp/x.*:*)" "never"
+'
+matchb="$(XDG_CONFIG_HOME="$TMPDIR/xdgb" bash -c '
+  source "'"$ROOT"'/bin/lib.sh"
+  blocklist_contains "Bash(rm -rf /tmp/x.*:*)" && echo MATCH || echo NOMATCH
+')"
+assert_eq "MATCH" "$matchb" "S3b 험한 메타패턴(슬래시/점/별표) contains 매치"
+
 # S4 — stats 가 HARNESS_ROOT/config 가 아닌 XDG 에 쓰임 (본체 비오염)
 seeded="$ROOT/config/orch-auto-allow-stats.yaml"
 before="$(grep -c . "$seeded" 2>/dev/null || echo 0)"
