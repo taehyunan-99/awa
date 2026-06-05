@@ -23,7 +23,7 @@ case "$action" in
     bookmarks_prune
     ;;
   menu|*)
-    echo "agpn bookmarks"
+    echo "awa bookmarks"
     echo "  (1) List       - show all bookmarks"
     echo "  (2) Set alias  - assign/change alias"
     echo "  (3) Remove     - delete selected"

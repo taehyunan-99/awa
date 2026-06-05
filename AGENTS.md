@@ -54,7 +54,7 @@ HOW/HOW NOT/WHY 는 placeholder. 본격 작성은 베이스라인 완성 즈음 
 - 통합 probe 포함: `RUN_INTEGRATION=1 bash tests/run-all.sh` <!-- claude CLI 필요 -->
 - 팀 가동: `.claude/skills/awa/harness/bin/awa-up.sh <profile>` (cwd=프로젝트 또는 `--project /path <profile>`)
 - 팀 정리: `.claude/skills/awa/harness/bin/awa-down.sh`
-- 세션 목록: `/agpn` (Step 0 resume) 또는 `/agpn bookmarks list`
+- 세션 목록: `/awa` (Step 0 resume) 또는 `/awa bookmarks list`
 
 **공통 명령어 가드** (모든 영역에 적용):
 

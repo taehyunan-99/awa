@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# /agpn 의 비대화 명령 조립 백엔드. 사용자 채팅 대화는 SKILL.md 가 수집.
+# /awa 의 비대화 명령 조립 백엔드. 사용자 채팅 대화는 SKILL.md 가 수집.
 # 7차 리뷰 [CRIT-7]: claude code Bash 도구는 stdin 닫혀있어 read 불가 — 모든 분기를 인자로 받음.
 #
 # Usage:
