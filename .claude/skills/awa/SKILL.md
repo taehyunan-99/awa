@@ -128,7 +128,7 @@ fi
      - 불변식 검증(`spec_parse_invariants`) → 투표2+면 review-mgr 자동 추가, 투표1명이면 거부(2명+로 늘리거나 0명으로). 저장 전 rc=0 확인.
      - 결과를 `<PROJECT>/.awa/team.yaml` 작성(Write). git 추적 안내.
      - **자연어 작업(plan skip 분기)이면**: 그 자연어 작업을 `<PROJECT>/.awa/task.md` 로도 Write(무엇 — ORCH 자동 착수용). 형식·절차는 `references/interview.md` 저장 섹션 참조. plan 경로면 task.md 불필요(상호배타).
-     - Step 4 launch 는 `--preset` 대신 `--spec <PROJECT>/.awa/team.yaml` 전달. 자연어 작업이면 `--plan <PROJECT>/.awa/task.md` 동반.
+     - Step 4 launch 는 `--spec <PROJECT>/.awa/team.yaml` 전달. 자연어 작업이면 `--plan <PROJECT>/.awa/task.md` 동반.
 
 4. **Step 3 — Mode (SKILL chat, dynamic):**
    - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_DASHBOARD$)' | wc -l`
@@ -140,7 +140,7 @@ fi
    bash "$HARNESS_ROOT/bin/awa-main.sh" launch \
      --project <resolved-path> \
      --mode-launch <single|multi> \
-     [--spec <PROJECT>/.awa/team.yaml | --preset <name> | --workers <spec>] \
+     [--spec <PROJECT>/.awa/team.yaml | --workers <spec>] \
      [--plan <path>]
    ```
    - team.yaml 재호출 시: `--spec <PROJECT>/.awa/team.yaml`

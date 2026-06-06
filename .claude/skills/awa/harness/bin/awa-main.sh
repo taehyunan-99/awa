@@ -8,7 +8,7 @@
 #   awa-main.sh attach --session <name>
 #       → "tmux attach -t <name>" 한 줄 출력
 #   awa-main.sh launch --project <path> --mode-launch <single|multi>
-#                            [--preset <name>|--workers <spec>|--spec <yaml>] [--plan <path>]
+#                            [--workers <spec>|--spec <yaml>] [--plan <path>]
 #       → 발진 명령 + AGPN_META 출력
 set -uo pipefail
 _DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -82,15 +82,13 @@ cmd_attach() {
 }
 
 cmd_launch() {
-  local project="" mode_launch="" preset="" workers_spec="" plan_path="" spec_file=""
+  local project="" mode_launch="" workers_spec="" plan_path="" spec_file=""
   while [ $# -gt 0 ]; do
     case "$1" in
       --project) project="${2:-}"; shift 2 ;;
       --project=*) project="${1#--project=}"; shift ;;
       --mode-launch) mode_launch="${2:-}"; shift 2 ;;
       --mode-launch=*) mode_launch="${1#--mode-launch=}"; shift ;;
-      --preset) preset="${2:-}"; shift 2 ;;
-      --preset=*) preset="${1#--preset=}"; shift ;;
       --workers) workers_spec="${2:-}"; shift 2 ;;
       --workers=*) workers_spec="${1#--workers=}"; shift ;;
       --plan) plan_path="${2:-}"; shift 2 ;;
@@ -106,20 +104,12 @@ cmd_launch() {
   case "$mode_launch" in single|multi) ;;
     *) echo "오류: --mode-launch 는 single|multi" >&2; return 1 ;;
   esac
-  # preset / workers / spec — 정확히 하나만 허용
+  # workers / spec — 정확히 하나만 허용
   local _n=0
-  [ -n "$preset" ] && _n=$((_n+1))
   [ -n "$workers_spec" ] && _n=$((_n+1))
   [ -n "$spec_file" ] && _n=$((_n+1))
-  if [ "$_n" -eq 0 ]; then echo "오류: --preset 또는 --workers 또는 --spec 필요" >&2; return 1; fi
-  if [ "$_n" -gt 1 ]; then echo "오류: --preset/--workers/--spec 중 하나만" >&2; return 1; fi
-  # 15차 quality review: preset 가 unquoted 로 cmd 문자열에 들어감 → paste-to-shell 방어용
-  # 화이트리스트. [A-Za-z0-9_-] 만 허용 (실 preset 이름 패턴과 일치).
-  if [ -n "$preset" ]; then
-    case "$preset" in
-      *[!A-Za-z0-9_-]*) echo "오류: --preset 은 [A-Za-z0-9_-] 만 — '$preset'" >&2; return 1 ;;
-    esac
-  fi
+  if [ "$_n" -eq 0 ]; then echo "오류: --workers 또는 --spec 필요" >&2; return 1; fi
+  if [ "$_n" -gt 1 ]; then echo "오류: --workers/--spec 중 하나만" >&2; return 1; fi
 
   local session_name
   session_name="$(session_name_for "$project")"
@@ -130,10 +120,8 @@ cmd_launch() {
   local cmd="bash \"$HARNESS_ROOT/bin/awa-up.sh\""
   if [ -n "$spec_file" ]; then
     cmd="$cmd --spec \"$spec_file\""
-  elif [ -n "$workers_spec" ]; then
-    cmd="$cmd --workers \"$workers_spec\""
   else
-    cmd="$cmd $preset"
+    cmd="$cmd --workers \"$workers_spec\""
   fi
   [ -n "$plan_path" ] && cmd="$cmd --plan \"$plan_path\""
   cmd="$cmd --project \"$project\""
@@ -164,7 +152,7 @@ case "$sub" in
   launch) cmd_launch "$@" ;;
   resolve-path) cmd_resolve_path "$@" ;;
   ""|-h|--help)
-    echo "Usage: $0 {resume | attach --session <n> | launch --project <p> --mode-launch <single|multi> [--preset <p>|--workers <s>] [--plan <p>] | resolve-path --input <alias|path>}"
+    echo "Usage: $0 {resume | attach --session <n> | launch --project <p> --mode-launch <single|multi> [--workers <s>|--spec <yaml>] [--plan <p>] | resolve-path --input <alias|path>}"
     ;;
   *) echo "오류: 알 수 없는 subcommand '$sub'" >&2; exit 1 ;;
 esac

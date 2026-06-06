@@ -1,7 +1,0 @@
-session: my-feature
-layout: tiled
-plan: docs/[draft]/foo.md
-
-workers:
-  - name: engineer
-    role: engineer

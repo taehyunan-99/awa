@@ -30,7 +30,6 @@ _normalize_plan_arg() {
   fi
   ( cd "$(dirname "$raw")" && printf '%s/%s\n' "$(pwd)" "$(basename "$raw")" )
 }
-PROFILE_ARG=""
 WORKERS_ARG=""
 SPEC_FILE=""
 DRY_CHECK=0
@@ -66,9 +65,9 @@ while [ $# -gt 0 ]; do
       shift ;;
     -*) echo "오류: 알 수 없는 옵션 $1" >&2; exit 1 ;;
     *)
-      # 비옵션 인자는 프로파일명. 정상 사용은 1개 — 여분이 오면 무음 무시 대신 경고.
-      [ -n "$PROFILE_ARG" ] && echo "경고: 프로파일 인자 여러 개 — '$1' 로 덮어씀(이전: '$PROFILE_ARG')" >&2
-      PROFILE_ARG="$1"; shift ;;
+      # 고정 시드 profile 제거(2026-06-06) — 비옵션 인자(구 프로파일명)는 더 이상 지원 안 함.
+      echo "오류: 알 수 없는 인자 '$1' — 팀 구성은 --spec <team.yaml> 또는 --workers <spec> 로 지정" >&2
+      exit 1 ;;
   esac
 done
 
@@ -104,15 +103,13 @@ fi
 # prompts 디렉터리 — 기본 $HARNESS_ROOT/prompts, 테스트 fixture 용 PROMPTS_DIR env override.
 PROMPTS_DIR="${PROMPTS_DIR:-$HARNESS_ROOT/prompts}"
 
-# 3분기: --spec / --workers / profile(yaml 우선·sh 하위호환).
+# 2분기: --spec / --workers. 고정 시드 profile 제거(2026-06-06) — 동적 조합(--spec)이 표준.
 # REVIEWERS 미설정 — 기존 ${REVIEWERS+x} 가드가 빈/미정의를 안전 처리.
 if [ -n "${SPEC_FILE:-}" ]; then
-  [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --spec 와 프로파일 동시 지정 불가" >&2; exit 1; }
   [ -n "${WORKERS_ARG:-}" ] && { echo "오류: --spec 와 --workers 동시 지정 불가" >&2; exit 1; }
   PROFILE="(spec)"
   spec_parse_load "$SPEC_FILE" || exit 1     # WORKERS/REVIEWERS/SESSION/LAYOUT 정의 (같은 셸 — 배열 보존)
 elif [ -n "${WORKERS_ARG:-}" ]; then
-  [ -n "${PROFILE_ARG:-}" ] && { echo "오류: --workers 와 프로파일 동시 지정 불가" >&2; exit 1; }
   PROFILE="(custom)"                    # 종료 메시지(팀 '$PROFILE' 가동 완료)용 라벨.
   # ORCH_MODEL/DESK_MODEL 디폴트 미지정 — EFF 폴백이 빈값을 보고 vendor_default_model 로 채움.
   WORKERS=()
@@ -120,30 +117,9 @@ elif [ -n "${WORKERS_ARG:-}" ]; then
   for _w in "${_wk[@]}"; do WORKERS+=("$_w"); done
   SESSION=""                            # profile SESSION 없음 — PROFILE_SESSION 빈값으로.
 else
-  PROFILE="${PROFILE_ARG:-default}"
-  # PROFILE 이 실재 파일 경로면 그대로, 아니면 profiles/<이름>.yaml → .sh 우선순위로 해석.
-  if [ -f "$PROFILE" ]; then
-    PROFILE_FILE="$PROFILE"
-  else
-    if [ -f "$HARNESS_ROOT/profiles/$PROFILE.yaml" ]; then
-      PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.yaml"
-    else
-      PROFILE_FILE="$HARNESS_ROOT/profiles/$PROFILE.sh"
-    fi
-  fi
-
-  if [ ! -f "$PROFILE_FILE" ]; then
-    echo "오류: 프로파일 없음 → $PROFILE_FILE" >&2
-    echo "사용 가능: $(ls "$HARNESS_ROOT/profiles" 2>/dev/null | sed 's/\.\(sh\|yaml\)$//' | sort -u | tr '\n' ' ')" >&2
-    exit 1
-  fi
-
-  # 프로파일 로드: yaml → spec_parse_load, sh → source (하위호환)
-  case "$PROFILE_FILE" in
-    *.yaml) spec_parse_load "$PROFILE_FILE" || exit 1 ;;
-    # shellcheck disable=SC1090
-    *)      source "$PROFILE_FILE" ;;
-  esac
+  echo "오류: --spec <team.yaml> 또는 --workers <spec> 필요" >&2
+  echo "  /awa 인터뷰가 .awa/team.yaml 을 만들어 --spec 으로 전달합니다." >&2
+  exit 1
 fi
 
 # --dry-check: 파싱·검증 완료 후 boot 없이 종료. WORKERS 가 채워진 뒤여야 의미.

@@ -1,8 +1,0 @@
-workers:
-  - name: engineer
-    role: engineer
-reviewers:
-  - name: alignment-rev
-    role: reviewer-alignment
-  - name: quality-rev
-    role: reviewer-quality
