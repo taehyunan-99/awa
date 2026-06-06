@@ -127,7 +127,8 @@ fi
      - **Stage 3 — codex 후행 질문 (기본 제외)**: 조립 확정 후 "다벤더 교차 리뷰를 위해 codex 리뷰어도 추가할까요? (codex 설치 필요)" 물어 **승인 시에만** `vendor: codex` 부여. 기본은 claude 리뷰어만 — codex 미설치 사용자 부팅 실패 방지.
      - 불변식 검증(`spec_parse_invariants`) → 투표2+면 review-mgr 자동 추가, 투표1명이면 거부(2명+로 늘리거나 0명으로). 저장 전 rc=0 확인.
      - 결과를 `<PROJECT>/.awa/team.yaml` 작성(Write). git 추적 안내.
-     - Step 4 launch 는 `--preset` 대신 `--spec <PROJECT>/.awa/team.yaml` 전달.
+     - **자연어 작업(plan skip 분기)이면**: 그 자연어 작업을 `<PROJECT>/.awa/task.md` 로도 Write(무엇 — ORCH 자동 착수용). 형식·절차는 `references/interview.md` 저장 섹션 참조. plan 경로면 task.md 불필요(상호배타).
+     - Step 4 launch 는 `--preset` 대신 `--spec <PROJECT>/.awa/team.yaml` 전달. 자연어 작업이면 `--plan <PROJECT>/.awa/task.md` 동반.
 
 4. **Step 3 — Mode (SKILL chat, dynamic):**
    - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_DASHBOARD$)' | wc -l`
@@ -144,6 +145,7 @@ fi
    ```
    - team.yaml 재호출 시: `--spec <PROJECT>/.awa/team.yaml`
    - 새 조합 인터뷰 완료 시: `--spec <PROJECT>/.awa/team.yaml` (Write 후)
+   - **자연어 작업(plan skip)이면**: 위에 더해 `--plan <PROJECT>/.awa/task.md` 동반 — ORCH 자동 착수. plan 파일 경로면 `--plan <plan-path>` (기존). 둘은 상호배타(같은 launch 에 함께 안 옴).
    main.sh prints the awa-up.sh command + `# AGPN_META: session=<n> mode=<m>` line.
 
    **AGPN_META parsing** (10th review [CRIT-27]):
