@@ -64,10 +64,24 @@
 **인터뷰가 직접 판단해 사용자에게 경고·확인하는 항목:**
 - 무리뷰(투표 0)는 "합의 게이트 없이 진행"을 사용자에게 명시 확인.
 
-## 저장 (.awa/team.yaml)
+## 저장 (.awa/team.yaml = 누가, .awa/task.md = 무엇)
+
+### team.yaml (누가 — 팀 구성)
 - 대상 프로젝트 PROJECT_ROOT/.awa/team.yaml 작성.
 - git 추적 여부 안내: 기본 추적되며, 개인 설정으로 끄려면 .gitignore 에 `.awa/` 한 줄 추가.
 - plan 참조 시: 그 plan 이 git 미추적(docs/)이면 "로컬 전용, 공유 안 됨" 고지(plan 은 soft reference — 재호출 시 없으면 경고 후 plan 없이 진행).
+
+### task.md (무엇 — 자연어 작업의 ORCH 전달)
+**plan 없이 자유 프롬프트로 작업을 받은 경우에만** 작성한다(plan 경로는 plan 파일 자체가 작업 정의이므로 task.md 불필요 — 상호배타).
+
+- 사용자가 자연어로 설명한 작업을 `PROJECT_ROOT/.awa/task.md` 로 Write 한다.
+- 목적: tmux 가동 시 ORCH 가 이 파일을 읽어 **자동으로 작업을 시작**하게 한다. task.md 없이 부팅하면 ORCH 는 지시 없이 idle 대기한다.
+- task.md 는 `--plan <PROJECT>/.awa/task.md` 로 launch 에 전달된다 — 기존 plan 주입 경로(`--append-system-prompt-file` 합본 + 자동 착수 트리거)를 그대로 재사용한다.
+- **task.md 는 plan 4축 리뷰를 거치지 않는다** — 자연어 = 간단 작업 신호. 복잡한 작업이면 사용자에게 "plan/PRD 를 먼저 만들어 전달하길 권장"한다(소프트 가이드).
+- git 추적: task.md 는 `.awa/` 안이라 team.yaml 과 동일하게 처리된다(SKILL.md 의 git init/gitignore 단계가 `.awa/` 통째로 커버 — 별도 처리 없음).
+
+#### task.md 형식 (SKILL 이 작성)
+ORCH 가 읽을 한국어 작업 설명. 첫 줄(H1 제목)을 `# 작업 지시 (자연어 입력 — 검증된 plan 아님)` 으로 두어, ORCH 가 plan 수준의 형식적 완결성을 기대하지 않게 한다. 본문은 사용자가 자연어로 설명한 작업 내용을 그대로 또는 정리해 기록한다.
 
 ## 스키마
 layout / workers[].{name,role,vendor,model} / reviewers[].{name,role,vendor} / plan(경로 참조, 선택)
