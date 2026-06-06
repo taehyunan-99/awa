@@ -50,22 +50,53 @@ fi
 
 **All Bash invocations MUST use `bash "$HARNESS_ROOT/bin/<script>.sh" ...` (absolute path).** Never use relative `bin/...` — cwd is unreliable across new terminal sessions. lib.sh's "not a git repo" warning is suppressed because `$HARNESS_ROOT` is always the repo root.
 
+> **Step 순서 (2026-06-06 재배치 — 경로 먼저, 작업 나중):** Step 0(resume) → **Step 1(Project 경로)** → **Step 1.5(team.yaml 재호출)** → **Step 2(Plan/작업 + 조합 인터뷰)** → Step 3(Mode) → Step 4(launch). 경로를 먼저 정해야 team.yaml 재호출 체크를 조합 인터뷰 *전에* 할 수 있다(이전 구성 있으면 인터뷰 생략 가능). 이전 순서(작업→경로)는 인터뷰를 다 마친 뒤에야 team.yaml 존재를 알아 비효율이었음.
+
 1. **Step 0 — Resume check (Bash):** `bash "$HARNESS_ROOT/bin/awa-main.sh" resume`
    - Parses TSV output (header line + 0+ rows). If rows exist, present them to user via chat. `_DASHBOARD` row is labeled `multi-view`.
    - User picks one → `bash "$HARNESS_ROOT/bin/awa-main.sh" attach --session <name>` → print attach cmd → END.
-   - User picks none / no rows → continue to Step 0.5.
+   - User picks none / no rows → continue to Step 1 (Project).
 
-   - **Step 0.5 — team.yaml 재호출:** **이 체크는 Step 3(Project 결정) 직후 수행한다** — PROJECT 경로가 정해진 뒤라야 .awa/team.yaml 경로를 안다. Step 3(Project) 에서 PROJECT_ROOT 가 결정된 후,
-     `bash -c "test -f <PROJECT>/.awa/team.yaml && echo found"` 실행.
-     - `found` 출력 시 → 사용자에게 "이전 팀 구성을 찾았습니다. 이어서 띄울까요? (.awa/team.yaml)" 제시.
-       - yes → Step 4 launch 로 직행 (`--spec <PROJECT>/.awa/team.yaml`).
-       - no → Step 1 인터뷰 (새 조합).
-     - 살아있는 세션과 team.yaml 둘 다 있으면: 세션 attach 가 우선, team.yaml 은 "새로 띄우기" 옵션.
-     - team.yaml 없으면 → Step 1 인터뷰로 진행.
-     - (PROJECT_ROOT 는 Step 3 에서 결정되므로, Step 0.5 체크는 Step 3 직후 Step 4 직전에 수행한다.)
+2. **Step 1 — Project (SKILL chat)** (15th live finding [L-3] · cwd 후보 추가 2026-06-06 · 순서 앞당김 2026-06-06):
+   질문 문구(사용자에게 그대로): **"팀이 작업할 프로젝트 폴더를 골라주세요. (워커들이 이 폴더의 파일을 읽고 수정합니다)"**
 
-2. **Step 1 — Plan (SKILL chat):**
-   - **Auto-discover** (9th review [CRIT-22]): plan 은 사용자 프로젝트 산출물이므로 PROJECT_ROOT(Step 3 에서 결정) 기준으로 검색한다 — `bash -c "ls -t \"$PROJECT_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip. plan 없으면 사용자에게 경로 입력을 요청한다.
+   - **현재 폴더 후보 자동 감지 (MUST run first):** 사용자가 `claude` 를 띄운 터미널 폴더를 후보로 제시한다.
+     `bash -c 'echo "$PWD"'` 로 읽는다. **주의: claude code Bash 도구의 `pwd`(=harness 경로)가 아니라 env `$PWD`(=사용자 터미널 cwd)를 써야 한다** — 이 둘은 다르며, Bash 도구 cwd 를 프로젝트로 쓰면 harness 자체에 팀이 뜨는 과거 결함(L-3) 재발. `$PWD` 가 비었거나 `$HARNESS_ROOT` 와 같으면 후보를 제시하지 않는다(신뢰 불가 케이스).
+     - **자동 선택 금지 — 후보로만 제시하고 사용자 확인 필수.** `$PWD` 도 항상 정확하진 않다(루트에서 띄웠으나 하위 폴더가 진짜 대상인 경우). "Claude 가 감지 + 사용자가 눈으로 확인"의 결합이 자동선택보다 안전하다. (이전 결정 "cwd 옵션 없음"을 2026-06-06 뒤집음 — 자동선택이 아닌 후보+확인이라 L-3 위험 없음.)
+
+   - **Options (사용자에게 보여줄 직관적 라벨):**
+     1. **이 폴더에서 작업** — `현재 폴더: <$PWD>` (감지된 경우만 표시. 지금 터미널이 열린 곳)
+     2. **다른 폴더 경로 입력** — 작업할 폴더의 전체 경로를 붙여넣기 (예: `/Users/you/projects/myapp`). 북마크에 저장한 별칭도 가능.
+     3. **저장된 북마크에서 고르기** — 전에 등록해둔 프로젝트 목록에서 선택
+     4. *(개발자 전용)* **AWA 하니스 자체** — AWA 코드를 직접 손볼 때만. 일반 작업이면 고르지 말 것.
+
+     (1번은 `$PWD` 감지 실패 시 목록에서 빠진다. 그 경우 2번이 기본 안내.)
+
+   - 각 분기 처리:
+     - **이 폴더에서 작업:** `$PWD` 값을 그대로 사용 (이미 절대경로).
+     - **다른 폴더 경로 입력:** 사용자에게 경로/별칭을 받는다.
+     - **북마크:** `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" list` → 행을 사용자에게 제시 → 번호/별칭 선택.
+     - **하니스 자체:** `$HARNESS_ROOT` 직접 사용.
+   - **Resolve to absolute path:** (1·하니스 외 입력은) `bash "$HARNESS_ROOT/bin/awa-main.sh" resolve-path --input <user-input>` → 해석된 경로(=PROJECT_ROOT) 또는 exit 1.
+
+   - **git 초기화 + .gitignore 처리 (2026-06-06 신설 — team.yaml 저장 전제):** PROJECT_ROOT 가 정해지면 git 상태를 확인하고 사용자 확인을 거친다.
+     - `bash -c "git -C <PROJECT> rev-parse --is-inside-work-tree 2>/dev/null"` 로 git repo 여부 확인.
+       - **git repo 아님** → 사용자에게 "이 폴더는 git 저장소가 아닙니다. `git init` 할까요? (team.yaml 버전 관리를 위해 권장)" 확인 → yes 시 `git -C <PROJECT> init`. no 면 그대로 진행(team.yaml 은 추적 안 됨 고지).
+     - `.gitignore` 처리 (git repo 일 때만):
+       - `.gitignore` **없으면** → "`.awa/` 를 git 으로 추적할까요, 무시할까요? 무시하려면 .gitignore 를 만들어 `.awa/` 를 추가합니다." 확인 → 무시 선택 시 `.gitignore` 생성 + `.awa/` 한 줄 추가. 추적 선택 시 아무것도 안 함(기본 추적).
+       - `.gitignore` **있으면** → `.awa/` 가 이미 있는지 확인. 없으면 "`.awa/` 를 .gitignore 에 추가할까요?(무시)" 만 확인 → yes 시 append. (있으면 아무것도 안 함.)
+     - **모든 단계는 사용자 확인 후 실행** — 임의 git init/파일 수정 금지([[feedback_gitignore_no_touch]] 정신).
+
+2.5. **Step 1.5 — team.yaml 재호출 (SKILL chat):** PROJECT 경로가 정해진 직후(조합 인터뷰 *전*) 수행한다.
+   `bash -c "test -f <PROJECT>/.awa/team.yaml && echo found"` 실행.
+   - `found` 출력 시 → 사용자에게 "이전 팀 구성을 찾았습니다. 이어서 띄울까요? (.awa/team.yaml)" 제시.
+     - yes → **Step 2(작업/조합 인터뷰) 생략**하고 Step 3(Mode)로 (`--spec <PROJECT>/.awa/team.yaml`).
+     - no → Step 2 조합 인터뷰 (새 조합).
+   - 살아있는 세션(Step 0)과 team.yaml 둘 다 있으면: 세션 attach 가 우선, team.yaml 은 "새로 띄우기" 옵션.
+   - team.yaml 없으면 → Step 2 조합 인터뷰로 진행.
+
+3. **Step 2 — Plan + 작업/조합 인터뷰 (SKILL chat):**
+   - **Auto-discover** (9th review [CRIT-22]): plan 은 사용자 프로젝트 산출물이므로 PROJECT_ROOT(Step 1 에서 결정) 기준으로 검색한다 — `bash -c "ls -t \"$PROJECT_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip. plan 없으면 사용자에게 경로 입력을 요청한다.
    - If user provides plan → Agent tool 4-axis review:
      - prompt: `references/review-prompt.md` + plan body
      - subagent_type: `general-purpose`
@@ -79,36 +110,31 @@ fi
      - For each FAIL (검증가능성 외), SKILL drafts a fix proposal (diff or rewrite snippet) and presents to user via chat.
      - User approves each fix → SKILL writes back to plan file via Edit tool.
      - After all fixes applied, re-run review *once* (one retry max — avoid infinite loop). If still CHANGES_NEEDED, SKILL summarizes remaining gaps and asks user: "proceed despite gaps?" (yes → continue, no → abort). 단, 재리뷰에서 검증가능성 FAIL 발생 시 위 분류대로 즉시 abort.
-   - **Preset suggestion** (9th review [MINOR-24]):
-     - After APPROVED, *SKILL itself* (no subagent) applies heuristics in `references/presets.md` to the plan body:
-       - keyword/path scan (Test:, tests/, "research", "security", Create:-count).
-       - returns one recommended seed profile + reasoning (구현→default, 조사→research, 보안→code-review, 풀스택→web, 혼합→feature-team).
-   - If user skips plan → directly proceed to 조합 인터뷰.
-   - **조합 인터뷰** — 2-stage 구성 (`references/interview.md` 절차 수행):
-     - **Stage 1**: 작업 종류 질문 → 시드 profile yaml(`profiles/<seed>.yaml`) 을 읽어 초안 제시.
-     - **Stage 2**: 워커·리뷰어 가감 인터뷰 → 사용자 승인/수정.
+   - **작업 분석 → 자율 조립** (2026-06-06 재설계 — 정적 시드 던지기 폐기):
+     - plan 이 있으면: SKILL 이 plan 본문을 분석 단서로 사용. `references/presets.md` 휴리스틱은 *내부 참고용*일 뿐, **시드 profile 을 통째로 사용자에게 던지지 않는다.**
+     - plan 이 없으면: 아래 **작업 입력 질문**으로 작업을 받는다.
+   - **작업 입력 질문 (plan skip 시 — AskUserQuestion):**
+     - 질문: "어떤 작업을 하시나요?"
+     - 선택지 (기초 3개 + 자유 입력):
+       1. **기능 구현** — 코드를 새로 짜거나 기능 추가
+       2. **코드 조사·분석** — 비교·탐색·리포트 (코드 변경 없음)
+       3. **코드 점검·보안** — 기존 코드 감사·취약점 점검
+       4. **작업 내용 직접 입력** — 자유 프롬프트로 무엇을 만들지 설명 (선택지에 안 맞으면 이걸로)
+     - 4번(또는 1~3 선택 후 상세) → 사용자가 자연어로 작업을 설명하면 **SKILL 이 그 프롬프트를 분석**해 조립.
+   - **조합 인터뷰** — `references/interview.md` 절차 수행:
+     - **Stage 1 — 작업 분석·자율 조립**: SKILL(Claude) 이 작업을 분석해 **역할 카탈로그**(`prompts/roles/` — engineer/frontend/backend/infra/researcher/tester/security + reviewer-*)에서 필요한 역할만 골라 팀을 조립하고 **근거를 설명**한다. profiles/*.yaml 은 참고만(통째 복사 금지).
+     - **Stage 2 — 가감**: 워커·리뷰어 가감 + 리뷰 수위(full-vote/quality-only/무리뷰) → 사용자 승인/수정.
+     - **Stage 3 — codex 후행 질문 (기본 제외)**: 조립 확정 후 "다벤더 교차 리뷰를 위해 codex 리뷰어도 추가할까요? (codex 설치 필요)" 물어 **승인 시에만** `vendor: codex` 부여. 기본은 claude 리뷰어만 — codex 미설치 사용자 부팅 실패 방지.
      - 불변식 검증(`spec_parse_invariants`) → 위반 시 자동 교정(review-mgr 추가)/경고.
      - 결과를 `<PROJECT>/.awa/team.yaml` 작성(Write). git 추적 안내.
      - Step 4 launch 는 `--preset` 대신 `--spec <PROJECT>/.awa/team.yaml` 전달.
 
-3. **Step 2 — Mode (SKILL chat, dynamic):**
+4. **Step 3 — Mode (SKILL chat, dynamic):**
    - Bash: `tmux list-sessions -F '#{session_name}' | grep -E '^(awa-|_DASHBOARD$)' | wc -l`
    - count ≥ 1 → ask user: Single vs Multi-view
    - count = 0 → mode=single auto, inform user
 
-4. **Step 3 — Project (SKILL chat)** (15th live finding [L-3]):
-   - Note: claude code Bash tool cwd cannot be trusted as the user's project root across new terminal sessions — therefore there is no separate "Current(cwd)" option. The user pastes their cwd via the *Custom path* option below.
-   - Options (3, with clear labels):
-     1. **Bookmarks** — pick from saved list
-     2. **Custom path** — paste absolute path or alias (this is also the channel for "my current cwd": just paste it)
-     3. **Harness root** — developer-only, runs against the harness repo itself
-   - For Bookmarks: `bash "$HARNESS_ROOT/bin/awa-bookmarks.sh" list` → present rows to user → user picks number or alias
-   - For Custom path: ask path/alias from user (label hints "absolute path or alias; if your terminal cwd, paste it here")
-   - For Harness root: use `$HARNESS_ROOT` directly
-   - **Resolve to absolute path:** `bash "$HARNESS_ROOT/bin/awa-main.sh" resolve-path --input <user-input>` → returns resolved path or exit 1.
-
 5. **Step 4 — Launch command output (Bash, non-interactive):**
-   (Step 3 직후 Step 0.5 team.yaml 체크 수행 — 위 Step 0.5 참조)
    ```
    bash "$HARNESS_ROOT/bin/awa-main.sh" launch \
      --project <resolved-path> \

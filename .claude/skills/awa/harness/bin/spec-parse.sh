@@ -63,6 +63,8 @@ spec_parse_validate() {
 # 리뷰어 불변식 — 투표 리뷰어(reviewer-alignment/quality/security) ≥1 이면
 # review-manager 역할 필수(없으면 drift-check silent skip). rc=1 + stderr.
 # 투표 리뷰어 0 은 정당(research 류 무리뷰) → 통과.
+# TODO(다음 사이클): 투표 1명 금지 추가 — multi-reviewed 정체성상 1명은 단독거부권(합의 아님).
+#   더미 프로파일(research/code-review/feature-team) 제거와 한 묶음으로 진행(지금 넣으면 더미 4테스트 깨짐).
 spec_parse_invariants() {
   local yaml="$1"
   [ -f "$yaml" ] && [ -r "$yaml" ] || { echo "오류: 명세 파일 없음/읽기불가 → $yaml" >&2; return 1; }
