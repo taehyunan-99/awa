@@ -23,7 +23,8 @@
 
 ## 3. HOW
 
-- **신호 N종 진화 = 4곳 동시 갱신** — 신호 1종 추가 시 `orch.md` 신호 목록 + 처리 절(ⓐ~ⓘ) + `_common.md` 신호 토큰 + `bin/watcher.sh` awk 분기 + `tests/test-*-e2e.sh` 검증 네 곳을 한 commit 에 모두 손댄다. 한 곳만 빠지면 *벙어리 신호* 가 된다.
+<!-- prev: 갱신처에 "tests/test-*-e2e.sh 검증" 포함 → tests/ 제거(2026-06-07, e654309). 검증은 실제 스킬 테스트(별도 클로드 세션). -->
+- **신호 N종 진화 = 4곳 동시 갱신** — 신호 1종 추가 시 `orch.md` 신호 목록 + 처리 절(ⓐ~ⓘ) + `_common.md` 신호 토큰 + `bin/watcher.sh` awk 분기 네 곳을 한 commit 에 모두 손댄다. 한 곳만 빠지면 *벙어리 신호* 가 된다.
 - **events.log 5필드 의미 표 유지** (`_common.md` 의 5필드 의미 행) — action 별로 필드5 의미가 다르다 (`modify=path` / `done=-` / `plan-defect=설명` / `drift-check`·`allow-confirm=key=value`). action 추가 시 표 행 추가 의무. 표 없는 신호는 reviewer 가 path 로 오해.
 
 ## 4. ⛔ HOW NOT
@@ -38,7 +39,8 @@
 - **의존**: (없음 — 마크다운만)
 - **피의존**:
   - [`bin/awa-up.sh`](../bin/awa-up.sh) — sed 치환 + stdin 주입
-  - [`profiles/*.sh`](../profiles/) — `WORKERS=("이름:역할:..")`의 `역할` 토큰이 여기 파일명과 매칭
+  <!-- prev: "profiles/*.sh — WORKERS 의 역할 토큰이 여기 파일명과 매칭" → profiles/ 디렉토리 제거(2026-06-07, e654309). 역할 토큰은 이제 .awa/team.yaml(--spec) 의 WORKERS 항목과 매칭. -->
+  - `.awa/team.yaml`(`--spec`) — `workers:` 의 `역할` 토큰이 여기 `roles/NN-part/<역할>.md` 파일명과 매칭
 - **경계 / 어댑터**:
   - 토큰 계약 — `{{HARNESS_ROOT}}` / `{{SESSION}}` / `{{WORKER_NAME}}`은 가동 시 치환되므로 텍스트에 리터럴 사용 금지
   - 완료 신호 — 워커가 `.agent-harness/events.log` 에 탭 5필드 done 라인 append(`...\tdone\t-`). watcher 가 폴링해 orch 를 깨운다. **워커는 tmux 직접호출 안 함**(P11 탈-tmux — sandbox 격리 경계 안에서 tmux 소켓 접근 불가하므로 파일 신호만). 과거 `tmux wait-for -S done-...` 채널은 폐지(잉여 — watcher 가 이미 done 라인 폴링).
@@ -53,10 +55,11 @@
 
 ```bash
 # 마크다운만이므로 별도 빌드/린트 없음
-# 부트 프롬프트 변경 검증은 tests/ 의 boot-tokens / role 관련 테스트로
-bash tests/test-boot-tokens.sh
-bash tests/role5axis/r5-score.sh
+# 토큰 계약 점검: 치환 전 텍스트에 리터럴 토큰이 남았는지 grep
+grep -rn '{{HARNESS_ROOT}}\|{{SESSION}}\|{{WORKER_NAME}}' roles/ _common.md
 ```
+<!-- prev: "bash tests/test-boot-tokens.sh" 등 boot-tokens/role5axis 검증 2줄 → tests/ 제거(2026-06-07, e654309). 부트 프롬프트 검증은 실제 스킬 테스트(별도 클로드 세션). -->
+
 
 _(영역 고유 가드는 update에서 추가)_
 

@@ -122,7 +122,7 @@ fi
        4. **작업 내용 직접 입력** — 자유 프롬프트로 무엇을 만들지 설명 (선택지에 안 맞으면 이걸로)
      - 4번(또는 1~3 선택 후 상세) → 사용자가 자연어로 작업을 설명하면 **SKILL 이 그 프롬프트를 분석**해 조립.
    - **조합 인터뷰** — `references/interview.md` 절차 수행:
-     - **Stage 1 — 작업 분석·자율 조립**: SKILL(Claude) 이 작업을 분석해 **역할 카탈로그**(`prompts/roles/` — engineer/frontend/backend/infra/researcher/tester/security + reviewer-*)에서 필요한 역할만 골라 팀을 조립하고 **근거를 설명**한다. profiles/*.yaml 은 참고만(통째 복사 금지).
+     - **Stage 1 — 작업 분석·자율 조립**: SKILL(Claude) 이 작업을 분석해 **역할 카탈로그**(`prompts/roles/` — engineer/frontend/backend/infra/researcher/tester/security + reviewer-*)에서 필요한 역할만 골라 팀을 조립하고 **근거를 설명**한다.
      - **Stage 2 — 가감**: 워커·리뷰어 가감 + 리뷰 수위(full-vote=투표2+·무리뷰=투표0; **투표 1명은 금지** — 불변식 위반) → 사용자 승인/수정.
      - **Stage 3 — codex 후행 질문 (기본 제외)**: 조립 확정 후 "다벤더 교차 리뷰를 위해 codex 리뷰어도 추가할까요? (codex 설치 필요)" 물어 **승인 시에만** `vendor: codex` 부여. 기본은 claude 리뷰어만 — codex 미설치 사용자 부팅 실패 방지.
      - 불변식 검증(`spec_parse_invariants`) → 투표2+면 review-mgr 자동 추가, 투표1명이면 거부(2명+로 늘리거나 0명으로). 저장 전 rc=0 확인.

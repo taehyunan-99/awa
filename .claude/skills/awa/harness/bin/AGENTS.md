@@ -29,7 +29,9 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 - `lib.sh` — 공통 함수(`generate_worker_settings`·`worker_turn_count`·`confirm_allow_yaml`·`bump_stats_counter` 등), 다른 스크립트가 source
 
 `awa-up.sh` 주요 옵션:
-- `--profile <name>` — 프로파일 fragment 선택 (`profiles/<name>.sh`)
+<!-- prev: "--profile <name> — 프로파일 fragment 선택 (profiles/<name>.sh)" → profiles/ 폴백 제거(2026-06-07, e654309). 팀 구성은 --spec / --workers 2분기로 일원화. -->
+- `--spec <team.yaml>` — 팀 구성 명세 로드 (`spec_parse_load`; `/awa` 인터뷰 산출 `.awa/team.yaml`)
+- `--workers <spec>` — 워커 인라인 명세 (spec 파일 없이 직접 구성)
 - `--project <path>` — PROJECT_ROOT 명시 (cwd 자동 도출 우회)
 - `--dry-check` — yaml 가드 (`danger-check.sh --check-allow-yaml`) 만 실행 후 즉시 종료 (boot 안 함, Task 7)
 - `--plan <file>` — 확정 plan 자동주입 (반복 가능, 합본 후 `--append-system-prompt-file` 로 ORCH 주입, 11차)
@@ -54,13 +56,14 @@ AWA 하니스의 실행층 — tmux 페인 배치·워커 부트·작업 dispatc
 <!-- 모두 약결합(마크다운 링크) — 강결합 승격은 /update에서 판단 -->
 
 - **의존**:
-  - [`profiles/`](../profiles/) — `awa-up.sh`가 `.yaml` 우선 로드(`spec_parse_load`), yaml 없으면 구 `.sh` source 폴백(`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT`)
+  <!-- prev: "profiles/ — .yaml 우선 로드, yaml 없으면 .sh source 폴백" → profiles/ 디렉토리 제거(2026-06-07, e654309). 팀 명세는 --spec 으로 받은 .awa/team.yaml 을 spec_parse_load 가 파싱. -->
+  - 팀 명세 — `--spec <team.yaml>` 로 받은 명세를 `spec-parse.sh::spec_parse_load` 가 파싱(`WORKERS`/`REVIEWERS`/`SESSION`/`LAYOUT` 도출). `.awa/team.yaml` 은 `/awa` 인터뷰 산출물(사용자 프로젝트 측).
   - [`prompts/`](../prompts/) — `_common.md` + `roles/NN-part/<역할>.md` 글롭으로 자동 카탈로그, `{{HARNESS_ROOT}}` 토큰을 sed 치환 후 워커 stdin에 주입
   - [`templates/`](../templates/) — `lib.sh::generate_worker_settings`가 역할군에 맞는 `settings.<군>.json.tpl` 선택
   - [`config/orch-auto-allow.yaml`](../config/orch-auto-allow.yaml) — `matrix-lookup.sh`의 awk 파서가 카테고리 패턴 읽음 (`category:` + 2칸 들여쓰기 + `- "패턴"` 단순 형식만)
 - **피의존**:
+  <!-- prev: "tests/ — test-*.sh 다수가 이 디렉토리 단위 검증" → tests/ 디렉토리 제거(2026-06-07, e654309). 회귀 검증은 실제 스킬 테스트(별도 클로드 세션)로 대체. -->
   - 워커(`prompts/roles/*`)가 `{{HARNESS_ROOT}}/bin/<도구>.sh` 절대경로로 호출
-  - [`tests/`](../tests/) — `test-*.sh` 다수가 이 디렉토리의 함수/스크립트 단위 검증
 - **경계 / 어댑터**:
   - tmux ↔ bash: `send-keys -l`(텍스트/Enter 분리), `wait-for`, `capture-pane`
   - claude CLI ↔ 워커: stdin 부트 프롬프트 주입, allow-set-title off로 pane title 보존
@@ -99,11 +102,13 @@ basename 다를 시 `awa-<basename>` 세션 동시 가동 가능. basename 충�
 ```bash
 # 정적 검사
 shellcheck bin/*.sh                # 설치된 경우
+bash -n bin/*.sh                   # 구문 검사
 
-# 단위 테스트 (이 디렉토리 변경 시)
-bash tests/run-all.sh
-RUN_INTEGRATION=1 bash tests/run-all.sh    # claude CLI 의존 probe 포함
+# 동작 검증 (이 디렉토리 변경 시): --dry-check 로 boot 없이 yaml 가드만
+bash bin/awa-up.sh --workers "dev:engineer" --dry-check
 ```
+<!-- prev: "bash tests/run-all.sh" 단위테스트 2줄 → tests/ 디렉토리 제거(2026-06-07, e654309). 회귀 검증은 실제 스킬 테스트(별도 클로드 세션). -->
+
 
 _(영역 고유 가드는 update에서 추가)_
 

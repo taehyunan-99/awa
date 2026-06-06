@@ -9,7 +9,8 @@
 
 (영어 5어휘 책임 위치 = `README.md` + `docs/identity-AWA.md` — Task 10 산출물)
 
-세션은 일회용이며 `profiles/` + `prompts/`로부터 매번 재생성된다 — 세션 상태를 저장/복원하지 않으니 가이드·프롬프트·프로파일 변경은 항상 git 추적되는 원본 파일에서 한다.
+<!-- prev: "profiles/ + prompts/로부터 재생성" (시드 profiles 존재 시절) → profiles/ 제거(2026-06-07, e654309), 팀 구성은 /awa 인터뷰 → .awa/team.yaml(--spec) 동적 생성 -->
+세션은 일회용이며 `prompts/` + `.awa/team.yaml`(`/awa` 인터뷰 산출, `--spec` 전달)로부터 매번 재생성된다 — 세션 상태를 저장/복원하지 않으니 가이드·프롬프트 변경은 항상 git 추적되는 원본 파일에서 한다.
 
 **Tradeoff**: 영역마다 가이드를 따로 읽는 비용 → 단일 거대 가이드의 lost-in-the-middle을 차단.
 
@@ -24,11 +25,9 @@ Claude Code 는 같은 폴더의 CLAUDE.md(= `@./AGENTS.md` 한 줄) 를 통해 
 작업 영역에 해당하는 AGENTS.md 를 먼저 읽고 진행한다.
 
 - **harness/bin/** — 하니스 실행 스크립트 (awa-up/down, watcher, dispatch, classify, permission-gate) → [`.claude/skills/awa/harness/bin/AGENTS.md`](.claude/skills/awa/harness/bin/AGENTS.md)
-- **harness/profiles/** — 팀 구성 정의 (default/feature-team/code-review/research) → [`.claude/skills/awa/harness/profiles/AGENTS.md`](.claude/skills/awa/harness/profiles/AGENTS.md)
 - **harness/prompts/** — 워커 부트 프롬프트 (`_common.md` + `roles/NN-part/*.md`) → [`.claude/skills/awa/harness/prompts/AGENTS.md`](.claude/skills/awa/harness/prompts/AGENTS.md)
 - **harness/templates/** — Claude `settings.json` 권한 템플릿 군 → [`.claude/skills/awa/harness/templates/AGENTS.md`](.claude/skills/awa/harness/templates/AGENTS.md)
 - **harness/config/** — permission-gate 자동 허용 카탈로그 (`orch-auto-allow.yaml`) → [`.claude/skills/awa/harness/config/AGENTS.md`](.claude/skills/awa/harness/config/AGENTS.md)
-- **tests/** — bash 테스트 + 통합 probe + 시나리오(lead-arena/m3/probes/role5axis/stress) → [`tests/AGENTS.md`](tests/AGENTS.md)
 - **docs/** — 설계 노트·E2E 시나리오·probe 결과·superpowers 11차 plan/specs → [`docs/AGENTS.md`](docs/AGENTS.md)
 
 ## 영역 가이드의 구조
@@ -50,9 +49,8 @@ HOW/HOW NOT/WHY 는 placeholder. 본격 작성은 베이스라인 완성 즈음 
 
 ## 공통 명령어
 
-- 전체 테스트: `bash tests/run-all.sh`
-- 통합 probe 포함: `RUN_INTEGRATION=1 bash tests/run-all.sh` <!-- claude CLI 필요 -->
-- 팀 가동: `.claude/skills/awa/harness/bin/awa-up.sh <profile>` (cwd=프로젝트 또는 `--project /path <profile>`)
+<!-- prev: "전체 테스트 bash tests/run-all.sh" 2줄 → tests/ 디렉토리 제거(2026-06-07, e654309)로 삭제. 회귀 검증은 실제 스킬 테스트(별도 클로드 세션)로 대체. -->
+- 팀 가동: `.claude/skills/awa/harness/bin/awa-up.sh --spec <PROJECT>/.awa/team.yaml` (또는 `--workers <spec>`; cwd=프로젝트 또는 `--project /path`)
 - 팀 정리: `.claude/skills/awa/harness/bin/awa-down.sh`
 - 세션 목록: `/awa` (Step 0 resume) 또는 `/awa bookmarks list`
 

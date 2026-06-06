@@ -433,7 +433,6 @@ fi
 
 # claude REPL 준비 대기(trust 통과 + ready 폴링)는 bin/vendors/claude.sh 의
 #   vendor_wait_ready 로 이관됨 (벤더 어댑터 규약). 화면 패턴·sleep·반복은 그곳이 단일 진실원.
-#   회귀 가드: tests/test-wait-repl-patterns.sh (T5-T7 이 vendor_wait_ready 본문 검사).
 
 # P2 §2.2: pane 부트스트랩 — 셸 ready 폴링 + Enter-만 재전송 안전망.
 # 세 경로(워커/lead/리뷰어)에 동일한 흐름을 일원화.
@@ -448,8 +447,7 @@ fi
 # cat 더미 분기는 claude PATH 없어 shell_ready_wait 가 timeout 되므로 skip,
 # 기존 sleep 0.2 흐름 유지 (테스트 호환).
 # SKIPPED_PANES 누적 → T5 (awa-up 끝부분 가시화) 가 소비. 본 함수 단독으론 변수만 누적.
-# shell_ready_wait 의 timeout 동작은 tests/test-shell-ready-wait.sh 가 단위 커버 (T2.2·T2.3).
-#   본 함수는 integration 수준 — Final probe (probe-cold-start-timing) 가 측정.
+# 본 함수는 integration 수준 — Final probe (probe-cold-start-timing) 가 측정.
 # 본 함수는 4 책임 (shell ready 폴링, claude 송신, Enter 재시도, REPL 폴링) 통합.
 #   T5 후 회고적 정리에서 _send_worker_cmd / _boot_repl_ready 로 분해 검토.
 bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label $5=role $6=model $7=vendor(opt)

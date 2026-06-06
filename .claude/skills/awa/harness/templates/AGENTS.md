@@ -51,11 +51,9 @@ _(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은
 for f in templates/*.tpl; do
   sed -e 's|{{[^}]*}}|null|g' "$f" | python3 -m json.tool >/dev/null && echo "ok: $f"
 done
-
-# settings 관련 테스트
-bash tests/test-default-settings.sh
-bash tests/probes/probe-settings-merge.sh
 ```
+<!-- prev: "bash tests/test-default-settings.sh" 등 settings 테스트 2줄 → tests/ 디렉토리 제거(2026-06-07, e654309). 머지 검증은 실제 스킬 테스트(별도 클로드 세션). -->
+
 
 _(영역 고유 가드는 update에서 추가)_
 

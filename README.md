@@ -13,7 +13,7 @@ AWA 는 멀티 에이전트 오케스트레이션 도구가 아니라 **감독�
 | 1 | Plan 검증 가능성 | `plan-anchored` | `.claude/skills/awa/SKILL.md` 검증가능성 abort 분기 + `harness/prompts/roles/01-orchestration/orch.md` ⓑ acceptance criteria push |
 | 2 | Plan 갱신 루프 | `plan-anchored` | `orch.md` ⓖ `@plan-defect` 채널 + `_common.md` 워커 한 줄 |
 | 3 | 다벤더 리뷰어 | `multi-reviewed` | (다벤더 통합 사이클 후 — `docs/superpowers/specs/2026-05-27-identity-redefinition-design.md` §12) |
-| 4 | 상시 추적 | `drift-tracked` | `harness/prompts/roles/03-quality/review-manager.md` plan-diff 시계열 + `tests/check-differentiation-status.sh` |
+| 4 | 상시 추적 | `drift-tracked` | `harness/prompts/roles/03-quality/review-manager.md` plan-diff 시계열 |
 | 5 | 권한 게이트 학습 | `permission-gated` + `deny-bounded` | `harness/bin/permission-gate.sh` + `harness/config/orch-auto-allow.yaml` + `harness/bin/classify.sh` + `harness/bin/danger-check.sh` |
 
 ## 권한 모델 (deny-bounded — 안전 한계선)

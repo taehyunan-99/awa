@@ -64,11 +64,9 @@
 ```bash
 # 파서 호환 형식 점검
 awk -f bin/matrix-lookup.sh config/orch-auto-allow.yaml   # 호출 시그니처는 실제 스크립트 확인
-
-# 관련 테스트
-bash tests/probes/probe-matcher-format.sh
-bash tests/probes/probe-permission-gate.sh
 ```
+<!-- prev: "bash tests/probes/probe-matcher-format.sh" 등 probe 2줄 → tests/ 디렉토리 제거(2026-06-07, e654309). 매처/게이트 검증은 실제 스킬 테스트(별도 클로드 세션). -->
+
 
 _(영역 고유 가드는 update에서 추가)_
 
