@@ -4,3 +4,5 @@ workers:
 reviewers:
   - name: alignment-rev
     role: Reviewer-Alignment
+  - name: quality-rev
+    role: Reviewer-Quality

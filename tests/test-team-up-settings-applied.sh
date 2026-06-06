@@ -24,36 +24,34 @@ cleanup() {
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-# feature-team 프로파일: dev/test/researcher 워커 + 3 reviewer.
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1
+# default 프로파일: engineer/researcher 워커 + alignment/quality/security 리뷰어 + review-mgr.
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 rc=$?
 assert_eq "0" "$rc" "awa-up 성공"
 
 BOOTSET="$TMP/.agent-harness/.boot-settings"
 [ -d "$BOOTSET" ]; assert_success "$?" ".boot-settings 디렉터리 생성"
 
-# feature-team WORKERS=(dev:dev tester:test arch:researcher), REVIEWERS=(spec-rev:reviewer-spec ...).
+# default WORKERS=(engineer:engineer researcher:researcher), REVIEWERS=(alignment-rev:reviewer-alignment ...).
 # generate_worker_settings 매핑 (2026-06-01 역할 재배선):
-#  - dev → dev 템플릿 → dev.json (코드 쓰기)
+#  - engineer → engineer 템플릿 → engineer.json (코드 쓰기)
 #  - researcher → readonly 템플릿 → researcher.json (읽기전용, 코드 쓰기 없음)
-#  - tester → test 템플릿 → tester.json
-#  - reviewer-* → reviewer 템플릿 → reviewer-{spec,quality,arch}.json
-# 6 파일 모두 *필수* 검증 — 매핑 회귀 신호 강하게.
-[ -f "$BOOTSET/dev.json" ]; assert_success "$?" "dev.json 존재"
-[ -f "$BOOTSET/tester.json" ]; assert_success "$?" "tester.json 존재"
+#  - reviewer-* → reviewer 템플릿 → reviewer-{alignment,quality,security}.json
+# 파일 모두 *필수* 검증 — 매핑 회귀 신호 강하게.
+[ -f "$BOOTSET/engineer.json" ]; assert_success "$?" "engineer.json 존재"
 [ -f "$BOOTSET/researcher.json" ]; assert_success "$?" "researcher.json 존재 (readonly 템플릿)"
 [ -f "$BOOTSET/reviewer-quality.json" ]; assert_success "$?" "reviewer-quality.json 존재"
-[ -f "$BOOTSET/reviewer-spec.json" ]; assert_success "$?" "reviewer-spec.json 존재"
-[ -f "$BOOTSET/reviewer-arch.json" ]; assert_success "$?" "reviewer-arch.json 존재"
+[ -f "$BOOTSET/reviewer-alignment.json" ]; assert_success "$?" "reviewer-alignment.json 존재"
+[ -f "$BOOTSET/reviewer-security.json" ]; assert_success "$?" "reviewer-security.json 존재"
 
-# dev 검증
-content="$(cat "$BOOTSET/dev.json")"
-assert_contains "$content" "Bash(git push *)" "dev.json git push deny"
-assert_contains "$content" "PROJECT_ROOT=\\\"$TMP\\\"" "dev.json PROJECT_ROOT 치환"
-assert_contains "$content" 'WORKER=\"dev\"' "dev.json WORKER=entry_name(dev)"
+# engineer 검증 (코드 쓰기 워커)
+content="$(cat "$BOOTSET/engineer.json")"
+assert_contains "$content" "Bash(git push *)" "engineer.json git push deny"
+assert_contains "$content" "PROJECT_ROOT=\\\"$TMP\\\"" "engineer.json PROJECT_ROOT 치환"
+assert_contains "$content" 'WORKER=\"engineer\"' "engineer.json WORKER=entry_name(engineer)"
 # 잔존 토큰 부재
 if printf '%s' "$content" | grep -qE '\{\{[A-Z_]+\}\}'; then
-  assert_eq "no" "yes" "dev.json 토큰 잔존 부재"
+  assert_eq "no" "yes" "engineer.json 토큰 잔존 부재"
 fi
 
 # researcher 검증 — readonly 매핑 (코드 전역 쓰기 없음, 공통산출은 gate 특례가 보장).
@@ -61,15 +59,7 @@ content="$(cat "$BOOTSET/researcher.json")"
 assert_not_contains "$content" "Write($TMP/**)" "researcher.json 코드 전역 쓰기 없음 (readonly)"
 assert_contains "$content" '"Read"' "researcher.json Read allow (readonly)"
 assert_contains "$content" "permission-gate.sh" "researcher.json PreToolUse 게이트 보존"
-assert_contains "$content" 'WORKER=\"arch\"' "researcher.json WORKER=entry_name(arch)"
-
-# tester 검증
-content="$(cat "$BOOTSET/tester.json")"
-assert_contains "$content" "Bash(rm *)" "tester.json rm deny"
-assert_contains "$content" 'WORKER=\"test\"' "tester.json WORKER=entry_name(test)"
-if printf '%s' "$content" | grep -q "git push"; then
-  assert_eq "no" "yes" "tester.json 에 git push deny 부재"
-fi
+assert_contains "$content" 'WORKER=\"researcher\"' "researcher.json WORKER=entry_name(researcher)"
 
 # reviewer-quality 검증
 content="$(cat "$BOOTSET/reviewer-quality.json")"
@@ -82,8 +72,8 @@ assert_contains "$content" "permission-gate.sh" "reviewer-quality.json hook"
 assert_contains "$content" '"Read"' "reviewer-quality.json seed allow Read"
 assert_contains "$content" 'WORKER=\"quality-rev\"' "reviewer-quality.json WORKER=entry_name"
 
-# reviewer-spec / reviewer-arch 도 동일 reviewer 템플릿 — Skill(awa) deny + hook 존재.
-for rev in reviewer-spec reviewer-arch; do
+# reviewer-alignment / reviewer-security 도 동일 reviewer 템플릿 — Skill(awa) deny + hook 존재.
+for rev in reviewer-alignment reviewer-security; do
   content="$(cat "$BOOTSET/$rev.json")"
   _rev_deny="$(printf '%s' "$content" | jq -r '.permissions.deny[]?' 2>/dev/null)"
   assert_contains "$_rev_deny" "Skill(awa)" "$rev.json deny 에 Skill(awa)"

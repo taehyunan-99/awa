@@ -6,8 +6,8 @@ source ./harness-paths.sh
 ROOT="$(cd .. && pwd)"
 source "$HARNESS_BIN/spec-parse.sh"
 
-# feature-team 프로파일: 형식 검증 (yaml 파서로 로드)
-spec_parse_load "$HARNESS_PROFILES/feature-team.yaml"
+# default 프로파일: 형식 검증 (yaml 파서로 로드)
+spec_parse_load "$HARNESS_PROFILES/default.yaml"
 [ "${#WORKERS[@]}" -ge 1 ] && out_w="W_OK" || out_w="W_FAIL"
 [ "${#REVIEWERS[@]}" -ge 1 ] && out_r="R_OK" || out_r="R_FAIL"
 

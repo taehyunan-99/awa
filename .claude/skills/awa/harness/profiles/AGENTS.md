@@ -12,15 +12,13 @@
 
 ## 2. CONTENTS
 
-yaml 명세 (우선):
+yaml 명세 (참고용 시드 2개 — 동적 조합 인터뷰가 작업 분석 후 역할 카탈로그에서 직접 조립하므로 통째 사용 안 함):
 - `default.yaml` — 워커 engineer/researcher, 투표 리뷰어 alignment-rev/quality-rev(claude)+security-rev(codex)(N=3 다벤더) + 집계 review-mgr
 - `web.yaml` — 워커 frontend/backend/infra(claude), 투표 리뷰어 alignment-rev/quality-rev(claude)+security-rev(codex)(N=3 다벤더) + 집계 review-mgr (default 와 동일 회로·워커만 풀스택 3분업)
-- `code-review.yaml` — 워커 security, 리뷰어 spec-rev/quality-rev/arch-rev + review-mgr
-- `research.yaml` — 워커 researcher×3, 리뷰어 quality-rev + review-mgr
-- `feature-team.yaml` — 워커 dev/test/arch, 리뷰어 spec-rev/quality-rev/arch-rev + review-mgr
+- (2026-06-06 더미 3개 제거: code-review/research/feature-team — 임시 참고물, 동적 조합이 대체)
 
 구 bash fragment (하위호환):
-- `default.sh`, `web.sh`, `code-review.sh`, `research.sh`, `feature-team.sh`
+- `default.sh`, `web.sh`
 - **폐기 조건**: yaml 경로가 라이브 가동에서 안정 확인되고, `profiles/*.sh`를 참조하는 테스트·문서가 0건이 되면 다음 정리 사이클에 `git rm`. 현재는 awa-up이 `.yaml` 우선·`.sh` 폴백이므로 `.sh` 삭제해도 기능은 동작하나, 회귀 안전을 위해 유지.
 
 yaml 스키마 (파서가 읽는 형식):
@@ -69,7 +67,7 @@ _(update 스킬에서 채워질 자리. 사용자 결정 사항이므로 init은
 ```bash
 # 프로파일은 직접 실행하지 않고 source된다
 bin/awa-up.sh default
-bin/awa-up.sh feature-team
+bin/awa-up.sh web
 bin/awa-up.sh --project ~/work/foo default
 ```
 

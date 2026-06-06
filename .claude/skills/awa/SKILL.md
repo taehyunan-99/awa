@@ -1,6 +1,6 @@
 ---
 name: awa
-description: AWA harness entry point. /awa (no args) launches with 4-axis plan review + preset + mode. Subcommands: down/dash/bookmarks. User `!` required for launch/attach.
+description: AWA harness entry point. /awa (no args) launches with 4-axis plan review + dynamic team composition + mode. Subcommands: down/dash/bookmarks. User `!` required for launch/attach.
 ---
 
 # awa — AWA harness entry point (15th cycle)
@@ -111,7 +111,7 @@ fi
      - User approves each fix → SKILL writes back to plan file via Edit tool.
      - After all fixes applied, re-run review *once* (one retry max — avoid infinite loop). If still CHANGES_NEEDED, SKILL summarizes remaining gaps and asks user: "proceed despite gaps?" (yes → continue, no → abort). 단, 재리뷰에서 검증가능성 FAIL 발생 시 위 분류대로 즉시 abort.
    - **작업 분석 → 자율 조립** (2026-06-06 재설계 — 정적 시드 던지기 폐기):
-     - plan 이 있으면: SKILL 이 plan 본문을 분석 단서로 사용. `references/presets.md` 휴리스틱은 *내부 참고용*일 뿐, **시드 profile 을 통째로 사용자에게 던지지 않는다.**
+     - plan 이 있으면: SKILL 이 plan 본문을 직접 분석해 역할 카탈로그에서 조립한다. **시드 profile 을 통째로 사용자에게 던지지 않는다.**
      - plan 이 없으면: 아래 **작업 입력 질문**으로 작업을 받는다.
    - **작업 입력 질문 (plan skip 시 — AskUserQuestion):**
      - 질문: "어떤 작업을 하시나요?"
@@ -184,7 +184,6 @@ actions: `list` | `set-alias` | `remove` | `prune` | `menu` (default)
 ## References
 
 - `references/review-prompt.md` — 4-axis review subagent prompt
-- `references/presets.md` — preset suggestion heuristics
 - `references/interview.md` — 동적 팀 조합 인터뷰 절차
 - spec: `docs/superpowers/specs/2026-05-29-dashboard-pane-grid-design.md`
 - spec: `docs/superpowers/specs/2026-06-04-dynamic-harness-composition-design.md`

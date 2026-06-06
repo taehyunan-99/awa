@@ -10,7 +10,7 @@
 
 **워커** (`02-development/`, `04-security/`):
 - `engineer` — 범용 구현 (단일 기능·소규모)
-- `dev` — 개발 (feature-team 류)
+- `dev` — 개발 (다역할 협업 구현)
 - `frontend` / `backend` / `infra` — 풀스택 3분업
 - `researcher` — 조사·읽기 전용 (코드 변경 없는 탐색·비교)
 - `tester` — 테스트 작성
@@ -41,7 +41,9 @@
 
 ### Stage 2 — 워커·리뷰어 가감
 4. 사용자가 조립을 승인하거나 가감(역할 추가/제거/인원/모델)을 지시.
-5. **리뷰 수위 확인**: full-vote(alignment+quality+security 리뷰어) / quality-only / 무리뷰(research 류).
+5. **리뷰 수위 확인**: full-vote(alignment+quality+security 투표 리뷰어 3 + review-mgr) / 무리뷰(투표 0).
+   ★ 투표 리뷰어 **1명은 금지**(multi-reviewed 정체성 — 1명은 합의가 아닌 단독거부권). 2명+ 또는 0명만.
+   2명+ 선택 시 review-mgr 자동 동반(불변식이 강제).
 
 ### Stage 3 — codex 다벤더 리뷰어 (후행 질문 — 기본 제외)
 6. **기본은 claude 리뷰어만.** 조립 확정 후 별도로 묻는다:

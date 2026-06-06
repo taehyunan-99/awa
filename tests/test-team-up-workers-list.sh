@@ -25,7 +25,7 @@ assert_contains "$src" 'vendor_gen_settings "orch" "ORCH"' "U3 orch 2인자"
 echo "[U6] cat 더미로 awa-up 성공 (데몬 폐기 후 cat 경로 무손상)"
 TMP="$(mktemp -d)"; SAFE="$(basename "$TMP" | sed 's/[^A-Za-z0-9_-]/_/g')"; SESSION="awa-$SAFE"
 ( cd "$TMP" && git init -q )
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 rc=$?
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 assert_eq "0" "$rc" "U6 awa-up 성공 (cat 경로)"
@@ -50,7 +50,7 @@ TMP8="$(mktemp -d)"; SAFE8="$(basename "$TMP8" | sed 's/[^A-Za-z0-9_-]/_/g')"; S
 ( cd "$TMP8" && git init -q )
 mkdir -p "$TMP8/.agent-harness/config"
 printf 'custom-marker:\n  - "Bash(my-custom:*)"\n' > "$TMP8/.agent-harness/config/orch-auto-allow.yaml"
-HARNESS_PROJECT="$TMP8" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP8" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 tmux kill-session -t "$SESSION8" 2>/dev/null || true
 assert_contains "$(cat "$TMP8/.agent-harness/config/orch-auto-allow.yaml")" "my-custom" "U8 기존 커스텀 yaml 보존"
 rm -rf "$TMP8"

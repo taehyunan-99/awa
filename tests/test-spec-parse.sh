@@ -35,13 +35,17 @@ echo "[P4] 정상 명세는 통과"
 spec_parse_validate "$ROOT/tests/fixtures/team-basic.yaml" 2>/dev/null
 assert_success "$?" "P4 정상 team-basic 통과"
 
-echo "[P5] 리뷰어 불변식 — 투표 리뷰어≥1 이면 review-manager 필수"
+echo "[P5] 리뷰어 불변식 — 투표 리뷰어≥2 이면 review-manager 필수"
 spec_parse_invariants "$ROOT/tests/fixtures/team-mgrless.yaml" 2>/dev/null
-assert_fail "$?" "P5 투표 리뷰어 있고 review-manager 없으면 거부"
+assert_fail "$?" "P5 투표 2명 있고 review-manager 없으면 거부"
 spec_parse_invariants "$ROOT/tests/fixtures/team-basic.yaml" 2>/dev/null
-assert_success "$?" "P5 투표+review-mgr 둘 다 있으면 통과"
+assert_success "$?" "P5 투표2+review-mgr 둘 다 있으면 통과"
 
-echo "[P6] 무리뷰 팀(투표 0)은 통과 (research 류 정당)"
+echo "[P5b] 투표 리뷰어 1명 금지 — mgr 유무 무관 (multi-reviewed: 1명은 단독거부권)"
+spec_parse_invariants "$ROOT/tests/fixtures/team-solo-voter.yaml" 2>/dev/null
+assert_fail "$?" "P5b 투표 1명은 review-mgr 있어도 거부"
+
+echo "[P6] 무리뷰 팀(투표 0)은 통과 (자유 조합 시 사용자 선택)"
 spec_parse_invariants "$ROOT/tests/fixtures/team-novote.yaml" 2>/dev/null
 assert_success "$?" "P6 투표 리뷰어 0 통과"
 
@@ -51,7 +55,7 @@ assert_fail "$?" "P7-inv 파일 없으면 거부"
 
 echo "[P8-inv] 대소문자 변형 role 도 투표 리뷰어로 인식 (거짓음성 방지)"
 spec_parse_invariants "$ROOT/tests/fixtures/team-uc-rev.yaml" 2>/dev/null
-assert_fail "$?" "P8-inv 대문자 role 도 voter 로 세고 mgr 없으면 거부"
+assert_fail "$?" "P8-inv 대문자 role 2명도 voter 로 세고 mgr 없으면 거부"
 
 echo "[P-load] WORKERS/REVIEWERS 배열 환산 (awa-up 소비 형식)"
 spec_parse_load "$ROOT/tests/fixtures/team-basic.yaml"

@@ -34,14 +34,14 @@ for f in "$HARNESS_PROMPTS"/roles/03-quality/reviewer-quality.md \
 done
 assert_eq "0" "$leak" "L1 quality/security/alternative 는 plan_alignment 출력 안 함(렌즈 독립)"
 
-# Layer 1: profiles/feature-team.yaml review-manager 등록 (yaml 파서로 로드)
+# Layer 1: profiles/default.yaml review-manager 등록 (yaml 파서로 로드)
 source "$HARNESS_BIN/spec-parse.sh"
-spec_parse_load "$HARNESS_PROFILES/feature-team.yaml"
+spec_parse_load "$HARNESS_PROFILES/default.yaml"
 found_mgr=0
 for entry in "${REVIEWERS[@]}"; do
   case "$entry" in *review-manager*) found_mgr=1 ;; esac
 done
-assert_eq "1" "$found_mgr" "L1 profiles feature-team.yaml review-manager pane 등록"
+assert_eq "1" "$found_mgr" "L1 profiles default.yaml review-manager pane 등록"
 
 # Layer 1: watcher.sh drift-check 트리거 + lib.sh worker_turn_count 함수
 grep -q 'drift-check' "$HARNESS_BIN/watcher.sh"

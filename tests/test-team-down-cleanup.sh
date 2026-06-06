@@ -24,7 +24,7 @@ cleanup() {
 trap cleanup EXIT
 ( cd "$TMP" && git init -q )
 
-HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" feature-team >/dev/null 2>&1
+HARNESS_PROJECT="$TMP" AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" default >/dev/null 2>&1
 
 # awa-up 후 권한 산출물 + 사용자 흔적 만들기.
 WS="$TMP/.agent-harness"

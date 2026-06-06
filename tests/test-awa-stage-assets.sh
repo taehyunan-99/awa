@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 12차→15차: 리뷰 프롬프트·preset 근거 파일이 references/ 로 이전됨 (Task 8).
+# 12차→15차: 리뷰 프롬프트 파일이 references/ 로 이전됨 (Task 8).
+# 16차: presets.md 폐기(동적 조합 인터뷰가 대체) — R3 블록 제거.
 set -uo pipefail
 cd "$(dirname "$0")"
 source ./assert.sh
 ROOT="$(cd .. && pwd)"
 RP="$ROOT/.claude/skills/awa/references/review-prompt.md"
-PF="$ROOT/.claude/skills/awa/references/presets.md"
 
 echo "[R1] 4축 리뷰 프롬프트 — 네 축 모두 명시"
 rp="$(cat "$RP")"
@@ -15,11 +15,5 @@ done
 echo "[R2] 반환 형식 — PASS/FAIL·종합 verdict"
 assert_contains "$rp" "APPROVED" "R2a APPROVED"
 assert_contains "$rp" "CHANGES_NEEDED" "R2b CHANGES_NEEDED"
-
-echo "[R3] presets.md — 네 preset 모두"
-pf="$(cat "$PF")"
-for p in "default" "feature-team" "research" "code-review"; do
-  assert_contains "$pf" "$p" "R3 $p"
-done
 
 test_summary

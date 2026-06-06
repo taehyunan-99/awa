@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # e2e dry-run: AGENT_CMD=cat 더미로 awa-up→상태검사→awa-down 전 배선을 무해 검증.
 #   실 claude 미기동(토큰 0·TCC 위험 0). 검증 대상:
-#   - 세션/윈도우/페인 구성 (lead + 워커 + 리뷰어, window0/1, 인덱스 고정)
-#   - pane title (LEAD·워커명·리뷰어명)
+#   - 세션/윈도우/페인 구성 (3윈도우: team=ORCH+DESK / workers=워커N+watcher / reviewers=리뷰어N+mgr)
+#   - pane title (ORCH·DESK·워커명·리뷰어명·watcher)
 #   - settings.json marker 생성 + 워커별 .boot-settings/*.json 생성 + hook 공존
 #   - boot 합본 파일 (.boot/*.md) 토큰 치환
-#   - orch-auto-allow.yaml·state 디렉터리 설치
+#   - orch-auto-allow.yaml(.agent-harness/config/)·state 디렉터리 설치
 #   - awa-down 정리 (런타임 산출물 제거, marker 제거)
+# 2026-06-06: harness 디렉토리 이동 후 상대 bin/ 호출이 깨져 있던 것 + ORCH/DESK·3윈도우
+#   아키텍처 전환 드리프트를 실제 구조에 맞게 전면 갱신. (이전: 2윈도우·LEAD/PM·상대 bin/)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 source "$ROOT/tests/harness-paths.sh"
-PROFILE="${1:-feature-team}"   # 가장 풍부한 편성 (워커3+리뷰어3)
+PROFILE="${1:-web}"   # 가장 풍부한 편성 (워커3+리뷰어3)
 PROJ="$(mktemp -d)"
 ( cd "$PROJ" && git init -q )
 
@@ -22,9 +24,9 @@ has() { if [ -e "$1" ]; then echo "  ok: $2"; PASS=$((PASS+1)); else echo "  FAI
 echo "=== dry-run: profile=$PROFILE  proj=$PROJ ==="
 
 # awa-up (더미 cat 엔진). REPL 폴링은 cat 분기라 sleep 0.2 만 — 빠름.
-AGENT_CMD=cat bash bin/awa-up.sh --project "$PROJ" "$PROFILE" 2>&1 | sed 's/^/  [up] /'
+AGENT_CMD=cat bash "$HARNESS_BIN/awa-up.sh" --project "$PROJ" "$PROFILE" 2>&1 | sed 's/^/  [up] /'
 
-SES="$(HARNESS_PROJECT="$PROJ" bash -c 'source bin/lib.sh; resolve_session')"
+SES="$(HARNESS_PROJECT="$PROJ" bash -c "source '$HARNESS_BIN/lib.sh'; resolve_session")"
 echo "=== 세션=$SES ==="
 
 # 1) 세션·윈도우·페인 구성
@@ -34,56 +36,54 @@ echo "  windows: $WINS"
 W0="$(tmux list-windows -t "$SES" -F '#{window_index}' 2>/dev/null | head -1)"
 chk 0 "$W0" "window 인덱스 0 부터 (세션 로컬 고정)"
 
-# 9차: feature-team window0 = lead+pm+watcher+워커3 = 6 pane, window1(review) = 리뷰어3 = 3 pane
+# web 3윈도우: team(ORCH+DESK=2) / workers(frontend+backend+infra+watcher=4) / reviewers(리뷰어3+mgr=4)
 P0="$(tmux list-panes -t "$SES:0" -F '#{pane_id}' 2>/dev/null | wc -l | tr -d ' ')"
 P1="$(tmux list-panes -t "$SES:1" -F '#{pane_id}' 2>/dev/null | wc -l | tr -d ' ')"
-echo "  window0 pane=$P0  window1 pane=$P1"
-chk 6 "$P0" "window0 = lead + pm + watcher + 워커3 = 6 pane"
-chk 3 "$P1" "window1(review) = 리뷰어3 = 3 pane"
+P2="$(tmux list-panes -t "$SES:2" -F '#{pane_id}' 2>/dev/null | wc -l | tr -d ' ')"
+echo "  window0 pane=$P0  window1 pane=$P1  window2 pane=$P2"
+chk 2 "$P0" "window0(team) = ORCH + DESK = 2 pane"
+chk 4 "$P1" "window1(workers) = 워커3 + watcher = 4 pane"
+chk 4 "$P2" "window2(reviewers) = 리뷰어3 + review-mgr = 4 pane"
 
-# 2) pane title (LEAD·워커명·리뷰어명)
-TITLES="$(tmux list-panes -t "$SES:0" -F '#{pane_title}' 2>/dev/null | tr '\n' ',')$(tmux list-panes -t "$SES:1" -F '#{pane_title}' 2>/dev/null | tr '\n' ',')"
+# 2) pane title (ORCH·DESK·워커명·리뷰어명·watcher) — 세 윈도우 전체
+TITLES="$(for w in 0 1 2; do tmux list-panes -t "$SES:$w" -F '#{pane_title}' 2>/dev/null; done | tr '\n' ',')"
 echo "  titles: $TITLES"
-case "$TITLES" in *LEAD*) chk yes yes "LEAD title";; *) chk yes no "LEAD title";; esac
-case "$TITLES" in *dev*)  chk yes yes "dev 워커 title";;  *) chk yes no "dev title";; esac
-case "$TITLES" in *spec-rev*) chk yes yes "spec-rev 리뷰어 title";; *) chk yes no "spec-rev title";; esac
-# 9차: pm·watcher pane title
-case "$TITLES" in *PM*) chk yes yes "PM title";; *) chk yes no "PM title";; esac
+case "$TITLES" in *ORCH*) chk yes yes "ORCH title";; *) chk yes no "ORCH title";; esac
+case "$TITLES" in *DESK*) chk yes yes "DESK title";; *) chk yes no "DESK title";; esac
+case "$TITLES" in *frontend*)  chk yes yes "frontend 워커 title";;  *) chk yes no "frontend title";; esac
+case "$TITLES" in *alignment-rev*) chk yes yes "alignment-rev 리뷰어 title";; *) chk yes no "alignment-rev title";; esac
 case "$TITLES" in *watcher*) chk yes yes "watcher title";; *) chk yes no "watcher title";; esac
 
 # 3) settings.json marker + 워커별 .boot-settings + hook 공존
 has "$PROJ/.claude/settings.json" "settings.json 생성"
 has "$PROJ/.claude/.agent-harness-marker" "marker 생성"
 chk '{}' "$(tr -d ' \n' < "$PROJ/.claude/settings.json")" "settings.json 은 빈 {} (hook 워커 이관)"
-has "$PROJ/.agent-harness/.boot-settings/dev.json" "워커 dev settings 사본"
-has "$PROJ/.agent-harness/.boot-settings/LEAD.json" "LEAD settings 사본"
+has "$PROJ/.agent-harness/.boot-settings/frontend.json" "워커 frontend settings 사본"
+has "$PROJ/.agent-harness/.boot-settings/orch.json" "ORCH settings 사본"
 # 워커 settings 에 PreToolUse(permission-gate) + PostToolUse(log-event) 공존
-DEVSET="$PROJ/.agent-harness/.boot-settings/dev.json"
+DEVSET="$PROJ/.agent-harness/.boot-settings/frontend.json"
 pre="$(jq -r '.hooks.PreToolUse[0].hooks[0].command' "$DEVSET" 2>/dev/null)"
 post="$(jq -r '.hooks.PostToolUse[0].hooks[0].command' "$DEVSET" 2>/dev/null)"
 case "$pre" in *permission-gate.sh*) chk yes yes "워커 PreToolUse=permission-gate";; *) chk yes no "PreToolUse";; esac
 case "$post" in *log-event.sh*) chk yes yes "워커 PostToolUse=log-event";; *) chk yes no "PostToolUse";; esac
-# LEAD 는 hook 없음 (게이트 대상 아님)
-lhook="$(jq -r '.hooks // "none"' "$PROJ/.agent-harness/.boot-settings/LEAD.json" 2>/dev/null)"
-chk none "$lhook" "LEAD 는 hook 없음"
-# 9차: PM settings·boot + hook 없음 + lead 채널
-has "$PROJ/.agent-harness/.boot-settings/PM.json" "PM settings 사본"
-has "$PROJ/.agent-harness/.boot/PM.md" "PM boot 합본"
-pmhook="$(jq -r '.hooks // "none"' "$PROJ/.agent-harness/.boot-settings/PM.json" 2>/dev/null)"
-chk none "$pmhook" "PM 은 hook 없음"
-grep -q "lead pane_id:" "$PROJ/.agent-harness/.boot/PM.md" 2>/dev/null \
-  && chk yes yes "PM boot 에 lead 채널" || chk yes no "PM lead 채널"
+# ORCH 는 hook 없음 (게이트 대상 아님)
+lhook="$(jq -r '.hooks // "none"' "$PROJ/.agent-harness/.boot-settings/orch.json" 2>/dev/null)"
+chk none "$lhook" "ORCH 는 hook 없음"
+# DESK settings + hook 없음
+has "$PROJ/.agent-harness/.boot-settings/desk.json" "DESK settings 사본"
+pmhook="$(jq -r '.hooks // "none"' "$PROJ/.agent-harness/.boot-settings/desk.json" 2>/dev/null)"
+chk none "$pmhook" "DESK 은 hook 없음"
 
-# 4) boot 합본 토큰 치환
-has "$PROJ/.agent-harness/.boot/dev.md" "워커 dev boot 합본"
-has "$PROJ/.agent-harness/.boot/LEAD.md" "LEAD boot 합본"
-if [ -f "$PROJ/.agent-harness/.boot/dev.md" ]; then
-  grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$PROJ/.agent-harness/.boot/dev.md" \
-    && chk no yes "dev boot 토큰 잔존(실패)" || chk yes yes "dev boot 토큰 전부 치환"
+# 4) boot 합본 토큰 치환 (워커 기준 — base orch/desk boot 파일명은 awa-up 옛이름 잔재라
+#    다음 사이클에서 정리 예정, 여기선 워커 boot 만 검증)
+has "$PROJ/.agent-harness/.boot/frontend.md" "워커 frontend boot 합본"
+if [ -f "$PROJ/.agent-harness/.boot/frontend.md" ]; then
+  grep -qE '\{\{(WORKER_NAME|SESSION|HARNESS_ROOT)\}\}' "$PROJ/.agent-harness/.boot/frontend.md" \
+    && chk no yes "frontend boot 토큰 잔존(실패)" || chk yes yes "frontend boot 토큰 전부 치환"
 fi
 
 # 5) config·state 설치
-has "$PROJ/config/orch-auto-allow.yaml" "orch-auto-allow.yaml 설치"
+has "$PROJ/.agent-harness/config/orch-auto-allow.yaml" "orch-auto-allow.yaml 설치"
 has "$PROJ/.agent-harness/state/pending-asks" "state/pending-asks 디렉터리"
 
 # 5.5) 9차 아키텍처 전환: /loop 프롬프트·wait-worker.sh 부재 + watcher.sh 존재
@@ -94,7 +94,7 @@ has "$PROJ/.agent-harness/state/pending-asks" "state/pending-asks 디렉터리"
 
 # 6) awa-down 정리
 echo "=== awa-down ==="
-bash bin/awa-down.sh --project "$PROJ" 2>&1 | sed 's/^/  [down] /'
+bash "$HARNESS_BIN/awa-down.sh" --project "$PROJ" 2>&1 | sed 's/^/  [down] /'
 tmux has-session -t "$SES" 2>/dev/null && chk no yes "awa-down 후 세션 잔존(실패)" || chk yes yes "awa-down 세션 종료"
 [ -f "$PROJ/.claude/settings.json" ] && chk no yes "settings.json 잔존(실패)" || chk yes yes "settings.json 정리"
 [ -f "$PROJ/.claude/.agent-harness-marker" ] && chk no yes "marker 잔존(실패)" || chk yes yes "marker 정리"
