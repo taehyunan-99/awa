@@ -8,7 +8,7 @@ HARNESS_ROOT="${HARNESS_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 # 하니스 디렉토리(bin/config/prompts/profiles/templates) 단일 출처 — 이동 후에도 $HARNESS_* 가 추종.
 # .claude/·tests/·README.md·docs/ 는 repo 루트에 잔류하므로 계속 $HARNESS_ROOT 사용.
 source "$(dirname "$0")/harness-paths.sh"
-SCRIPT_BIRTHDAY_FILE="${HARNESS_ROOT}/docs/differentiation-checkpoints/.birthday"
+SCRIPT_BIRTHDAY_FILE="${HARNESS_ROOT}/tests/differentiation-checkpoints/.birthday"
 
 PASS=0; FAIL=0; SKIP=0; GRACE=0
 declare -a RESULTS
@@ -108,7 +108,7 @@ if [[ -f "$SCRIPT_BIRTHDAY_FILE" ]]; then
     RESULTS+=("[GRACE] sanity-log.md PASS 조건 임시 PASS (신설 후 30일 grace, ${grace_end} 까지)")
     GRACE=$((GRACE+1))
   else
-    if ! find "${HARNESS_ROOT}/docs/differentiation-checkpoints/sanity-log.md" -mtime -30 2>/dev/null | grep -q .; then
+    if ! find "${HARNESS_ROOT}/tests/differentiation-checkpoints/sanity-log.md" -mtime -30 2>/dev/null | grep -q .; then
       RESULTS+=("[FAIL] sanity-log.md 직전 30일 기록 없음")
       FAIL=$((FAIL+1))
     fi

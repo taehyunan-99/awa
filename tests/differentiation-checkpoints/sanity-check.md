@@ -17,7 +17,7 @@ spec §9.6 — 옵션 A (Sanity Check 시나리오).
 6. 재실행 — PASS 보고 확인
 
 ## 기록
-`docs/differentiation-checkpoints/sanity-log.md` 에 다음 형식으로 누적:
+`tests/differentiation-checkpoints/sanity-log.md` 에 다음 형식으로 누적:
 
 ```
 ## YYYY-MM-DD
