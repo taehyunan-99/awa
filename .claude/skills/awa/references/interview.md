@@ -23,7 +23,7 @@
 - `reviewer-arch` — 아키텍처 검토
 - `reviewer-spec` — 스펙 충족 검토
 - `reviewer-alternative` — 대안 관점
-- `review-manager` — 집계·드리프트 추적 (투표 리뷰어 ≥1 시 필수)
+- `review-manager` — 집계·드리프트 추적 (투표 리뷰어 ≥2 시 필수)
 
 권한은 역할에서 자동 파생(generate_worker_settings): engineer/dev/frontend/backend/infra/security→dev쓰기, researcher/review-manager→readonly, tester→test, reviewer-*→reviewer.
 
@@ -38,6 +38,7 @@
    - 코드 감사·보안 → security 워커 + 다관점 리뷰어
    - 설계 비중 큼 → dev + tester + (arch 관점 리뷰어)
 3. **조립 결과 + 근거를 사용자에게 제시**한다. 예: "메모 웹앱이라 frontend(폼/목록)·backend(저장 API)·infra(실행) 3명, plan 정합·품질 리뷰어를 붙였습니다. 인증/DB 불필요라 security 워커는 뺐습니다."
+   - ★ **투표 리뷰어는 0명 또는 2명+ 만 제안한다 — 1명 조립은 절대 제안 금지**(불변식 위반·부팅 실패). 소규모라 리뷰를 가볍게 하려면 **무리뷰(0명)**를 제안하고, 리뷰를 둘 거면 **최소 2종**(예: quality+alignment)을 제안하라. "reviewer-quality 1명"은 금지.
 
 ### Stage 2 — 워커·리뷰어 가감
 4. 사용자가 조립을 승인하거나 가감(역할 추가/제거/인원/모델)을 지시.
@@ -55,13 +56,13 @@
 
 ## 불변식 (spec §4 — 반드시 강제)
 
-**파서가 자동 검증(review-mgr 강제)하는 항목:**
-- 투표 리뷰어(reviewer-alignment/quality/security) ≥1 이면 review-manager(name: review-mgr) 자동 포함.
+**파서가 자동 거부하는 항목 (spec_parse_invariants → rc=1):**
+- **투표 리뷰어(reviewer-alignment/quality/security)는 0 또는 2명+ 만 허용. 1명은 거부**(단독거부권 ≠ 합의, multi-reviewed 정체성). 인터뷰는 1명 조립을 *애초에 제안하지 말 것* — 저장 단계에서 막히면 사용자 경험이 나쁨.
+- 투표 리뷰어 ≥2 이면 review-manager(name: review-mgr) 필수 — 없으면 자동 포함.
 - 저장 전 `bash -c 'source "$HARNESS_ROOT/bin/spec-parse.sh" && spec_parse_invariants <path>'` 로 검증(rc=0 확인).
 
-**인터뷰가 직접 판단해 사용자에게 경고·확인하는 항목 (파서 불변식 아님):**
+**인터뷰가 직접 판단해 사용자에게 경고·확인하는 항목:**
 - 무리뷰(투표 0)는 "합의 게이트 없이 진행"을 사용자에게 명시 확인.
-- 투표 리뷰어 1명뿐이면 단독 거부권이 됨 — 인터뷰가 사용자에게 경고(파서 불변식이 아닌 인터뷰 책임).
 
 ## 저장 (.awa/team.yaml)
 - 대상 프로젝트 PROJECT_ROOT/.awa/team.yaml 작성.
