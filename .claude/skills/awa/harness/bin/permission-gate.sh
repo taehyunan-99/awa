@@ -154,7 +154,9 @@ EOF
     danger)
       queue_incident "$tool" "$input" "$detail"
       emit_deny "danger:${detail}"
-      log_safe "[$(timestamp)] ${WORKER} ${tool} → AUTO-DENY (${detail})" ;;
+      log_safe "[$(timestamp)] ${WORKER} ${tool} → AUTO-DENY (${detail})"
+      # 계측(H2): events.log deny 라인. detail=danger 카테고리(23종 중 하나).
+      log_gate_event "${WORKER:--}" "-" "deny" "cat=${detail};tool=${tool}" ;;
     auto)
       local acat apat
       IFS="$T" read -r acat apat <<EOF2
