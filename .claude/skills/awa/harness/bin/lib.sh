@@ -410,12 +410,26 @@ send_prompt() {
     # 프롬프트 라인 마커에 텍스트 앞부분이 같이 있으면 미전송 → Enter 1회.
     # ★ 마커 3종: '❯'(U+276F, claude REPL 실제 입력 프롬프트)·'›'(U+203A)·'>'(ASCII).
     #   라이브 결함: 기존엔 ❯ 누락으로 claude 입력창 잔류를 못 잡아 Enter 재전송 미발동 → 박힘.
-    if tmux capture-pane -p -t "$target" 2>/dev/null | grep -E '^[[:space:]]*[❯›>]' | grep -Fq "$head"; then
-      tmux send-keys -t "$target" Enter
-      sleep "${SEND_PROMPT_RETRY_DELAY:-0.5}"
-    else
-      break   # 잔류 없음 = 전송 완료(또는 텍스트가 입력창 밖으로 사라짐).
-    fi
+    # ★ 2026-06-07 과다재전송 가드: 기존엔 마커-줄 전체에서 head 를 grep -Fq("포함")로 찾아,
+    #   head 가 마커 *바로 뒤*가 아니어도(다른 위치 우연 일치·이전 출력 잔상) 잔류로 오판 →
+    #   빈 Enter 를 _max 회까지 폭주 송신(더미 read 루프 실측 4회). 입력창 잔류는 정의상
+    #   "마커 + (공백) + head" 형태이므로, 마커-줄에서 마커·선행공백을 sed 로 벗긴 *나머지*가
+    #   head 로 시작할 때만 재전송. case glob 으로 head 를 리터럴 매칭(정규식 메타 안전).
+    #   tail -1: 입력 프롬프트는 화면 하단 → 가장 마지막 마커 줄만 봐야 위쪽 출력 잔상에
+    #   오판 안 함(여러 마커 줄 중 첫 줄이 head 아니어도 false-negative 안 됨).
+    _resid="$(tmux capture-pane -p -t "$target" 2>/dev/null \
+      | grep -E '^[[:space:]]*[❯›>]' \
+      | tail -1 \
+      | sed -E 's/^[[:space:]]*[❯›>][[:space:]]*//' )"
+    case "$_resid" in
+      "$head"*)
+        tmux send-keys -t "$target" Enter
+        sleep "${SEND_PROMPT_RETRY_DELAY:-0.5}"
+        ;;
+      *)
+        break   # 잔류 없음(또는 head 가 마커 바로 뒤 아님) = 전송 완료로 판정.
+        ;;
+    esac
   done
 }
 

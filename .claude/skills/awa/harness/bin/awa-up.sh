@@ -319,7 +319,16 @@ if [ ! -f "$LEARNED_YAML" ]; then
 fi
 
 # lead 페인으로 세션 생성. 셸 유지.
-tmux new-session -d -s "$SESSION" -c "${PROJECT_ROOT}" -x 220 -y 50 -n team
+# ★ 2026-06-07 (#3 부트 견고화): -e DISABLE_AUTO_UPDATE=true 로 셸 시작 *전* 환경 주입 →
+#   oh-my-zsh 자동업데이트 프롬프트("Would you like to update? [Y/n]")가 sentinel 송신을
+#   가로채 shell_ready_wait timeout 되던 결함 차단(check_for_upgrade.sh L19: 이 변수면
+#   update_mode=disabled → 프롬프트 자체 미발생). -e 는 첫 pane(ORCH) 셸 exec 전 적용.
+#   send-keys 로 export 하면 rc 가 이미 로드된 뒤라 늦음 — 반드시 셸 시작 전 환경에 있어야.
+#   tmux 3.0+ -e 지원(AGENTS.md tmux 3.6+ 전제). conda init 은 프롬프트 안 띄움(자동) → 무관.
+tmux new-session -d -s "$SESSION" -c "${PROJECT_ROOT}" -e DISABLE_AUTO_UPDATE=true -x 220 -y 50 -n team
+# 세션 환경에도 등록 → 이후 split-window/new-window 로 만드는 모든 pane(워커·리뷰어·watcher)이
+# 상속(실측: P0/P1/P2 전부 true). 첫 pane 은 위 -e, 후속 pane 은 이 set-environment 담당.
+tmux set-environment -t "$SESSION" DISABLE_AUTO_UPDATE true 2>/dev/null || true
 
 # 인덱스 규약 세션 로컬 고정: 사용자 전역 ~/.tmux.conf 의
 # base-index/pane-base-index(예: 1) 와 무관하게 window 0 / pane 1 보장.
@@ -406,9 +415,29 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
   tmux new-window -t "$SESSION" -n reviewers
   # allow-set-title 은 window-level 옵션 → 새 윈도우는 global 상속.
   fix_session_titles "$SESSION"
+  # 2026-06-07 (web 팀 백로그 #1): codex(비-claude) 리뷰어를 최하단으로 몰아 다벤더 경계를
+  #   시각적으로 분리(claude 리뷰어 사이에 codex 가 끼지 않게). split 은 위→하 누적이므로
+  #   배열 순서 = pane 순서 → claude/빈벤더 먼저, codex 나중 = codex 최하단.
+  #   안정 정렬(같은 그룹 내 원래 순서 보존) — review-manager 위치·EXPECTED_VOTERS 카운트
+  #   불변. watcher 는 pane_id 목록으로 동작하므로 순서 무관(REVIEW_MANAGER_PANE 도 pane_id).
+  #   ★ 두 그룹 임시배열을 만들어 "${arr[@]}" 합치면 한쪽 빈 그룹이 set -u 에서 unbound →
+  #     REVIEWERS 를 2-pass 순회하며 _REV_SORTED 에 += 누적해 빈 배열 전개를 회피.
+  _REV_SORTED=()
+  for entry in "${REVIEWERS[@]}"; do   # pass 1: claude/빈벤더 (위쪽)
+    parse_entry "$entry"
+    if [ -z "$ENTRY_VENDOR" ] || [ "$ENTRY_VENDOR" = "claude" ]; then
+      _REV_SORTED+=("$entry")
+    fi
+  done
+  for entry in "${REVIEWERS[@]}"; do   # pass 2: codex 등 비-claude (아래쪽)
+    parse_entry "$entry"
+    if [ -n "$ENTRY_VENDOR" ] && [ "$ENTRY_VENDOR" != "claude" ]; then
+      _REV_SORTED+=("$entry")
+    fi
+  done
   first=1
   _prev_rev_pid=""
-  for entry in "${REVIEWERS[@]}"; do
+  for entry in "${_REV_SORTED[@]}"; do
     parse_entry "$entry"
     if [ "$first" = "1" ]; then
       pid="$(tmux display-message -p -t "$SESSION:reviewers" '#{pane_id}')"
