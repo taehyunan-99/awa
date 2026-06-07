@@ -253,6 +253,8 @@ gate_gray() {
 
 notify_gray_log() {
   log_safe "[$(timestamp)] ${WORKER} ${2} → USER-ASK (uuid=${1})"
+  # 계측(H1): events.log user-ask 라인. task 는 log_gate_event 가 .harness-task 폴백.
+  log_gate_event "${WORKER:--}" "-" "user-ask" "tool=${2};uuid=${1}"
 }
 
 # 라이브러리 모드(단위 테스트)면 main 미실행 — 함수만 로드 (stdin hang 회피).
