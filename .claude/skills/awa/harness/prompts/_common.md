@@ -26,6 +26,9 @@
   - `done`: `-` (placeholder)
   - `plan-defect`: 설명 (자유 텍스트, 탭·개행 → 공백 sanitize 워커 책임)
   - `drift-check`: key=value payload (예: `turn=10` — watcher 가 자동 기록, 워커는 출력 금지)
+  - `user-ask`: key=value payload (회색명령 사용자 승인 요청 — H1 계측, `tool=...;uuid=...` — permission-gate 가 자동 기록, 워커는 출력 금지)
+  - `deny`: key=value payload (위험명령 자동거부 — H2 계측, `cat=<카테고리>;tool=...` — permission-gate 가 자동 기록, 워커는 출력 금지)
+  - `task-start`: key=value payload (dispatch 주입 시점 — H1 cycle·H6·H7 기준점, `cycle=N;scope=<경로>` — dispatch 가 자동 기록, 워커는 출력 금지)
 - 필드5 의 path 디바운스는 `action=modify` 만 적용 (`lib.sh::debounce_pairs` 가 다른 action 의 payload 를 path 키로 오해하지 않도록 분기).
 
 ## 도구 위치 (3차 PROJECT_ROOT 분리 이후)

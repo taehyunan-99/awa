@@ -25,7 +25,7 @@
 
 <!-- prev: 갱신처에 "tests/test-*-e2e.sh 검증" 포함 → tests/ 제거(2026-06-07, e654309). 검증은 실제 스킬 테스트(별도 클로드 세션). -->
 - **신호 N종 진화 = 4곳 동시 갱신** — 신호 1종 추가 시 `orch.md` 신호 목록 + 처리 절(ⓐ~ⓘ) + `_common.md` 신호 토큰 + `bin/watcher.sh` awk 분기 네 곳을 한 commit 에 모두 손댄다. 한 곳만 빠지면 *벙어리 신호* 가 된다.
-- **events.log 5필드 의미 표 유지** (`_common.md` 의 5필드 의미 행) — action 별로 필드5 의미가 다르다 (`modify=path` / `done=-` / `plan-defect=설명` / `drift-check`·`allow-confirm=key=value`). action 추가 시 표 행 추가 의무. 표 없는 신호는 reviewer 가 path 로 오해.
+- **events.log 5필드 의미 표 유지** (`_common.md` 의 5필드 의미 행) — action 별로 필드5 의미가 다르다 (`modify=path` / `done=-` / `plan-defect=설명` / `drift-check`·`allow-confirm`·`user-ask`·`deny`·`task-start`=key=value). action 추가 시 표 행 추가 의무. 표 없는 신호는 reviewer 가 path 로 오해.
 
 ## 4. ⛔ HOW NOT
 
