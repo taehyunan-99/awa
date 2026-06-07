@@ -467,7 +467,13 @@ bootstrap_pane() {  # $1=pane_id $2=worker_name $3=cmd $4=role_label $5=role $6=
   # CLI 바이너리 존재 검증 — 벤더별(claude→claude, codex→codex). codex 워커가 claude PATH
   #   부재 환경에서도 부트되도록 벤더명을 cli_bin 으로 넘긴다(=현재 벤더명이 곧 바이너리명).
   if ! shell_ready_wait "$pid" "" "$vendor"; then
-    echo "경고: '$wname' pane shell_ready_wait timeout($vendor CLI 부재?) — 송신 skip" >&2
+    # 원인 후보 2종: (a) $vendor CLI PATH 부재 (b) 셸 시작 시 *차단성 프롬프트*가 sentinel 을
+    #   가로챔 — oh-my-zsh 자동업데이트 [Y/n]·conda init 확인 등이 입력 대기로 멈추면 ready
+    #   echo 가 실행 안 돼 timeout. (b)는 라이브 빈발(2026-06-06 진단). 회피: rc 파일에
+    #   DISABLE_AUTO_UPDATE=true(oh-my-zsh)·자동업데이트/대화프롬프트 비활성.
+    echo "경고: '$wname' pane shell_ready_wait timeout — 송신 skip" >&2
+    echo "  원인: $vendor CLI PATH 부재 또는 셸 시작 차단프롬프트(oh-my-zsh 자동업데이트/conda 등)." >&2
+    echo "  차단프롬프트면 DISABLE_AUTO_UPDATE=true 등으로 비활성, 느린 셸이면 SHELL_READY_TIMEOUT 상향." >&2
     SKIPPED_PANES="${SKIPPED_PANES:-} $wname"
     return 0   # 다른 pane 진행 (기존 동작 유지·set -e 충돌 회피).
   fi
@@ -570,7 +576,7 @@ fi
 # 우연히 {{HARNESS_ROOT}} 등이 들어있어도 그대로 전달되는 것이 의도.
 # LEAD 시스템프롬프트 합본 = 역할(obf) + plan(있으면). claude --append-system-prompt-file 복수 불가 →
 # 단일 파일로 cat 합본. 역할을 시스템으로 올려 injection 우회(워커/리뷰어와 동일 원리).
-ORCH_SYSPROMPT_FILE="$WORKSPACE/.boot/lead-system.md"
+ORCH_SYSPROMPT_FILE="$WORKSPACE/.boot/orch-system.md"
 # PLAN_BOOT_FILE = 순수 plan 합본(있을 때만). codex LEAD 의 vendor_orch_plan_directive 가
 #   "이 파일 Read" 로 가리킬 대상 — 역할이 섞이면 안 되므로 plan 전용 유지.
 #   (실제론 LEAD=claude 고정[resolve_orchestrator_vendor]이라 codex 경로 미발생 — 의미 명료성 위해 분리.)

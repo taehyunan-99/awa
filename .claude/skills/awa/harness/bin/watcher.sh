@@ -9,7 +9,6 @@
 #   REVIEW_MANAGER_PANE  review-manager pane_id (있으면) — drift-check 전용 깨움 (I-3 정정)
 #   STATE_DIR            .agent-harness/state (pending-asks/ 포함)
 #   EVENTS               .agent-harness/events.log
-#   SEEN                 .watcher-seen (처리한 uuid 누적)
 #   REV_DEBOUNCE         reviewer 깨움 디바운스 초 (기본 3)
 set -u
 
@@ -19,7 +18,6 @@ REVIEWER_PANES="${REVIEWER_PANES:-}"
 REVIEW_MANAGER_PANE="${REVIEW_MANAGER_PANE:-}"
 STATE_DIR="${STATE_DIR:-}"
 EVENTS="${EVENTS:-}"
-SEEN="${SEEN:-$STATE_DIR/.watcher-seen}"
 REV_DEBOUNCE="${REV_DEBOUNCE:-3}"
 EXPECTED_VOTERS="${EXPECTED_VOTERS:-0}"
 
@@ -51,13 +49,28 @@ last_events="$(awk 'END{print NR}' "$EVENTS" 2>/dev/null || echo 0)"
 debounced_rev=0
 
 while tmux has-session -t "$SESSION" 2>/dev/null; do
-  # 1) pending-asks 새 .json → lead 깨움
+  # 1) pending-asks 미처리 .json → lead 재발화(ack 큐, @done 동형 — 점유 중 소실 복구).
+  #    결함 배경(2026-06-06 라이브): 과거엔 $SEEN 에 uuid 를 1회만 마킹하고 fire-and-forget
+  #    send-keys 했다. ORCH 점유(작업/모달) 중이면 그 @gate 가 claude TUI 에서 소실되는데
+  #    이미 SEEN 마킹돼 영영 재발화 안 함 → 워커 권한 USER-ASK 가 사용자에 push 안 됨.
+  #    수정: @done 의 pending-done ack 큐와 동형으로, ack(=ORCH 가 .response 기록) 없는 .json 을
+  #    REQUEUE_AGE 초마다 재발화. ack 메커니즘은 orch.md ⓓ — ORCH 가 <uuid>.response 를 atomic
+  #    기록하면(hook 폴링) 그게 처리 완료 표시. .response 있으면 더는 재발화 안 함.
   for f in "$STATE_DIR"/pending-asks/*.json; do
     [ -f "$f" ] || continue
     uuid="$(basename "$f" .json)"
-    grep -qxF "$uuid" "$SEEN" 2>/dev/null && continue
-    pane_alive "$ORCH_PANE" || continue   # M2: 죽은 pane 이면 seen 마킹 보류(살아나면 재시도)
-    printf '%s\n' "$uuid" >> "$SEEN"
+    # ack 확인: ORCH 가 응답을 기록했으면(<uuid>.response) 처리 완료 — 재발화 중단.
+    [ -f "$STATE_DIR/pending-asks/$uuid.response" ] && continue
+    # 재발화 디바운스: 마지막 발화 마커(.gate-fired.<uuid>) mtime 이 REQUEUE_AGE 안이면 건너뜀.
+    #   @done ack 큐의 mtime touch 디바운스와 동형(매 사이클 폭주 방지).
+    _gate_marker="$STATE_DIR/pending-asks/.gate-fired.$uuid"
+    if [ -f "$_gate_marker" ]; then
+      _gm="$(stat -f %m "$_gate_marker" 2>/dev/null || stat -c %Y "$_gate_marker" 2>/dev/null || echo 0)"
+      case "$_gm" in ''|*[!0-9]*) _gm=0 ;; esac
+      [ "$(( $(date +%s) - _gm ))" -ge "$REQUEUE_AGE" ] || continue
+    fi
+    pane_alive "$ORCH_PANE" || continue   # M2: 죽은 pane 이면 발화 보류(살아나면 재시도 — 마커 미갱신)
+    touch "$_gate_marker" 2>/dev/null || true   # 발화 마커 갱신 → 다음 재발화를 REQUEUE_AGE 만큼 미룸
     # -l 과 Enter 를 독립 실행: && 체이닝이면 -l 성공·Enter 실패 시 텍스트만 입력되고 미제출
     # (half-sent) 되며 || true 가 그걸 삼킨다. set -e 없으니 분리해도 루프 안 죽음 (send_prompt 와 동형).
     tmux send-keys -t "$ORCH_PANE" -l "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리." 2>/dev/null

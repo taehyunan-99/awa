@@ -184,7 +184,10 @@ queue_pending_ask() {
 
 cleanup_pending() {
   local uuid="$1"
-  rm -f "${STATE_DIR}/pending-asks/${uuid}.json" "${STATE_DIR}/pending-asks/${uuid}.response"
+  # .gate-fired.<uuid> = watcher 의 @gate 재발화 디바운스 마커(watcher.sh pending-asks 분기).
+  #   .json 소비 시 함께 정리 — 안 지우면 stale 마커가 누적(무해하나 디렉토리 오염).
+  rm -f "${STATE_DIR}/pending-asks/${uuid}.json" "${STATE_DIR}/pending-asks/${uuid}.response" \
+        "${STATE_DIR}/pending-asks/.gate-fired.${uuid}"
 }
 
 gate_gray() {
