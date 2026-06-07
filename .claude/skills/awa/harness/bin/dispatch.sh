@@ -86,5 +86,14 @@ if [ -z "$TARGET" ]; then
 fi
 
 write_harness_task "$WORKER" "$TASK_ID"
+
+# 계측(H1 사이클축·H6 리드타임·H7 속도): task-start 라인.
+# cycle = 프로젝트 누적 dispatch 순번(학습곡선 x축). scope = task 헤더(Stage B drift-detect).
+_cyc_file="$WORKSPACE/.cycle-count"
+_cyc="$(cat "$_cyc_file" 2>/dev/null || echo 0)"; _cyc=$((_cyc + 1)); echo "$_cyc" > "$_cyc_file"
+_scope="$(awk -F'scope:[[:space:]]*' '/^scope:/{print $2; exit}' "$TASK_FILE" 2>/dev/null || true)"
+_scope="${_scope%/}"   # trailing slash 제거(m1: build/ → build, prefix 매칭 정합)
+log_gate_event "$WORKER" "$TASK_ID" "task-start" "cycle=${_cyc};scope=${_scope:-*}"
+
 send_prompt "$TARGET" "TASK $TASK_ID"
 echo "배정 완료: 워커=$WORKER ($TARGET) ← TASK $TASK_ID"
