@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # run-once.sh 의 wait_for_done 폴링 검증. 실 awa-up 없이 가짜 events.log 로.
+# tmp 파일은 mktemp 임시파일 — 운영 events.log 아님(직접 printf 안전, AGENTS.md §4 무관).
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/run-once.sh" --source-only   # 함수만 로드, main 실행 안 함
