@@ -31,8 +31,9 @@ if [ -z "$TASK_FILE" ] || [ -z "$PROJECT_DIR" ] || [ -z "$OUT_EVENTS" ]; then
   exit 2
 fi
 [ -f "$TASK_FILE" ] || { echo "오류: task 파일 없음: $TASK_FILE" >&2; exit 2; }
+[ -d "$PROJECT_DIR" ] || { echo "오류: project dir 없음: $PROJECT_DIR" >&2; exit 2; }
 
-HERE="$(cd "$(dirname "$0")" && pwd)"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1; pwd)"
 EVENTS="$PROJECT_DIR/.agent-harness/events.log"
 
 # 정리 보장 — 성공·실패·중단 무관 awa-down. (set -e 아님: 데몬성, 실패 흡수)
