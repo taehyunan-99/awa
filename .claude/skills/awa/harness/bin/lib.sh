@@ -1095,6 +1095,27 @@ confirm_allow_yaml() {
   esac
 }
 
+# 계측 (차별성 데이터 spec §5) — events.log 5필드 보호 append.
+# confirm_allow_yaml 의 events.log 가드 패턴 모방: events.log 존재 시에만 발화, append 실패 흡수.
+# 직접 printf 금지(AGENTS.md HOW NOT) 계약을 이 보호 함수로 지킨다.
+# task 폴백(C2): permission-gate hook 은 HARNESS_TASK 부재 → task 가 비거나 '-' 면
+#   .harness-task.<worker> 에서 읽는다(log-event.sh:14-19 동형).
+# $1=worker(- 가능) $2=task(- 가능) $3=action $4=payload(key=value;...)
+log_gate_event() {
+  local worker="${1:--}" task="${2:--}" action="$3" payload="${4:-}"
+  local root="${PROJECT_ROOT:-$PWD}"
+  if [ -z "$task" ] || [ "$task" = "-" ]; then
+    local _htf="${root}/.agent-harness/.harness-task.${worker}"
+    [ -f "$_htf" ] && task="$(cat "$_htf" 2>/dev/null || true)"
+    [ -z "$task" ] && task="-"
+  fi
+  local events_log="${EVENTS:-${root}/.agent-harness/events.log}"
+  [ -f "$events_log" ] || return 0
+  printf '%s\t%s\t%s\t%s\t%s\n' \
+    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$worker" "$task" "$action" "$payload" \
+    >> "$events_log" 2>/dev/null || true
+}
+
 # team 명세 yaml 파서 (동적 하네스 조합) — 함수 노출. HARNESS_ROOT 는 L7 에서 이미 정의.
 # shellcheck disable=SC1090
 . "$HARNESS_ROOT/bin/spec-parse.sh"
