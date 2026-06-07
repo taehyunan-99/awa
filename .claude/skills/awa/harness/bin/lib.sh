@@ -827,6 +827,18 @@ worker_done_count() {
   awk -F'\t' -v w="$worker" '$2==w && $4=="done" { n++ } END { print n+0 }' "$events_log"
 }
 
+# 계측 파서 (차별성 데이터 spec §4). worker_turn_count 와 동형 — awk -F'\t'.
+worker_user_ask_count() {
+  local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
+  [ -f "$events_log" ] || { echo 0; return 0; }
+  awk -F'\t' -v w="$worker" '$2==w && $4=="user-ask" { n++ } END { print n+0 }' "$events_log"
+}
+deny_count() {
+  local events_log="${1:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
+  [ -f "$events_log" ] || { echo 0; return 0; }
+  awk -F'\t' '$4=="deny" { n++ } END { print n+0 }' "$events_log"
+}
+
 # worker_modify_count — modify 라인만 카운트 (도구 호출 의미)
 worker_modify_count() {
   local worker="$1" events_log="${2:-${EVENTS:-${WORKSPACE:-.}/events.log}}"
