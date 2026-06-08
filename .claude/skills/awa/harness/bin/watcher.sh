@@ -22,8 +22,10 @@ REV_DEBOUNCE="${REV_DEBOUNCE:-3}"
 EXPECTED_VOTERS="${EXPECTED_VOTERS:-0}"
 
 # §5.7 drift-check 용 worker_turn_count 함수 — lib.sh 에서 끌어온다 (없으면 무해 진행).
+# AWA_AUTO_LEARN 수집모드에서 confirm_allow_yaml 재호출 시 lib 경로 재사용 위해 변수화.
+_WATCHER_DIR="$(dirname "$0")"
 # shellcheck source=lib.sh
-. "$(dirname "$0")/lib.sh" 2>/dev/null || true
+. "$_WATCHER_DIR/lib.sh" 2>/dev/null || true
 # @done ack 큐 함수(enqueue_pending_done/requeue_pending_done) — 회로① 침묵 차단.
 # shellcheck source=watcher-lib.sh
 . "$(dirname "$0")/watcher-lib.sh" 2>/dev/null || true
@@ -192,10 +194,24 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
     # @allow-confirm: 라인 payload(필드5 = pattern=...;role=...) 추출 → lead ⓘ 라우팅 (§7 Phase A).
+    # AWA_AUTO_LEARN=1 (수집모드): ORCH push·사람 AskUserQuestion 우회 — watcher 가 직접
+    #   confirm_allow_yaml accepted 호출해 learned-allow.yaml 영속화(무인 학습곡선 수집 전용).
+    #   PROJECT_ROOT 는 awa-up 이 HARNESS_PROJECT 로 주입 → confirm_allow_yaml 이 PROJECT_ROOT 의존.
     sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
       | awk -F'\t' '$4=="allow-confirm"{print $5}' \
       | while IFS= read -r payload; do
           [ -n "$payload" ] || continue
+          if [ "${AWA_AUTO_LEARN:-0}" = "1" ]; then
+            # payload = pattern=<...>;role=<...> → pattern 값만 추출(첫 key, ; 앞까지, pattern= 제거).
+            _apat="${payload%%;*}"; _apat="${_apat#pattern=}"
+            [ -n "$_apat" ] || continue
+            # ★ HARNESS_PROJECT 로 전달 — lib.sh source 시 resolve_project_root 가 HARNESS_PROJECT 를
+            #   최우선으로 PROJECT_ROOT 에 쓴다. PROJECT_ROOT 직접 주입은 source 시 git toplevel(본체)로
+            #   덮어써져 무력화(실측). learned-allow.yaml 이 본체에 잘못 쓰이는 것 차단.
+            HARNESS_PROJECT="${HARNESS_PROJECT:-}" LIB_PATH="$_WATCHER_DIR/lib.sh" bash -c \
+              'source "$LIB_PATH" && confirm_allow_yaml "$1" accepted' _ "$_apat" >/dev/null 2>&1 || true
+            continue
+          fi
           pane_alive "$ORCH_PANE" || continue
           tmux send-keys -t "$ORCH_PANE" -l "@allow-confirm: $payload" 2>/dev/null
           tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null

@@ -277,6 +277,12 @@ splash_append_member() {  # $1=이름 $2=역할(bare, 빈값 가능) $3=모델
 # 생성하면 watcher 의 last_events 초기화(현재 줄 수=0) 와 정합 — 과거 done 폭주 없음.
 touch "$WORKSPACE/events.log"
 
+# 수집모드 마커 — AWA_AUTO_LEARN=1 이면 ORCH 가 무인 진행(dispatch·게이트 확인 자동 통과).
+# ORCH pane env 체인(bootstrap_pane)을 안 건드리고 파일로 모드 전달 — orch.md ⓑ 가 이 파일 감지.
+if [ "${AWA_AUTO_LEARN:-0}" = "1" ]; then
+  : > "$WORKSPACE/.auto-learn"
+fi
+
 # 5차→8차: orch-auto-allow.yaml 설치 + marker 게이트 + 백업 갱신.
 # orch_auto_allow_lookup 은 ${PROJECT_ROOT}/.agent-harness/config/orch-auto-allow.yaml 을 읽으므로,
 #   파일이 없으면 lookup 이 영구 rc=1 → orch-auto-allow 전체 무동작. 부트 시 설치.
@@ -818,7 +824,7 @@ if [ "$_last" != "watcher" ]; then
   exit 1
 fi
 # watcher 기동: pane 에 env 세팅 후 watcher.sh 실행 명령 주입.
-tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION ORCH_PANE=$ORCH_PID REVIEWER_PANES=\"$_rev_panes\" REVIEW_MANAGER_PANE=\"${REVIEW_MANAGER_PANE:-}\" EXPECTED_VOTERS=\"$EXPECTED_VOTERS\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" HARNESS_PROJECT=\"$PROJECT_ROOT\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
+tmux send-keys -t "$WATCHER_PANE" -l "SESSION=$SESSION ORCH_PANE=$ORCH_PID REVIEWER_PANES=\"$_rev_panes\" REVIEW_MANAGER_PANE=\"${REVIEW_MANAGER_PANE:-}\" EXPECTED_VOTERS=\"$EXPECTED_VOTERS\" STATE_DIR=\"$WORKSPACE/state\" EVENTS=\"$WORKSPACE/events.log\" SEEN=\"$WORKSPACE/state/.watcher-seen\" HARNESS_PROJECT=\"$PROJECT_ROOT\" AWA_AUTO_LEARN=\"${AWA_AUTO_LEARN:-0}\" bash \"$HARNESS_ROOT/bin/watcher.sh\""
 tmux send-keys -t "$WATCHER_PANE" Enter
 
 # 14차 UX: 첫 attach 시 항상 team(LEAD+PM) 윈도우로 접속 ('window 0=LEAD+PM' 확정과 정합).

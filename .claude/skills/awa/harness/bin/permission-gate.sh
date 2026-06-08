@@ -205,6 +205,14 @@ gate_gray() {
   local resp="${STATE_DIR}/pending-asks/${uuid}.response"
   queue_pending_ask "$uuid" "$WORKER" "$ENTRY_ROLE" "$tool" "$input" "$$" "$tuid" "$channel"
   notify_gray_log "$uuid" "$tool"
+  # ★ 무인 수집모드(.auto-learn): ORCH .response 를 기다리지 않고 hook 이 직접 approve-permanent
+  #   자동 작성. ORCH LLM 의 게이트 처리 비결정성(approve-once 응답 → 학습 안 됨 / 메뉴 멈춤)
+  #   우회 — 결정적 코드 경로. user-ask 는 위에서 이미 발화(곡선 cycle1 출발점 보존).
+  #   아래 기존 .response 검증 로직이 approve-permanent:* 분기 → add_to_allow → allow-confirm →
+  #   learned-allow 영속화. danger 는 이 함수 도달 전 자동거부라 수집모드 무관(deny-bounded 불변).
+  if [ -f "${PROJECT_ROOT}/.agent-harness/.auto-learn" ]; then
+    printf '%s' "approve-permanent:command-group" > "${resp}.tmp.$$" && mv "${resp}.tmp.$$" "$resp"
+  fi
   # ★ .response 파일 폴링 (P11 탈-tmux 2026-05-31): 기존엔 `tmux wait-for "$channel"`
   #   1회 블로킹으로 lead 의 -S 깨움을 기다렸다. 그러나 hook 은 워커 프로세스 안에서 돌고,
   #   codex sandbox(seatbelt network deny)에선 tmux 소켓 connect 가 즉시 실패(rc≠0, 10ms)

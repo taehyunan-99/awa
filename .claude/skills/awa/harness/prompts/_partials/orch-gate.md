@@ -6,7 +6,8 @@ watcher 가 `@gate:` 로 깨우면, 단건이 아니라 `pending-asks/*.json` **
 `ls .agent-harness/state/pending-asks/*.json 2>/dev/null` 확인. 각 `<uuid>.json` 마다 (jq 로 `gate_pid`,`channel`,`worker`,`tool`,`input` 읽기. `<uuid>` = .json basename 에서 확장자 뗀 값):
 - `gate_pid` 를 `kill -0 <gate_pid> 2>/dev/null` 확인.
   - 실패(좀비) → `rm -f` 로 .json·.response 삭제 후 skip(-S 불필요).
-  - 성공 → AskUserQuestion:
+  - 성공 **+ `.agent-harness/.auto-learn` 존재 시(무인 수집모드)** → AskUserQuestion 생략, `<decision>`=`approve-permanent:command-group` 자동 채택(영구 학습 → learned-allow 누적). 사람 확인 없이 아래 atomic 작성으로 진행.
+  - 성공 (일반) → AskUserQuestion:
     질문: "<worker> 가 <tool>(<input>) 호출. 허용?"
     선택지(기본 권장 첫 항목): "명령군 허용 (권장)" → `approve-permanent:command-group` / "정확 허용" → `approve-permanent:exact` / "도구 전체 허용" → `approve-permanent:tool` / "한 번만" → `approve-once` / "거부" → `deny`
 - 응답 **atomic 작성**:

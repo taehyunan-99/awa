@@ -636,9 +636,27 @@ derive_pattern() {
         # 호출부(gate_gray)가 학습 생략 + approve-once 강등. (7차 결함3, 실측 규명)
         # 판정: 줄바꿈 또는 셸 메타문자(&& || ; | $( ` > <) 포함 시 복합.
         local NL; NL=$'\n'   # bash 3.2 ANSI-C 인용 (실측 지원 확인)
-        case "$field" in
+        # ★ 후행 출력 리다이렉트만 스트립 후 판정 (2026-06-08): LLM 워커가 `du -sh . 2>&1`,
+        #   `python3 --version 2>/dev/null` 처럼 *출력 폐기/병합* 리다이렉트를 습관적으로 덧붙여
+        #   `>` 가드에 걸려 학습이 영구 강등(곡선 평평)됐다. 2>&1·>&2·>/dev/null·2>/dev/null 류는
+        #   출력 *방향*만 바꿀 뿐 파일 쓰기·명령 실행이 없어 위험하지 않다 → 명령 끝의 이들만 제거.
+        #   일반 파일 쓰기(`> out.txt`)·파이프·연결자는 스트립 대상 아님 → 아래 가드가 그대로 차단.
+        # 공백 변형 정규화(`2> /dev/null`→`2>/dev/null`) 후 후행 리다이렉트 토큰 반복 제거.
+        local cgfield="$field"
+        cgfield="${cgfield//2> \/dev\/null/2>/dev/null}"
+        cgfield="${cgfield//1> \/dev\/null/1>/dev/null}"
+        cgfield="${cgfield//> \/dev\/null/>/dev/null}"
+        while :; do
+          case "$cgfield" in
+            *' 2>&1'|*' >&2'|*' 1>&2'|*' &>/dev/null'|*' >/dev/null'|*' 1>/dev/null'|*' 2>/dev/null')
+              cgfield="${cgfield% *}" ;;
+            *) break ;;
+          esac
+        done
+        case "$cgfield" in
           *'&&'*|*'||'*|*';'*|*'|'*|*'$('*|*'`'*|*'>'*|*'<'*|*"$NL"*) printf ''; return ;;
         esac
+        field="$cgfield"
         # 첫 2 토큰을 prefix 로 (예: "npm test foo" → "npm test"). 단일 토큰이면 그 토큰만.
         local first second prefix
         first="$(printf '%s' "$field" | awk '{print $1}')"
