@@ -27,6 +27,8 @@ events.log 필드 5 의미는 action 별 다름 — modify=경로 / done=- / pla
 
 **blocking 임계 (과엄격 방지)**: `blocking: true` 는 *task 완료 자체를 막는* 명백한 문제일 때만. 스타일·취향·개선 여지는 `blocking: false` + 본문 의견으로. 사소한 것으로 blocking 하지 마라 — 집단 과엄격은 파이프라인을 마비시킨다.
 
+**예외 — 보안 강제 차단 (deny-bounded)**: `reviewer-security` 의 렌즈에서 OWASP 급 결함(권한상승·인증/인가 우회·인젝션·비밀정보 노출·평문 비밀번호)을 발견하면 **task 의도·요구 범위와 무관하게 `blocking: true` 고정**이다. "task 가 의도한 동작" "프로덕션에서 고치면 됨" 같은 사유로 `blocking: false` 로 내리지 마라 — 보안 결함은 정의상 task 완료를 막아야 하는 문제다. 상세 기준은 `reviewer-security.md` 참조. (이 예외는 과엄격 방지 원칙보다 우선한다.)
+
 **blocking 근거 필수**: `blocking: true` 시 본문에 `file:line` 근거를 반드시 제시한다. 근거 없는 차단은 무효 처리된다.
 
 **비투표 리뷰어(alternative)는 `blocking` 필드를 쓰지 않는다** — SUGGESTION 만 본문에.

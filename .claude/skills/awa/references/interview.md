@@ -18,13 +18,19 @@
 - `security` — 보안 점검·코드 감사 워커
 
 **리뷰어** (`03-quality/`):
-- `reviewer-alignment` — plan 정합 검토
-- `reviewer-quality` — 품질 검토
-- `reviewer-security` — 보안 검토
-- `reviewer-arch` — 아키텍처 검토
-- `reviewer-spec` — 스펙 충족 검토
-- `reviewer-alternative` — 대안 관점
-- `review-manager` — 집계·드리프트 추적 (투표 리뷰어 ≥2 시 필수)
+
+★ **투표(voter) 리뷰어는 정확히 이 셋뿐** — 합의 게이트(0/2+ 불변식)는 이 셋만 카운트한다:
+- `reviewer-alignment` — plan 정합 검토 **(voter)**
+- `reviewer-quality` — 품질 검토 **(voter)**
+- `reviewer-security` — 보안 검토 **(voter)**
+
+비투표(non-voter) 리뷰어 — 의견만 내고 합의 카운트에 **안 잡힌다**(단독으로 두면 voter 0명 취급):
+- `reviewer-arch` — 아키텍처 검토 (non-voter)
+- `reviewer-spec` — 스펙 충족 검토 (non-voter)
+- `reviewer-alternative` — 대안 관점 (non-voter)
+- `review-manager` — 집계·드리프트 추적 (관리자, voter 아님 — 투표 리뷰어 ≥2 시 필수)
+
+⚠️ **혼동 주의**: `reviewer-spec`/`reviewer-arch` 를 리뷰어로 넣고 `reviewer-security` 하나만 더 붙이면 → voter 는 security 1명 = **불변식 위반(거부)**. "리뷰어 N명"이 아니라 **voter 가 0 또는 2+** 여야 한다. 리뷰를 둘 거면 voter 셋 중 **2종 이상**(예: security+quality)을 반드시 포함하라.
 
 권한은 역할에서 자동 파생(generate_worker_settings): engineer/dev/frontend/backend/infra/security→dev쓰기, researcher/review-manager→readonly, tester→test, reviewer-*→reviewer.
 
