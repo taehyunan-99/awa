@@ -395,8 +395,27 @@ done_logged() {  # $1=events.log $2=worker $3=id → done 라인 있으면 0
 #   claude 는 간격 없이도 동작하나 codex 는 텍스트→Enter 사이 지연 + 미전송 시 재Enter 필요.
 #   → 텍스트 후 짧은 지연 + Enter, 그래도 입력창에 텍스트 잔류하면(prompt 마커 '›'+텍스트
 #   앞부분 매치) Enter 1회 재전송. claude 엔 무해(이미 전송됨 → 빈 Enter 또는 잔류 없음).
+# 워커 pane 이 입력 받을 준비(idle)인지 — 화면 하단에 입력 프롬프트 마커('❯'/'›'/'>')가
+# 떠 있으면 idle. busy(작업중 출력·스피너) 면 마커가 없다. send_prompt 송신 *전* 가드용.
+#   $1=target pane.  return 0=idle(마커 있음), 1=busy/미확정(마커 없음).
+_pane_idle() {
+  tmux capture-pane -p -t "$1" 2>/dev/null \
+    | grep -Eq '^[[:space:]]*[❯›>]'
+}
+
 send_prompt() {
   local target="$1" text="$2"
+  # ★ (b) 송신 전 ready 폴링 (I-1, 2026-06-09): 워커가 busy(직전 task 처리 중)면 claude TUI 가
+  #   입력을 큐잉만 하고 제출 안 함(P17 동형). 그 상태로 send-keys 하면 텍스트가 박히지도,
+  #   잔류감지(아래)에 걸리지도 않아 *에러 없이 유실*된다(task-start 안 찍힘). 격리 재현:
+  #   busy pane 에 dispatch → 0초 성공반환·워커 미수신. → 송신 전 idle 마커가 뜰 때까지 폴링.
+  #   타임아웃(기본 30×0.5s=15s)까지 busy 면 진행은 하되(데드락 방지) 잔류감지·(a)의 task-start
+  #   ack 가 유실을 잡는다. 부트 직후 첫 송신엔 마커가 아직 없을 수 있어 timeout 후 진행 허용.
+  local _ri _rmax="${SEND_PROMPT_READY_MAX:-30}"
+  for _ri in $(seq 1 "$_rmax"); do
+    _pane_idle "$target" && break
+    sleep "${SEND_PROMPT_READY_DELAY:-0.5}"
+  done
   tmux send-keys -t "$target" -l "$text"
   sleep "${SEND_PROMPT_ENTER_DELAY:-0.4}"   # codex 렌더링 여유 (claude 엔 무해한 짧은 지연)
   tmux send-keys -t "$target" Enter

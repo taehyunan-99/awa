@@ -99,5 +99,31 @@ write_harness_task "$WORKER" "$TASK_ID"
   log_gate_event "$WORKER" "$TASK_ID" "task-start" "cycle=${_cyc};scope=${_scope:-*}"
 ) || true
 
+# ★ (a) dispatch ack (I-1, 2026-06-09): send_prompt 가 busy pane 에 *에러 없이* 유실할 수 있어
+#   (격리 재현: busy→0초 성공반환·워커 미수신), 송신 자체의 성공/실패만으론 워커 수신을 보장
+#   못 한다. → 송신 후 워커가 실제로 task 를 받았다는 증거(events.log 에 이 worker 의 새 액션
+#   라인 출현)를 짧게 폴링. 안 나타나면 exit 3(유실 의심) → watcher 가 dispatch-queue .json 을
+#   소비 않고 재발화(@done ack 큐와 동형). task-start 는 dispatch 가 직접 찍으므로 ack 증거가
+#   아님 — task-start *이후* 늘어난 이 worker 라인(modify/user-ask/done 등)이 수신 증거.
+_ev_before="$(awk 'END{print NR}' "$WORKSPACE/events.log" 2>/dev/null || echo 0)"
 send_prompt "$TARGET" "TASK $TASK_ID"
 echo "배정 완료: 워커=$WORKER ($TARGET) ← TASK $TASK_ID"
+
+# 송신 후 워커 수신 확인 폴링. 새 라인 중 이 worker 의 비-task-start 액션이 1줄이라도 나오면 ack.
+# 타임아웃(기본 16×0.5s=8s)까지 무흔적이면 유실 의심 — exit 3. (watcher 가 재발화 판단)
+_ack_max="${DISPATCH_ACK_MAX:-16}"
+_ack_ok=0
+for _ai in $(seq 1 "$_ack_max"); do
+  _ev_now="$(awk 'END{print NR}' "$WORKSPACE/events.log" 2>/dev/null || echo 0)"
+  if [ "$_ev_now" -gt "$_ev_before" ]; then
+    # 새 구간에서 이 worker 의 task-start 아닌 액션 라인이 있으면 수신 확정.
+    _new_worker_action="$(sed -n "$((_ev_before+1)),${_ev_now}p" "$WORKSPACE/events.log" 2>/dev/null \
+      | awk -F'\t' -v w="$WORKER" '$2==w && $4!="task-start"{c++} END{print c+0}')"
+    if [ "${_new_worker_action:-0}" -gt 0 ]; then _ack_ok=1; break; fi
+  fi
+  sleep "${DISPATCH_ACK_DELAY:-0.5}"
+done
+if [ "$_ack_ok" != 1 ]; then
+  echo "경고: 워커=$WORKER 가 TASK $TASK_ID 수신 흔적 없음(${_ack_max}회 폴링) — 유실 의심. 재발화 위임." >&2
+  exit 3
+fi

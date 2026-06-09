@@ -89,4 +89,4 @@ assumptions: <ASSUMED 한 것 요약, 없으면 ->
 - `NEEDS: <입력>` — scope 밖 필요 입력 (orch 가 cross-lane 처리).
 - `ASSUMED: <가정> because <이유>` — 가정 플래그.
 - `@plan-defect: {{WORKER_NAME}}/<task-id> <설명>` — plan 자체 결함 발견 시(acceptance criteria 모호·전제 모순·**criteria 간 상충**[결과값↔구현방식처럼 한 단계 추론을 거쳐 드러나는 미묘한 충돌 포함] 등). 모순을 구현으로 조용히 메우지 말고 *여기로 올린다*(§완료·노력·가정 의 assume-and-flag 예외 참조). stdout 출력 후 events.log 보조 append: `printf '%s\t%s\t%s\tplan-defect\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "{{WORKER_NAME}}" "<task-id>" "<설명>" >> .agent-harness/events.log` — watcher 가 잡아 orch ⓖ 로 라우팅. *`<설명>` 안의 탭·개행은 공백으로 치환* (watcher awk 가 5번째 필드만 추출 — 탭 섞이면 뒤 잘림).
-(`@done:`·`@gate:`·`@review:` 는 watcher/orch 가 쓰는 토큰 — 워커는 위 4개만.)
+(`@done:`·`@gate:`·`@review:`·`@stall:` 는 watcher/orch 가 쓰는 토큰 — 워커는 위 4개만.)

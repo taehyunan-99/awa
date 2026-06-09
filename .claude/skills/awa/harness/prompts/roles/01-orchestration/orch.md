@@ -6,7 +6,7 @@
 ## ⓐ 동작 모델 (이벤트 반응형)
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
-- 신호 9종: `@desk: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@verdict-arrived: <worker>-<id>`(→ⓒ 재집계) · `@review:`(reviewer 용 — 무시).
+- 신호 10종: `@desk: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@verdict-arrived: <worker>-<id>`(→ⓒ 재집계) · `@stall: <N>초 무활동. 미완료 워커: <목록>`(→ⓙ) · `@review:`(reviewer 용 — 무시).
 - 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
 - boot 직후 1회: `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 stale 판별 — 완료 task 새 배정 마라. 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
@@ -74,3 +74,12 @@
 1) `events.log` 의 `pattern=...;role=...` payload 파싱 (필드5 key=value, precondition C-1 정합)
 2) 사용자 AskUserQuestion: "패턴 '<pattern>' 영구 카탈로그 추가? accepted/rejected/never"
 3) 사용자 결정 후 호출: `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && confirm_allow_yaml <pattern> <decision>'` (yaml/stats 누적, never 시 blocklist 추가, 사후 검증 실패 시 rejected 카운터 +1)
+
+## ⓙ @stall → 전역 정체 진단·복구 (어디서 깨졌나)
+@stall 의 미완료 워커 목록(`worker(action@task)`)으로 **멈춘 지점을 특정**한다. 추측 금지 — pane 을 직접 본다.
+1) **진단**: 각 미완료 워커 pane 을 `tmux capture-pane -p -t <session>:<win>.<pane>` 으로 캡처(워커→pane 은 `tmux list-panes -a -F '#{pane_title} #{pane_id}'`). 화면 하단을 보고 원인 분류:
+   - (a) **입력창에 명령 박힘·미제출**(프롬프트 마커 `❯`/`›` 뒤에 텍스트 잔류) → 송신이 깨진 것. `tmux send-keys -t <pane> Enter` 로 제출하거나, task 를 dispatch-queue 에 재기록(재발화).
+   - (b) **오류로 멈춤**(에러 메시지·권한 거부·크래시) → results/<task>.md 미생성 확인 후 task 재배정(dispatch-queue). 반복되면 ⓔ BLOCKED 사용자 push.
+   - (c) **정상 장시간 작업 중**(스피너·긴 출력 진행) → 오탐. 조치 없이 대기(다음 @stall 까지 두고 봄).
+2) **누락 추적**: `events.log` 에서 그 워커의 마지막 action 이 `task-start`면 *받고 한 줄도 진행 못 함*(=수신·시작 직후 정지, 위 a/b 유력), `modify` 면 *작업 중 정지*. tasks/<task>.md 는 있는데 results/<task>.md 없으면 미완료 확정.
+3) 재배정해도 같은 지점서 또 멈추면(2회+) ⓔ 로 사용자 push: "워커 <name> task <id> 반복 정체(<원인>). 수동 개입 필요."

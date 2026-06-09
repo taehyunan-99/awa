@@ -50,6 +50,17 @@ pane_alive() {
 last_events="$(awk 'END{print NR}' "$EVENTS" 2>/dev/null || echo 0)"
 debounced_rev=0
 
+# ── Stall watchdog (2026-06-09) ─────────────────────────────────────────────
+# 결함 배경: watcher 는 events.log 가 *늘어날 때*만 반응한다(§2). 아무 일도 안 일어나면
+# (전역 정체 — 명령 깨짐·송신 실패·워커 멈춤) 그냥 폴링만 하고 침묵 → 무한 대기. ORCH 도
+# "워커가 일하는 중"인지 "멈춘 것"인지 구분 못 함. → events.log 가 STALL_THRESHOLD 초 동안
+# 한 줄도 안 늘고 + 미완료(진행중) 워커가 있으면 ORCH 에 @stall 알림. 감지만 — 복구(재배정)는
+# 판단 주체인 ORCH 몫(watcher 는 ORCH 역할 침범 안 함). 디바운스: 알린 뒤 STALL_THRESHOLD 마다 재발화.
+STALL_THRESHOLD="${STALL_THRESHOLD:-180}"
+case "$STALL_THRESHOLD" in ''|*[!0-9]*) STALL_THRESHOLD=180 ;; esac
+last_activity_ts="$(date +%s)"   # 마지막 events.log 증가 시각
+last_stall_fire=0                 # 마지막 @stall 발화 시각(디바운스)
+
 while tmux has-session -t "$SESSION" 2>/dev/null; do
   # 1) pending-asks 미처리 .json → lead 재발화(ack 큐, @done 동형 — 점유 중 소실 복구).
   #    결함 배경(2026-06-06 라이브): 과거엔 $SEEN 에 uuid 를 1회만 마킹하고 fire-and-forget
@@ -98,16 +109,42 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     bash "$(dirname "$0")/dispatch.sh" \
       ${HARNESS_PROJECT:+--project "$HARNESS_PROJECT"} "$dq_worker" "$dq_task" >/dev/null 2>&1 || _dq_rc=$?
     if [ "$_dq_rc" = 0 ]; then
-      :   # 성공 — dispatch.sh 가 워커 페인에 TASK 주입. lead 통지 불필요(조용).
+      :   # 성공 — dispatch.sh 가 워커 페인에 TASK 주입(수신 ack 확인됨). lead 통지 불필요(조용).
     elif [ "$_dq_rc" = 2 ]; then
       :   # 차단(계획 B 합의 게이트) — dispatch.sh 가 거부. 실패 아님이라 @dispatch-fail 통지 안 함.
           #   LEAD 가 차단 워커를 재배정한 경우라 조용히 소비(통지 루프 방지). 해소는 clear_block.
+    elif [ "$_dq_rc" = 3 ]; then
+      # ★ (a) 유실 의심(I-1, 2026-06-09): dispatch.sh 가 송신은 했으나 워커 수신 흔적(events.log
+      #   새 액션) 무 → busy pane 유실 가능성. .json 을 소비하지 *않고* 재발화(다음 폴링에 워커가
+      #   idle 됐으면 (b) ready 폴링이 통과해 정상 송신). pending-asks 와 동형 — .dispatch-fired
+      #   마커로 REQUEUE_AGE 디바운스 + 최대 재시도(DISPATCH_REQUEUE_MAX) 후 단념(무한루프 차단).
+      _df_key="$(_pd_sanitize "$dq_worker")__$(_pd_sanitize "$dq_task")"
+      _df_marker="$STATE_DIR/dispatch-queue/.dispatch-fired.$_df_key"
+      _df_cnt=0
+      if [ -f "$_df_marker" ]; then
+        _df_cnt="$(cat "$_df_marker" 2>/dev/null || echo 0)"
+        case "$_df_cnt" in ''|*[!0-9]*) _df_cnt=0 ;; esac
+      fi
+      if [ "$_df_cnt" -ge "${DISPATCH_REQUEUE_MAX:-5}" ]; then
+        # 단념 — 재시도 소진. lead 통지 후 소비(영구 박힘 방지).
+        if pane_alive "$ORCH_PANE"; then
+          tmux send-keys -t "$ORCH_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — 수신 ack ${DISPATCH_REQUEUE_MAX:-5}회 실패. 워커 상태 확인 후 수동 재배정." 2>/dev/null
+          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+        fi
+        rm -f "$_df_marker" 2>/dev/null
+        rm -f "$f" 2>/dev/null
+      else
+        echo "$((_df_cnt+1))" > "$_df_marker" 2>/dev/null || true
+        continue   # .json 유지 → 다음 폴링에 재발화(소비 안 함)
+      fi
     elif pane_alive "$ORCH_PANE"; then
       # 진짜 실패만 lead 에 통지(세션/페인/task 파일 이상). -l 과 Enter 분리(half-sent 방지).
       tmux send-keys -t "$ORCH_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)." 2>/dev/null
       tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
     fi
-    rm -f "$f" 2>/dev/null   # 소비 완료(성공·실패 무관 1회만 — 실패는 위에서 lead 통지)
+    # 성공(0)·차단(2)·진짜실패(기타)·ack단념(3 소진) → 소비. ack 재시도(3 미소진)는 위 continue 로 유지.
+    rm -f "$STATE_DIR/dispatch-queue/.dispatch-fired.$(_pd_sanitize "$dq_worker")__$(_pd_sanitize "$dq_task")" 2>/dev/null
+    rm -f "$f" 2>/dev/null   # 소비 완료
   done
 
   # 1c) desk-queue 새 .json → ORCH 에 @desk: 전달 (P11 Phase4 탈-tmux: DESK 도 sandbox 안이라
@@ -217,6 +254,7 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
+    last_activity_ts="$now"   # stall watchdog: events.log 증가 = 활동 있음 → 정체 타이머 리셋
   fi
 
   # 3) @done ack 큐 재발화 — events 증가와 무관하게 매 사이클. LEAD 가 점유 중이라 @done 을
@@ -244,6 +282,25 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
           tmux send-keys -t "$ORCH_PANE" -l "@verdict-arrived: $wid 투표 $EXPECTED_VOTERS종 전원 도착. review/ 재종합." 2>/dev/null
           tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
         done
+  fi
+
+  # 4) Stall watchdog — events.log 가 STALL_THRESHOLD 초 무증가 + 미완료(진행중) 워커 존재 시
+  #    ORCH 에 @stall 알림(감지만, 복구는 ORCH). 진단정보 동봉 — ORCH 가 "어디서 멈췄나" 판단하도록
+  #    worker별 마지막 (action,task) 을 함께 전달(사용자 요구: 어디서 깨지고 어디부터 누락인지).
+  _wd_now="$(date +%s)"
+  if [ "$((_wd_now - last_activity_ts))" -ge "$STALL_THRESHOLD" ] && pane_alive "$ORCH_PANE"; then
+    # 미완료 워커 = events.log 에서 마지막 action 이 'done' 이 아닌 worker(task-start/modify/user-ask
+    # 에서 멈춤). worker '-'(시스템 라인 allow-confirm 등)는 제외. 하나라도 있어야 정체로 본다
+    # (전부 done = 정상 완료·대기 → 알림 안 함).
+    _stuck="$(awk -F'\t' '$2!="-" && $2!=""{last_a[$2]=$4; last_t[$2]=$3}
+                          END{for(w in last_a) if(last_a[w]!="done") printf "%s(%s@%s) ", w, last_a[w], last_t[w]}' \
+              "$EVENTS" 2>/dev/null)"
+    if [ -n "$_stuck" ] && [ "$((_wd_now - last_stall_fire))" -ge "$STALL_THRESHOLD" ]; then
+      _idle_sec="$((_wd_now - last_activity_ts))"
+      tmux send-keys -t "$ORCH_PANE" -l "@stall: ${_idle_sec}초간 events.log 무활동(전역 정체 의심). 미완료 워커: ${_stuck}— 각 워커 pane 을 capture-pane 으로 확인해 (1)멈춘 워커가 어느 task 의 무슨 단계인지 (2)명령이 입력창에 박혀 미제출인지 (3)오류로 멈췄는지 진단 후, 필요하면 해당 task 를 dispatch-queue 로 재배정하라." 2>/dev/null
+      tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+      last_stall_fire="$_wd_now"
+    fi
   fi
 
   sleep 1
