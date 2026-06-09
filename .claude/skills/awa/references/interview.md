@@ -80,7 +80,7 @@
 - 사용자가 자연어로 설명한 작업을 `PROJECT_ROOT/.awa/task.md` 로 Write 한다.
 - 목적: tmux 가동 시 ORCH 가 이 파일을 읽어 **자동으로 작업을 시작**하게 한다. task.md 없이 부팅하면 ORCH 는 지시 없이 idle 대기한다.
 - task.md 는 `--plan <PROJECT>/.awa/task.md` 로 launch 에 전달된다 — 기존 plan 주입 경로(`--append-system-prompt-file` 합본 + 자동 착수 트리거)를 그대로 재사용한다.
-- **task.md 는 plan 4축 리뷰를 거치지 않는다** — 자연어 = 간단 작업 신호. 복잡한 작업이면 사용자에게 "plan/PRD 를 먼저 만들어 전달하길 권장"한다(소프트 가이드).
+- **task.md 는 plan 4축 리뷰를 거치지 않는다** — 자연어 = 간단 작업 신호. **복잡한 작업이면 task.md 로 진행하지 말고 SKILL.md Step 2 의 난이도 게이트가 plan 작성을 권유하고 AWA 를 종료한다**(소프트 가이드 아님 — 명확한 진입점). task.md 경로는 게이트에서 사용자가 "그래도 자연어로 진행" 을 고른 단순 작업에만 해당. 근거: plan 없이 자연어로 가면 plan-anchored 회로(alignment 감시·@plan-defect 방향수정)가 약해진다.
 - git 추적: task.md 는 `.awa/` 안이라 team.yaml 과 동일하게 처리된다(SKILL.md 의 git init/gitignore 단계가 `.awa/` 통째로 커버 — 별도 처리 없음).
 
 #### task.md 형식 (SKILL 이 작성)
