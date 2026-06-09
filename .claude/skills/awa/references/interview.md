@@ -10,8 +10,7 @@
 `prompts/roles/` 에서 글롭으로 확인. 현재 가용:
 
 **워커** (`02-development/`, `04-security/`):
-- `engineer` — 범용 구현 (단일 기능·소규모)
-- `dev` — 개발 (다역할 협업 구현)
+- `engineer` — 범용 구현 (도메인 무관 — 셸·스크립트·설정·글루 등 무엇이든)
 - `frontend` / `backend` / `infra` — 풀스택 3분업
 - `researcher` — 조사·읽기 전용 (코드 변경 없는 탐색·비교)
 - `tester` — 테스트 작성
@@ -24,13 +23,10 @@
 - `reviewer-quality` — 품질 검토 **(voter)**
 - `reviewer-security` — 보안 검토 **(voter)**
 
-비투표(non-voter) 리뷰어 — 의견만 내고 합의 카운트에 **안 잡힌다**(단독으로 두면 voter 0명 취급):
-- `reviewer-arch` — 아키텍처 검토 (non-voter)
-- `reviewer-spec` — 스펙 충족 검토 (non-voter)
-- `reviewer-alternative` — 대안 관점 (non-voter)
+관리자 (voter 아님):
 - `review-manager` — 집계·드리프트 추적 (관리자, voter 아님 — 투표 리뷰어 ≥2 시 필수)
 
-⚠️ **혼동 주의**: `reviewer-spec`/`reviewer-arch` 를 리뷰어로 넣고 `reviewer-security` 하나만 더 붙이면 → voter 는 security 1명 = **불변식 위반(거부)**. "리뷰어 N명"이 아니라 **voter 가 0 또는 2+** 여야 한다. 리뷰를 둘 거면 voter 셋 중 **2종 이상**(예: security+quality)을 반드시 포함하라.
+⚠️ **혼동 주의**: voter 셋(alignment/quality/security) 중 **하나만** 붙이면 → voter 1명 = **불변식 위반(거부)**. "리뷰어 N명"이 아니라 **voter 가 0 또는 2+** 여야 한다. 리뷰를 둘 거면 voter 셋 중 **2종 이상**(예: security+quality)을 반드시 포함하라.
 
 권한은 역할에서 자동 파생(generate_worker_settings): engineer/dev/frontend/backend/infra/security→dev쓰기, researcher/review-manager→readonly, tester→test, reviewer-*→reviewer.
 
@@ -43,7 +39,7 @@
    - 풀스택 웹 → frontend + backend + infra (전부 필요한지 작업 보고 판단 — API만이면 backend만 등)
    - 조사·비교 → researcher 1~3, 코드 변경 없으면 무리뷰 가능
    - 코드 감사·보안 → security 워커 + 다관점 리뷰어
-   - 설계 비중 큼 → dev + tester + (arch 관점 리뷰어)
+   - 설계 비중 큼 → engineer + tester + (alignment+quality 투표 리뷰어)
 3. **조립 결과 + 근거를 사용자에게 제시**한다. 예: "메모 웹앱이라 frontend(폼/목록)·backend(저장 API)·infra(실행) 3명, plan 정합·품질 리뷰어를 붙였습니다. 인증/DB 불필요라 security 워커는 뺐습니다."
    - ★ **투표 리뷰어는 0명 또는 2명+ 만 제안한다 — 1명 조립은 절대 제안 금지**(불변식 위반·부팅 실패). 소규모라 리뷰를 가볍게 하려면 **무리뷰(0명)**를 제안하고, 리뷰를 둘 거면 **최소 2종**(예: quality+alignment)을 제안하라. "reviewer-quality 1명"은 금지.
 

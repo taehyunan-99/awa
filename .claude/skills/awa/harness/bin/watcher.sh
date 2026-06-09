@@ -284,20 +284,34 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
         done
   fi
 
-  # 4) Stall watchdog — events.log 가 STALL_THRESHOLD 초 무증가 + 미완료(진행중) 워커 존재 시
+  # 4) Stall watchdog — events.log 가 STALL_THRESHOLD 초 무증가 + 진짜 미완료 워커 존재 시
   #    ORCH 에 @stall 알림(감지만, 복구는 ORCH). 진단정보 동봉 — ORCH 가 "어디서 멈췄나" 판단하도록
   #    worker별 마지막 (action,task) 을 함께 전달(사용자 요구: 어디서 깨지고 어디부터 누락인지).
+  #    ★ false-positive 차단: events.log 의 done 라인만 보면, 워커가 results/<task>.md 는 썼는데
+  #      done 라인을 직접 안 찍은 '완료-idle' 을 정체로 오판한다(course 폭주 트리거였음). 그래서
+  #      각 워커의 마지막 task 에 대한 results/<task>.md 가 존재하면 완료로 간주해 제외한다.
   _wd_now="$(date +%s)"
   if [ "$((_wd_now - last_activity_ts))" -ge "$STALL_THRESHOLD" ] && pane_alive "$ORCH_PANE"; then
-    # 미완료 워커 = events.log 에서 마지막 action 이 'done' 이 아닌 worker(task-start/modify/user-ask
-    # 에서 멈춤). worker '-'(시스템 라인 allow-confirm 등)는 제외. 하나라도 있어야 정체로 본다
-    # (전부 done = 정상 완료·대기 → 알림 안 함).
-    _stuck="$(awk -F'\t' '$2!="-" && $2!=""{last_a[$2]=$4; last_t[$2]=$3}
-                          END{for(w in last_a) if(last_a[w]!="done") printf "%s(%s@%s) ", w, last_a[w], last_t[w]}' \
+    # 미완료 후보 = events.log 에서 마지막 action 이 'done' 이 아닌 worker. worker '-'(시스템 라인
+    # allow-confirm 등)는 제외. 필드5 분리(탭 안전) 위해 worker|task|action 으로 출력.
+    _RESULTS_DIR="$(dirname "$EVENTS")/results"
+    _stuck_cand="$(awk -F'\t' '$2!="-" && $2!=""{last_a[$2]=$4; last_task[$2]=$3}
+                          END{for(w in last_a) if(last_a[w]!="done") printf "%s|%s|%s\n", w, last_task[w], last_a[w]}' \
               "$EVENTS" 2>/dev/null)"
+    # results/<task>.md 존재 = 완료로 간주, _stuck 에서 제외(진짜 미완료만 남김).
+    _stuck=""
+    while IFS='|' read -r _w _t _a; do
+      [ -n "$_w" ] || continue
+      if [ -n "$_t" ] && [ -f "$_RESULTS_DIR/$_t.md" ]; then continue; fi  # 완료-idle → 제외
+      _stuck="${_stuck}${_w}(${_a}@${_t}) "
+    done <<EOF
+$_stuck_cand
+EOF
     if [ -n "$_stuck" ] && [ "$((_wd_now - last_stall_fire))" -ge "$STALL_THRESHOLD" ]; then
       _idle_sec="$((_wd_now - last_activity_ts))"
-      tmux send-keys -t "$ORCH_PANE" -l "@stall: ${_idle_sec}초간 events.log 무활동(전역 정체 의심). 미완료 워커: ${_stuck}— 각 워커 pane 을 capture-pane 으로 확인해 (1)멈춘 워커가 어느 task 의 무슨 단계인지 (2)명령이 입력창에 박혀 미제출인지 (3)오류로 멈췄는지 진단 후, 필요하면 해당 task 를 dispatch-queue 로 재배정하라." 2>/dev/null
+      # ⚠ ORCH 에게 AskUserQuestion 을 유발하지 않는다 — @stall 는 진단·재배정 트리거일 뿐.
+      #   사용자 push 는 orch.md ⓙ 가 '재배정해도 2회+ 반복 정체' 일 때만(course 폭주 차단).
+      tmux send-keys -t "$ORCH_PANE" -l "@stall: ${_idle_sec}초간 events.log 무활동. results 미생성 미완료 워커: ${_stuck}— 각 워커 pane 을 capture-pane 으로 진단(입력창 박힘/오류정지/정상 장시간)하고 필요하면 dispatch-queue 로 재배정하라. 사용자에게 묻지 말고 직접 진단·복구하라." 2>/dev/null
       tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
       last_stall_fire="$_wd_now"
     fi

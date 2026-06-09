@@ -20,7 +20,8 @@ read-only:
   - "Bash(which:*)"
   - "Bash(echo:*)"
   # 부작용 0 순수 출력 도구 (게이트 폭주 완화 2026-06-03). 명령실행·쓰기·네트워크 없음.
-  # 제외: awk(system() 명령실행 가능)·env/printenv(비밀정보 노출)·node/python(임의코드, gray 유지).
+  # 제외: awk(system() 명령실행 가능)·env/printenv(비밀정보 노출)·node/python(임의코드, gray 유지 —
+  #   단 `--version`/`-v` 만 아래 version-probe 카테고리에 exact 등록).
   - "Bash(nl:*)"
   - "Bash(od:*)"
   - "Bash(cut:*)"
@@ -35,9 +36,26 @@ read-only:
   - "Bash(jq:*)"
   - "Bash(cmp:*)"
   - "Bash(cksum:*)"
+  - "Bash(du:*)"
+  - "Bash(pwd:*)"
+  - "Bash(tree:*)"
   - "Read"
   - "Glob"
   - "Grep"
+version-probe:
+  # 버전 조회 전용 — 부작용 0(코드 실행 아님). node/python 전체는 gray 유지(임의코드 위험)지만
+  # `<runtime> --version`/`-v` 만 exact 등록해 게이트 폭주 완화(2026-06-09 재테스트 진단).
+  # exact 패턴이라 `node evil.js` 는 여전히 gray — 인자 임의실행 경로 안 열림.
+  - "Bash(node --version)"
+  - "Bash(node -v)"
+  - "Bash(python --version)"
+  - "Bash(python3 --version)"
+  - "Bash(npm --version)"
+  - "Bash(npm -v)"
+  - "Bash(npx --version)"
+  - "Bash(tsc --version)"
+  - "Bash(go version)"
+  - "Bash(cargo --version)"
 git-readonly:
   - "Bash(git status:*)"
   - "Bash(git diff:*)"

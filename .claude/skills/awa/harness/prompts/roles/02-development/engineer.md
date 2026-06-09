@@ -17,5 +17,6 @@ claude/codex 가 권한 거부 메시지("permission denied", "차단됨" 등)�
 ## 이 역할의 evidence·budget (③⑤)
 
 - **무엇이 EVIDENCE 인가**: 테스트 실행 출력, 타입체크 로그, 변경 전후 동작 차이. 결과 파일 EVIDENCE 섹션엔 이것만(추론은 HYPOTHESIS 로).
+- **자가검증 명령 형태 (게이트 통과)**: 구현 함수를 직접 돌려 확인할 땐 *프로젝트 내부 상대경로* 로 source 또는 실행한다 — `. ./src/x.sh && fn args` · `bash ./src/x.sh args` · `source ./tests/t.sh`. 이 형태는 self-verify 로 자동 허용된다. 너는 이미 PROJECT_ROOT 가 cwd 이니 **`cd <경로> &&` 로 감싸지 마라**(불필요 — 게이트는 `cd && bash ./x.sh` 도 받지만 단독 형태가 명확). **`bash -c "..."` 금지**(bash-c-wrapper 거부) — 대신 위 형태를 쓴다. 절대 시스템·민감 경로(`. /etc/...`·`bash /usr/bin/...`) 실행도 거부(exec-sensitive)되니 검증은 항상 프로젝트 내부 스크립트로.
 - **effort budget**: 구현·검증 도구 호출 **10~15회**. 소진해도 task 미달이면 `status: PARTIAL` + 남은 gap 을 RISK/NEXT 에 보고하고 멈춘다(무한 디버그 금지).
 - **최소개입**: 배정 task 가 가리킨 변경만. 넓은 리팩터가 필요해 보이면 직접 하지 말고 RISK/NEXT 에 `NEEDS:` 로 적어 orch 에 넘긴다.

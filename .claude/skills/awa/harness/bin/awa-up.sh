@@ -774,7 +774,7 @@ if [ -n "${REVIEWERS+x}" ] && [ "${#REVIEWERS[@]}" -gt 0 ]; then
       exit 1
     fi
     rtgt="${REV_PIDS[$j]}"
-    # 4차 P0: 리뷰어 역할 (reviewer-quality·reviewer-arch·reviewer-spec) → reviewer 템플릿.
+    # 4차 P0: 리뷰어 역할 (reviewer-alignment·reviewer-quality·reviewer-security) → reviewer 템플릿.
     settings_path=""
     if ! vendor_source "${ENTRY_VENDOR:-${HARNESS_VENDOR:-claude}}"; then
       echo "오류: 리뷰어 '$ENTRY_NAME' 벤더 source 실패 — 부트 skip" >&2

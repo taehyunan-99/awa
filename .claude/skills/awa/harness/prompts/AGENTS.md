@@ -16,7 +16,7 @@
 - `_partials/orch-gate.md` — orch 전용 권한 게이트 partial
 - `roles/01-orchestration/{orch.md,desk.md}`
 - `roles/02-development/{dev.md,researcher.md}`
-- `roles/03-quality/{reviewer-arch.md,reviewer-common.md,reviewer-quality.md,reviewer-spec.md,review-manager.md,tester.md}`
+- `roles/03-quality/{reviewer-alignment.md,reviewer-common.md,reviewer-quality.md,reviewer-security.md,review-manager.md,tester.md}`
 - `roles/04-security/security.md`
 
 기술 스택: 마크다운(첫 줄 = 한 줄 desc — 5축 형식, `_common.md` 참조)

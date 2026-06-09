@@ -215,7 +215,8 @@ generate_worker_settings() {
   local role="$1" entry_name="${2:-}"
   local tpl_name=""
   case "$role" in
-    engineer|dev|security|frontend|backend|infra) tpl_name="dev" ;;
+    engineer|security|frontend|backend|infra) tpl_name="dev" ;;
+    dev) tpl_name="dev" ;;   # dev = 구 역할명 하위호환(engineer 로 통합 2026-06-09) — 카탈로그 미노출
     researcher|review-manager) tpl_name="readonly" ;;
     tester) tpl_name="test" ;;
     reviewer-*) tpl_name="reviewer" ;;

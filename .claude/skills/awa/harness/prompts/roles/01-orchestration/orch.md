@@ -76,7 +76,7 @@
 3) 사용자 결정 후 호출: `bash -c 'source "$HARNESS_ROOT/bin/lib.sh" && confirm_allow_yaml <pattern> <decision>'` (yaml/stats 누적, never 시 blocklist 추가, 사후 검증 실패 시 rejected 카운터 +1)
 
 ## ⓙ @stall → 전역 정체 진단·복구 (어디서 깨졌나)
-@stall 의 미완료 워커 목록(`worker(action@task)`)으로 **멈춘 지점을 특정**한다. 추측 금지 — pane 을 직접 본다.
+@stall 의 미완료 워커 목록(`worker(action@task)`)으로 **멈춘 지점을 특정**한다. 추측 금지 — pane 을 직접 본다. **★ @stall 에 AskUserQuestion 을 호출하지 마라** — 그건 진단·재배정 트리거지 사용자 push 표면이 아니다(완료-idle 오탐 + 도구호출 깨짐이 맞물려 폭주한 전례). 사용자에게 묻는 건 3) 의 *반복 정체* 단 한 경우뿐. 그 외엔 조용히 진단·복구만 한다.
 1) **진단**: 각 미완료 워커 pane 을 `tmux capture-pane -p -t <session>:<win>.<pane>` 으로 캡처(워커→pane 은 `tmux list-panes -a -F '#{pane_title} #{pane_id}'`). 화면 하단을 보고 원인 분류:
    - (a) **입력창에 명령 박힘·미제출**(프롬프트 마커 `❯`/`›` 뒤에 텍스트 잔류) → 송신이 깨진 것. `tmux send-keys -t <pane> Enter` 로 제출하거나, task 를 dispatch-queue 에 재기록(재발화).
    - (b) **오류로 멈춤**(에러 메시지·권한 거부·크래시) → results/<task>.md 미생성 확인 후 task 재배정(dispatch-queue). 반복되면 ⓔ BLOCKED 사용자 push.
