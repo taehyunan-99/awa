@@ -6,6 +6,10 @@
 
 # 설계/계획 문서 — git 추적 안 함
 docs/
+# 예외: 발표용 차트만 추적 (docs/ 전체 무시 + 이 폴더만 풀기 — 중간 경로도 함께 부정해야 작동)
+!docs/
+docs/*
+!docs/charts/
 
 # superpowers brainstorming/visual-companion 로컬 세션 산출물
 .superpowers/
