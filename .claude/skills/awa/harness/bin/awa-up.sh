@@ -109,6 +109,22 @@ if [ -n "${SPEC_FILE:-}" ]; then
   [ -n "${WORKERS_ARG:-}" ] && { echo "오류: --spec 와 --workers 동시 지정 불가" >&2; exit 1; }
   PROFILE="(spec)"
   spec_parse_load "$SPEC_FILE" || exit 1     # WORKERS/REVIEWERS/SESSION/LAYOUT 정의 (같은 셸 — 배열 보존)
+  # plan: 키 폴백 (2026-06-10 B4): --plan 미지정 시 team.yaml 의 `plan:` 스칼라를 읽어 재주입.
+  # 재가동(/awa resume·--spec 단독)이 plan 없이 부팅돼 ORCH idle 되던 공백 해소 — 인터뷰가
+  # plan: 키를 써놓고 아무도 안 읽던 죽은 줄의 배선. 상대경로는 PROJECT_ROOT 기준.
+  # 오발 방지는 ORCH ⓑ 승인 게이트("🟠 [판단] 진행?")가 담당 — 자동 dispatch 아님.
+  if [ "${#PLAN_FILES[@]}" -eq 0 ]; then
+    _spec_plan="$(spec_parse_scalar "$SPEC_FILE" plan)"
+    if [ -n "$_spec_plan" ]; then
+      case "$_spec_plan" in /*) : ;; *) _spec_plan="$PROJECT_ROOT/$_spec_plan" ;; esac
+      if [ -f "$_spec_plan" ]; then
+        PLAN_FILES+=("$_spec_plan")
+        echo "plan 재주입: team.yaml plan: → $_spec_plan"
+      else
+        echo "경고: team.yaml plan: 파일 없음 → $_spec_plan (plan 없이 부팅)" >&2
+      fi
+    fi
+  fi
 elif [ -n "${WORKERS_ARG:-}" ]; then
   PROFILE="(custom)"                    # 종료 메시지(팀 '$PROFILE' 가동 완료)용 라벨.
   # ORCH_MODEL/DESK_MODEL 디폴트 미지정 — EFF 폴백이 빈값을 보고 vendor_default_model 로 채움.

@@ -67,44 +67,82 @@ requeue_pending_done() {
 # ── @verdict-arrived: review/ glob quorum 스캔 ──────────────────────────────
 # review/ Write 는 events.log 에 안 남으므로(log-event.sh:39 메타 skip) 파일시스템이 유일한
 # 진실 원천. review/ 를 직접 glob 해 wid(=<worker>-<id>) 별 투표 voter 수를 세고, N 전원
-# 도착 + 미발화(.verdict-fired.<wid> 마커 없음) wid 를 stdout 으로 emit + 마커 touch(1회 차단).
-# bash 3.2(macOS) 호환 — 연관배열(declare -A) 안 씀. wid→voter 매핑은 tab 줄 sort -u | awk 집계.
-#   $1=REVIEW_DIR  $2=STATE_DIR  $3=N(기대 투표 리뷰어 수)
+# 도착한 wid 를 stdout 으로 emit.
+# ★ 2-파일 ack 체계(R1b-v2, 2026-06-10 — B4 무한 재발화 실측 수정):
+#   - `.verdict-fired.<wid>` = 발화 디바운스 전용(스캔이 touch). ORCH 는 건드리지 않는다.
+#   - `.verdict-ack.<wid>`   = ORCH 가 재집계 후 touch(ack). **ack mtime ≥ 그 wid 최신 verdict
+#     mtime** 이면 그 라운드 처리 완료로 보고 발화 안 함. 재판정 라운드(verdict 재작성)는
+#     파일이 ack 보다 새로워져 자동 재발화 — 마커 삭제 불필요.
+#   구설계(ORCH 가 fired 마커 rm=ack)는 quorum 파일이 남아있는 한 rm→재발화→rm 무한루프
+#   (B4 라이브: ORCH 가 review/ 를 아카이브로 옮겨 우회 — 합의 게이트 재독 경로 훼손).
+# bash 3.2(macOS) 호환 — 연관배열(declare -A) 안 씀. 집계는 awk 내부 배열.
+#   $1=REVIEW_DIR  $2=STATE_DIR  $3=N(기대 투표 리뷰어 수)  $4=age_thresh(초, 기본 0=1회성)
 scan_verdict_quorum() {
-  local review_dir="$1" sd="$2" n="$3"
+  local review_dir="$1" sd="$2" n="$3" age_thresh="${4:-0}"
   # N 비정수/0 이면 무력화(투표 리뷰어 없는 프로파일 회귀 안전).
   case "$n" in ''|*[!0-9]*) return 0 ;; esac
   [ "$n" -gt 0 ] || return 0
   [ -d "$review_dir" ] || return 0
+  case "$age_thresh" in ''|*[!0-9]*) age_thresh=0 ;; esac
 
-  # 1) 투표 voter 파일 glob → "wid<TAB>voter" 줄 누적.
+  # 1) 투표 voter 파일 glob → "wid<TAB>voter<TAB>mtime" 줄 누적.
+  # ★ 글롭 불일치 수정(R1a, 2026-06-10 — B3 실측): 기존 글롭은 `*.alignment-rev.md`(기본 프로파일
+  #   워커 *이름*)만 봤는데, 실제 리뷰어 산출은 `*.reviewer-alignment.md`(*역할명*,
+  #   reviewer-common.md 규약) → 영구 무매치로 @verdict-arrived 가 사상 발화 0회였다.
+  #   역할명 접미사가 정규 규약(reviewer-common.md 에 명문화), `-rev` 변형은 하위호환 유지.
   local lines=""
-  local f base voter wid
-  for f in "$review_dir"/*.alignment-rev.md "$review_dir"/*.quality-rev.md "$review_dir"/*.security-rev.md; do
+  local f base voter wid fmt
+  for f in "$review_dir"/*.reviewer-alignment.md "$review_dir"/*.reviewer-quality.md "$review_dir"/*.reviewer-security.md \
+           "$review_dir"/*.alignment-rev.md "$review_dir"/*.quality-rev.md "$review_dir"/*.security-rev.md; do
     [ -f "$f" ] || continue                 # glob 무매치 시 리터럴 패턴 스킵
-    base="${f##*/}"; base="${base%.md}"      # <wid>.<voter>-rev
-    voter="${base##*.}"; voter="${voter%-rev}"
-    case "$voter" in alignment|quality|security) : ;; *) continue ;; esac
-    wid="${base%.*}"                          # <wid> (마지막 .<voter>-rev 제거)
+    base="${f##*/}"; base="${base%.md}"      # <wid>.<voter 접미사>
+    voter="${base##*.}"
+    case "$voter" in
+      reviewer-alignment|alignment-rev) voter=alignment ;;
+      reviewer-quality|quality-rev)     voter=quality ;;
+      reviewer-security|security-rev)   voter=security ;;
+      *) continue ;;
+    esac
+    wid="${base%.*}"                          # <wid> (마지막 .<voter 접미사> 제거)
     [ -n "$wid" ] || continue
-    lines="${lines}${wid}	${voter}
+    fmt="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)"
+    case "$fmt" in ''|*[!0-9]*) fmt=0 ;; esac
+    lines="${lines}${wid}	${voter}	${fmt}
 "
   done
   [ -n "$lines" ] || return 0
 
-  # 2) wid 별 고유 voter 수 ≥ N 인 wid 추출(sort -u 로 중복 voter 제거 후 그룹 카운트).
+  # 2) wid 별 고유 voter 수 ≥ N 인 wid 추출 + wid 의 최신 verdict mtime.
+  #    (같은 voter 의 두 파일명 변형이 공존해도 1표 — wid+voter 키 dedup.)
   local quorum_wids
-  quorum_wids="$(printf '%s' "$lines" | sort -u \
-    | awk -F'\t' -v n="$n" '{c[$1]++} END{for(k in c) if(c[k]>=n) print k}')"
+  quorum_wids="$(printf '%s' "$lines" | awk -F'\t' -v n="$n" '
+    { key=$1 "\t" $2 }
+    !(key in seen) { seen[key]=1; c[$1]++ }
+    ($3+0) > mt[$1] { mt[$1]=$3+0 }
+    END { for(k in c) if(c[k]>=n) printf "%s\t%s\n", k, mt[k]+0 }')"
   [ -n "$quorum_wids" ] || return 0
 
-  # 3) 미발화 wid 만 emit + 마커 touch. wid 파일명 안전화는 _pd_sanitize 재사용.
-  local w marker
-  printf '%s\n' "$quorum_wids" | while IFS= read -r w; do
+  # 3) 발화 대상 wid emit. ack 검사 → fired 디바운스 → emit + fired touch.
+  local w maxmt ack ackmt marker mt now
+  now="$(date +%s)"
+  printf '%s\n' "$quorum_wids" | while IFS=$'\t' read -r w maxmt; do
     [ -n "$w" ] || continue
+    case "$maxmt" in ''|*[!0-9]*) maxmt=0 ;; esac
+    # ack: 최신 verdict 라운드를 ORCH 가 이미 처리(touch)했으면 발화 안 함.
+    ack="$sd/.verdict-ack.$(_pd_sanitize "$w")"
+    if [ -f "$ack" ]; then
+      ackmt="$(stat -f %m "$ack" 2>/dev/null || stat -c %Y "$ack" 2>/dev/null || echo 0)"
+      case "$ackmt" in ''|*[!0-9]*) ackmt=0 ;; esac
+      [ "$ackmt" -ge "$maxmt" ] && continue
+    fi
     marker="$sd/.verdict-fired.$(_pd_sanitize "$w")"
-    [ -f "$marker" ] && continue              # 이미 발화 → 재발화 차단
-    : > "$marker" 2>/dev/null || true         # 마커 생성(touch)
+    if [ -f "$marker" ]; then
+      [ "$age_thresh" -gt 0 ] || continue     # 1회성 모드 — 재발화 차단
+      mt="$(stat -f %m "$marker" 2>/dev/null || stat -c %Y "$marker" 2>/dev/null || echo 0)"
+      case "$mt" in ''|*[!0-9]*) mt=0 ;; esac
+      [ $(( now - mt )) -ge "$age_thresh" ] || continue   # 디바운스(폭주 방지)
+    fi
+    : > "$marker" 2>/dev/null || true         # fired touch(다음 재발화 디바운스)
     printf '%s\n' "$w"
   done
 }

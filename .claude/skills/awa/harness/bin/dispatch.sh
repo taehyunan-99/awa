@@ -106,8 +106,31 @@ write_harness_task "$WORKER" "$TASK_ID"
 #   소비 않고 재발화(@done ack 큐와 동형). task-start 는 dispatch 가 직접 찍으므로 ack 증거가
 #   아님 — task-start *이후* 늘어난 이 worker 라인(modify/user-ask/done 등)이 수신 증거.
 _ev_before="$(awk 'END{print NR}' "$WORKSPACE/events.log" 2>/dev/null || echo 0)"
+
+# ★ (a2) 송신 신뢰도 ack (R4, 2026-06-10 B3 실측 수정): 워커의 첫 events.log 라인은 수신 후
+#   20~60s(task 읽기·사고는 로그에 안 남음) — 아래 (a) 8s 폴링이 매번 '유실 의심' 오판 →
+#   watcher 재발화로 같은 TASK 를 3~4중 송신했다(B3: t2 cycle=4·5·6·7). I-1 유실의 실체는
+#   "busy pane 송신"이므로, ①송신 전 idle 도달 + ②송신 후 입력창 잔류 없음 이면 수신 확정으로
+#   exit 0(events 폴링 생략). idle 미도달(busy 송신)일 때만 (a) events 폴링 → exit 3 재발화.
+#   잔존 위험(idle 송신인데 미수신)은 @stall watchdog 이 잡는다(R2 로 오탐 제거됨).
+_was_idle=0
+for _ri in $(seq 1 "${SEND_PROMPT_READY_MAX:-30}"); do
+  if _pane_idle "$TARGET"; then _was_idle=1; break; fi
+  sleep "${SEND_PROMPT_READY_DELAY:-0.5}"
+done
 send_prompt "$TARGET" "TASK $TASK_ID"
 echo "배정 완료: 워커=$WORKER ($TARGET) ← TASK $TASK_ID"
+
+if [ "$_was_idle" = 1 ]; then
+  # send_prompt 가 잔류 Enter 재시도까지 마친 뒤의 최종 잔류만 확인(grep 무매치 rc 는 || true 로 흡수).
+  _resid="$(tmux capture-pane -p -t "$TARGET" 2>/dev/null \
+    | grep -E '^[[:space:]]*[❯›>]' | tail -1 \
+    | sed -E 's/^[[:space:]]*[❯›>][[:space:]]*//')" || _resid=""
+  case "$_resid" in
+    "TASK"*) : ;;   # 입력창 잔류(미제출) → 아래 (a) events 폴링이 판정
+    *) exit 0 ;;    # idle 송신 + 잔류 없음 = 수신 확정 — 재발화 불필요
+  esac
+fi
 
 # 송신 후 워커 수신 확인 폴링. 새 라인 중 이 worker 의 비-task-start 액션이 1줄이라도 나오면 ack.
 # 타임아웃(기본 16×0.5s=8s)까지 무흔적이면 유실 의심 — exit 3. (watcher 가 재발화 판단)

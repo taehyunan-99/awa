@@ -417,6 +417,18 @@ send_prompt() {
     _pane_idle "$target" && break
     sleep "${SEND_PROMPT_READY_DELAY:-0.5}"
   done
+  # ★ 송신 전 잔류 flush (R7, 2026-06-10 B4 실측): 입력창에 이전 텍스트가 박혀 있으면(직전
+  #   송신의 Enter 씹힘 — half-sent. B4: 워커 입력창 'TASK t2' 박힘·리뷰어 3종 깨움 박힘)
+  #   새 텍스트가 그 뒤에 *병합*돼 깨진 명령이 된다. 마커-줄 잔류 감지 시 Enter 로 먼저
+  #   제출(원래 보내려던 텍스트라 제출이 정답 — 박힌 입력창의 자가 회복 경로이기도 하다).
+  local _pre
+  _pre="$(tmux capture-pane -p -t "$target" 2>/dev/null \
+    | grep -E '^[[:space:]]*[❯›>]' | tail -1 \
+    | sed -E 's/^[[:space:]]*[❯›>][[:space:]]*//')" || _pre=""
+  if [ -n "$_pre" ]; then
+    tmux send-keys -t "$target" Enter
+    sleep "${SEND_PROMPT_RETRY_DELAY:-0.5}"
+  fi
   tmux send-keys -t "$target" -l "$text"
   sleep "${SEND_PROMPT_ENTER_DELAY:-0.4}"   # codex 렌더링 여유 (claude 엔 무해한 짧은 지연)
   tmux send-keys -t "$target" Enter

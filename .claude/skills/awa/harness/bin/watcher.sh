@@ -10,6 +10,7 @@
 #   STATE_DIR            .agent-harness/state (pending-asks/ 포함)
 #   EVENTS               .agent-harness/events.log
 #   REV_DEBOUNCE         reviewer 깨움 디바운스 초 (기본 3)
+#   REVIEW_WAKE_REQUEUE  reviewer 깨움 재발화 임계 초 (기본 120) — 3c cursor 정체 감지
 set -u
 
 SESSION="${SESSION:-}"
@@ -43,12 +44,29 @@ pane_alive() {
   tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qxF "$1"
 }
 
+# ORCH 알림 송신 — raw send-keys 금지 (R5, 2026-06-10 B3 '명령 깨짐' 수정).
+# 기존 raw `send-keys -l`+Enter 는 ① busy ORCH 에 침묵 유실(I-1 동형) ② Enter 씹힘 시 다음
+# 알림이 같은 입력줄에 *병합*돼 깨진 명령으로 제출(라이브 관측). → lib.sh send_prompt 경유
+# (ready 폴링 + 송신 전 잔류 flush + 잔류 Enter 재시도 — flush 는 send_prompt 내장, R7).
+# ready 대기는 짧게(기본 10×0.5=5s) — @gate/@done/@verdict 는 재발화 큐가 유실을 복구하므로
+# 긴 블로킹으로 watcher 폴링 루프를 막지 않는다. send_prompt 부재(lib source 실패)시 raw 폴백.
+notify_orch() {
+  pane_alive "$ORCH_PANE" || return 0
+  if ! type send_prompt >/dev/null 2>&1; then
+    tmux send-keys -t "$ORCH_PANE" -l "$1" 2>/dev/null
+    tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+    return 0
+  fi
+  SEND_PROMPT_READY_MAX="${ORCH_NOTIFY_READY_MAX:-10}" send_prompt "$ORCH_PANE" "$1" 2>/dev/null
+}
+
 # last_events 를 기동 시 events.log 현재 줄 수로 초기화 (R4 — 첫 폴링 stale done 폭주 방지).
 # 0 으로 두면 기동 첫 사이클이 events.log 전체를 "새 줄"로 간주해 과거 done 라인을 일제히
 # @done: 재발화한다. 정상 흐름은 awa-down 이 events.log 를 지워 무해하나, 비정상 종료 후
 # 재가동(events.log 잔존) 시 lead 가 이미 끝난 task 들을 재종합 — 현재 줄 수에서 시작해 차단.
 last_events="$(awk 'END{print NR}' "$EVENTS" 2>/dev/null || echo 0)"
 debounced_rev=0
+last_done_line=0   # 마지막 done 발생 시점의 events.log 줄수 — 3c) reviewer 깨움 재발화 기준
 
 # ── Stall watchdog (2026-06-09) ─────────────────────────────────────────────
 # 결함 배경: watcher 는 events.log 가 *늘어날 때*만 반응한다(§2). 아무 일도 안 일어나면
@@ -84,10 +102,7 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     fi
     pane_alive "$ORCH_PANE" || continue   # M2: 죽은 pane 이면 발화 보류(살아나면 재시도 — 마커 미갱신)
     touch "$_gate_marker" 2>/dev/null || true   # 발화 마커 갱신 → 다음 재발화를 REQUEUE_AGE 만큼 미룸
-    # -l 과 Enter 를 독립 실행: && 체이닝이면 -l 성공·Enter 실패 시 텍스트만 입력되고 미제출
-    # (half-sent) 되며 || true 가 그걸 삼킨다. set -e 없으니 분리해도 루프 안 죽음 (send_prompt 와 동형).
-    tmux send-keys -t "$ORCH_PANE" -l "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리." 2>/dev/null
-    tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+    notify_orch "@gate: 워커 승인 대기 (uuid=$uuid). pending-asks 처리."
   done
 
   # 1b) dispatch-queue 새 .json → dispatch.sh 실행 (P11 탈-tmux: lead 가 sandbox 안이라
@@ -127,20 +142,16 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       fi
       if [ "$_df_cnt" -ge "${DISPATCH_REQUEUE_MAX:-5}" ]; then
         # 단념 — 재시도 소진. lead 통지 후 소비(영구 박힘 방지).
-        if pane_alive "$ORCH_PANE"; then
-          tmux send-keys -t "$ORCH_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — 수신 ack ${DISPATCH_REQUEUE_MAX:-5}회 실패. 워커 상태 확인 후 수동 재배정." 2>/dev/null
-          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
-        fi
+        notify_orch "@dispatch-fail: $dq_worker/$dq_task — 수신 ack ${DISPATCH_REQUEUE_MAX:-5}회 실패. 워커 상태 확인 후 수동 재배정."
         rm -f "$_df_marker" 2>/dev/null
         rm -f "$f" 2>/dev/null
       else
         echo "$((_df_cnt+1))" > "$_df_marker" 2>/dev/null || true
         continue   # .json 유지 → 다음 폴링에 재발화(소비 안 함)
       fi
-    elif pane_alive "$ORCH_PANE"; then
-      # 진짜 실패만 lead 에 통지(세션/페인/task 파일 이상). -l 과 Enter 분리(half-sent 방지).
-      tmux send-keys -t "$ORCH_PANE" -l "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)." 2>/dev/null
-      tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+    else
+      # 진짜 실패만 lead 에 통지(세션/페인/task 파일 이상).
+      notify_orch "@dispatch-fail: $dq_worker/$dq_task — dispatch.sh 실패(세션/페인/task 파일 확인)."
     fi
     # 성공(0)·차단(2)·진짜실패(기타)·ack단념(3 소진) → 소비. ack 재시도(3 미소진)는 위 continue 로 유지.
     rm -f "$STATE_DIR/dispatch-queue/.dispatch-fired.$(_pd_sanitize "$dq_worker")__$(_pd_sanitize "$dq_task")" 2>/dev/null
@@ -158,9 +169,8 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       continue
     fi
     pane_alive "$ORCH_PANE" || continue   # 죽은 pane 이면 소비 보류(살아나면 재시도 — .json 유지).
-    # ORCH 가 @desk: 접두로 DESK 지시를 식별(사용자 입력과 구분). -l/Enter 분리(half-sent 방지).
-    tmux send-keys -t "$ORCH_PANE" -l "@desk: $desk_inst" 2>/dev/null
-    tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+    # ORCH 가 @desk: 접두로 DESK 지시를 식별(사용자 입력과 구분).
+    notify_orch "@desk: $desk_inst"
     rm -f "$f" 2>/dev/null   # 소비 완료.
   done
 
@@ -176,6 +186,8 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     # 함께 검토된다 — 깨움을 done 으로 좁혀도 약한 신호 누락 없음.
     new_done="$(sed -n "$((last_events+1)),${cur}p" "$EVENTS" 2>/dev/null \
       | awk -F'\t' '$4=="done"{c++} END{print c+0}')"
+    # done 발생 줄수 기록 — 3c) cursor 정체 비교 기준(깨움 디바운스와 무관하게 갱신).
+    [ "$new_done" -gt 0 ] && last_done_line="$cur"
     # M3: reviewer 디바운스 — 단 새 구간에 done 이 있을 때만 깨운다.
     if [ "$new_done" -gt 0 ] && [ "$((now - debounced_rev))" -ge "$REV_DEBOUNCE" ]; then
       for rp in $REVIEWER_PANES; do
@@ -196,9 +208,7 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       | while IFS=$'\t' read -r dw dt; do
           [ -n "$dw" ] && [ -n "$dt" ] || continue
           enqueue_pending_done "$STATE_DIR" "$dw" "$dt"   # ack 큐 적재(LEAD 가 종합 후 rm)
-          pane_alive "$ORCH_PANE" || continue
-          tmux send-keys -t "$ORCH_PANE" -l "@done: $dw/$dt 완료. results/ 확인 후 종합." 2>/dev/null
-          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+          notify_orch "@done: $dw/$dt 완료. results/ 확인 후 종합."
         done
     # @drift-check: worker_turn_count 임계 (N=10) 도달 → review-manager 깨움 트리거 (§5.7).
     # done 라인 발생 시 worker 별 turn 누적 검사. sort -u 로 동일 worker 중복 트리거 방지.
@@ -226,9 +236,7 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       | awk -F'\t' '$4=="plan-defect"{print $2"/"$3"\t"$5}' \
       | while IFS=$'\t' read -r wt desc; do
           [ -n "$wt" ] || continue
-          pane_alive "$ORCH_PANE" || continue
-          tmux send-keys -t "$ORCH_PANE" -l "@plan-defect: $wt $desc" 2>/dev/null
-          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+          notify_orch "@plan-defect: $wt $desc"
         done
     # @allow-confirm: 라인 payload(필드5 = pattern=...;role=...) 추출 → lead ⓘ 라우팅 (§7 Phase A).
     # AWA_AUTO_LEARN=1 (수집모드): ORCH push·사람 AskUserQuestion 우회 — watcher 가 직접
@@ -249,9 +257,7 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
               'source "$LIB_PATH" && confirm_allow_yaml "$1" accepted' _ "$_apat" >/dev/null 2>&1 || true
             continue
           fi
-          pane_alive "$ORCH_PANE" || continue
-          tmux send-keys -t "$ORCH_PANE" -l "@allow-confirm: $payload" 2>/dev/null
-          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+          notify_orch "@allow-confirm: $payload"
         done
     last_events="$cur"   # 서브셸 밖에서 갱신 (R3 안전)
     last_activity_ts="$now"   # stall watchdog: events.log 증가 = 활동 있음 → 정체 타이머 리셋
@@ -264,24 +270,53 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     requeue_pending_done "$STATE_DIR" "$REQUEUE_AGE" 2>/dev/null \
       | while IFS= read -r rq; do
           [ -n "$rq" ] || continue
-          pane_alive "$ORCH_PANE" || continue
-          tmux send-keys -t "$ORCH_PANE" -l "@done: $rq 완료. results/ 확인 후 종합." 2>/dev/null
-          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+          notify_orch "@done: $rq 완료. results/ 확인 후 종합."
         done
   fi
 
   # 3b) verdict glob — 투표 리뷰어 N 전원 도착 시 LEAD 재종합 깨움(단발 task 재종합 누락 차단).
   #     review/ Write 는 events.log 에 안 남으므로(log-event.sh:39 skip) 디렉토리를 직접 스캔.
-  #     매 사이클 도되 .verdict-fired.<wid> 마커로 wid 당 1회만 발화. events 증가 무관(§2 아님).
+  #     ★ R1b-v2(2026-06-10 B4): ack = ORCH 가 `.verdict-ack.<wid>` touch(최신 verdict 라운드
+  #     처리 표시). ack 없거나 verdict 가 더 새로우면 REQUEUE_AGE 마다 재발화. 구 rm 방식은
+  #     무한 재발화 루프였다(scan_verdict_quorum 헤더 참조).
   if [ -n "$STATE_DIR" ] && [ "$EXPECTED_VOTERS" -gt 0 ]; then
     _review_dir="$(dirname "$EVENTS")/review"
-    scan_verdict_quorum "$_review_dir" "$STATE_DIR" "$EXPECTED_VOTERS" 2>/dev/null \
+    scan_verdict_quorum "$_review_dir" "$STATE_DIR" "$EXPECTED_VOTERS" "$REQUEUE_AGE" 2>/dev/null \
       | while IFS= read -r wid; do
           [ -n "$wid" ] || continue
-          pane_alive "$ORCH_PANE" || continue
-          tmux send-keys -t "$ORCH_PANE" -l "@verdict-arrived: $wid 투표 $EXPECTED_VOTERS종 전원 도착. review/ 재종합." 2>/dev/null
-          tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+          notify_orch "@verdict-arrived: $wid 투표 ${EXPECTED_VOTERS}종 전원 도착. review/ 재종합 후 ack 필수: touch .agent-harness/state/.verdict-ack.$wid (review/ 파일 이동·삭제 금지)."
         done
+  fi
+
+  # 3c) reviewer 깨움 재발화(R7, 2026-06-10 B4: T6·T7·T8 깨움 누락 — Enter 씹힘/콜드스타트로
+  #     유실되면 verdict 가 영영 안 와 quorum 정체). 리뷰어는 검토 후 `.review-cursor.<역할명>`
+  #     을 events.log 줄수로 갱신하므로(reviewer-common.md) 그게 자연 ack 다: done 발생 줄수
+  #     (last_done_line)보다 cursor 가 뒤처진 채 REVIEW_WAKE_REQUEUE 초 지나면 재깨움.
+  #     증분검토는 멱등("새 줄 없으면 아무것도 안 함")이라 중복 깨움 안전. 긴 정상 검토(>2분)
+  #     중 재깨움은 입력창에 큐잉됐다 검토 후 처리됨(무해 잡음).
+  if [ "$EXPECTED_VOTERS" -gt 0 ] && [ "${last_done_line:-0}" -gt 0 ]; then
+    _rw_now="$(date +%s)"
+    if [ $((_rw_now - debounced_rev)) -ge "${REVIEW_WAKE_REQUEUE:-120}" ]; then
+      _hdir="$(dirname "$EVENTS")"
+      _cur_cnt=0; _cur_min=-1
+      for cf in "$_hdir"/.review-cursor.reviewer-*; do
+        [ -f "$cf" ] || continue
+        _cv="$(cat "$cf" 2>/dev/null)"; case "$_cv" in ''|*[!0-9]*) _cv=0 ;; esac
+        _cur_cnt=$((_cur_cnt+1))
+        if [ "$_cur_min" -lt 0 ] || [ "$_cv" -lt "$_cur_min" ]; then _cur_min="$_cv"; fi
+      done
+      [ "$_cur_min" -lt 0 ] && _cur_min=0
+      # cursor 파일 수 < N(아직 한 번도 검토 안 한 리뷰어 존재) 또는 최소 cursor 가 done 줄수
+      # 미달(검토 안 끝남/깨움 유실) → 전 리뷰어 재깨움(멱등).
+      if [ "$_cur_cnt" -lt "$EXPECTED_VOTERS" ] || [ "$_cur_min" -lt "$last_done_line" ]; then
+        for rp in $REVIEWER_PANES; do
+          pane_alive "$rp" || continue
+          [ "$rp" = "$REVIEW_MANAGER_PANE" ] && continue
+          send_prompt "$rp" "@review: done 라인 발생. cursor 부터 증분 검토." 2>/dev/null
+        done
+        debounced_rev="$_rw_now"
+      fi
+    fi
   fi
 
   # 4) Stall watchdog — events.log 가 STALL_THRESHOLD 초 무증가 + 진짜 미완료 워커 존재 시
@@ -292,11 +327,18 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
   #      각 워커의 마지막 task 에 대한 results/<task>.md 가 존재하면 완료로 간주해 제외한다.
   _wd_now="$(date +%s)"
   if [ "$((_wd_now - last_activity_ts))" -ge "$STALL_THRESHOLD" ] && pane_alive "$ORCH_PANE"; then
-    # 미완료 후보 = events.log 에서 마지막 action 이 'done' 이 아닌 worker. worker '-'(시스템 라인
-    # allow-confirm 등)는 제외. 필드5 분리(탭 안전) 위해 worker|task|action 으로 출력.
+    # 미완료 후보 = task 생애주기 action(task-start/modify/done)의 마지막이 done 아닌 worker.
+    # ★ R2(2026-06-10 B3 오탐 수정): 비-생애주기 라인이 last action 을 오염시켰다 —
+    #   ① watcher 자신이 쓰는 drift-check(task='-')가 done 직후 워커를 덮어 영구 stall 후보화
+    #   ② user-ask(게이트 대기)는 pending-asks 재발화가 전담하는 대기라 stall 지목은 이중 잡음.
+    #   → 생애주기 3종만 추적하고, *전체* 마지막 action 이 user-ask/plan-defect 인 워커는
+    #   의도된 대기로 보고 제외. worker '-'(시스템 라인)는 기존대로 제외.
     _RESULTS_DIR="$(dirname "$EVENTS")/results"
-    _stuck_cand="$(awk -F'\t' '$2!="-" && $2!=""{last_a[$2]=$4; last_task[$2]=$3}
-                          END{for(w in last_a) if(last_a[w]!="done") printf "%s|%s|%s\n", w, last_task[w], last_a[w]}' \
+    _stuck_cand="$(awk -F'\t' '$2!="-" && $2!=""{
+                            if($4=="task-start"||$4=="modify"||$4=="done"){la[$2]=$4; lt[$2]=$3}
+                            oa[$2]=$4}
+                          END{for(w in la) if(la[w]!="done" && oa[w]!="user-ask" && oa[w]!="plan-defect")
+                            printf "%s|%s|%s\n", w, lt[w], la[w]}' \
               "$EVENTS" 2>/dev/null)"
     # results/<task>.md 존재 = 완료로 간주, _stuck 에서 제외(진짜 미완료만 남김).
     _stuck=""
@@ -311,8 +353,7 @@ EOF
       _idle_sec="$((_wd_now - last_activity_ts))"
       # ⚠ ORCH 에게 AskUserQuestion 을 유발하지 않는다 — @stall 는 진단·재배정 트리거일 뿐.
       #   사용자 push 는 orch.md ⓙ 가 '재배정해도 2회+ 반복 정체' 일 때만(course 폭주 차단).
-      tmux send-keys -t "$ORCH_PANE" -l "@stall: ${_idle_sec}초간 events.log 무활동. results 미생성 미완료 워커: ${_stuck}— 각 워커 pane 을 capture-pane 으로 진단(입력창 박힘/오류정지/정상 장시간)하고 필요하면 dispatch-queue 로 재배정하라. 사용자에게 묻지 말고 직접 진단·복구하라." 2>/dev/null
-      tmux send-keys -t "$ORCH_PANE" Enter 2>/dev/null
+      notify_orch "@stall: ${_idle_sec}초간 events.log 무활동. results 미생성 미완료 워커: ${_stuck}— 각 워커 pane 을 capture-pane 으로 진단(입력창 박힘/오류정지/정상 장시간)하고 필요하면 dispatch-queue 로 재배정하라. 사용자에게 묻지 말고 직접 진단·복구하라."
       last_stall_fire="$_wd_now"
     fi
   fi
