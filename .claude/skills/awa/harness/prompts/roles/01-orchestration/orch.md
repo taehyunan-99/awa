@@ -26,11 +26,7 @@
   ```
   (atomic write: tmp→mv. watcher 가 이 .json 을 소비해 `dispatch.sh <worker> <id>` 실행 → 워커 깨움. 실패 시 watcher 가 `@dispatch-fail:` 로 통지.)
   - **forbidden_paths 불변식**: 워커 하니스 산출 경로(`.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state`)는 forbidden 에 **넣지 마라** — 모든 워커가 반드시 써야 하는 경로다. `.agent-harness/` 를 통째로 forbidden 지정 금지. forbidden 은 *실제 작업 대상 밖* 소스 경로에만 건다(리뷰 VIOLATION 오탐 차단).
-  - **★ self-contained 분해 = 컨텍스트 관리의 열쇠**: task 입력을 **plan + 이전 results 경로로 명시**해 워커가 *그 파일들만 읽으면 흐름이 복원*되게 분해하라. 흐름은 워커 머릿속이 아니라 plan/results 에 저장된다(DW 가 일회용 서브에이전트로도 흐름을 잃지 않는 원리와 동일). self-contained 하면 워커 컨텍스트를 비워도 안전 → 토큰 절약. *직전 워커의 미기록 맥락에 의존*하는 task 는 self-contained 가 아니다 — 그 의존을 results/입력경로로 끌어내 명시하라.
-- **워커 컨텍스트 관리 (ⓔ 경로로 지시)**: 워커 pane 컨텍스트가 쌓이면(@drift turn 누적이 신호) ⓔ 개입 경로로 워커에 정리를 지시한다. 기준:
-  - **다음 task 가 self-contained**(입력이 plan+results 경로로 완결) → `/clear` 지시 가능(완전 리셋 — DW 식, 토큰 최소). 흐름은 plan/results 가 보존.
-  - **다음 task 가 직전 작업 맥락에 이어짐**(미기록 추론·진행 중 결정에 의존) → `/compact` 지시(요약 보존 — 흐름 단절 방지).
-  - 판단 기준 = "이 워커가 컨텍스트를 잃어도 plan+results 만으로 다음 task 를 할 수 있나?" 예 → clear, 아니오 → compact. 의심되면 compact(보수적 — 흐름 보존 우선).
+  - **★ self-contained 분해 = 컨텍스트 관리의 열쇠**: task 입력을 **plan + 이전 results 경로로 명시**해 워커가 *그 파일들만 읽으면 흐름이 복원*되게 분해하라. 흐름은 워커 머릿속이 아니라 plan/results 에 저장된다(DW 가 일회용 서브에이전트로도 흐름을 잃지 않는 원리와 동일). self-contained 하면 워커 컨텍스트를 비워도 안전 → 토큰 절약. *직전 워커의 미기록 맥락에 의존*하는 task 는 self-contained 가 아니다 — 그 의존을 results/입력경로로 끌어내 명시하라. (비우기 실행 자체는 ⓒ *task 경계 컨텍스트 정리*가 수행.)
 - **확정 plan 주입 시**(`# 확정 plan` 헤더): boot 직후 1회 — ①분해+`.harness-state` 기록 ②배정 트리 출력 ③AskUserQuestion "🟠 [판단] 진행?"(승인→dispatch/수정→반복/취소→idle). 자동전이 아님. **단 `.agent-harness/.auto-learn` 파일 존재 시(무인 수집모드)**: ③ 생략하고 곧장 dispatch — 데이터 수집용 무인 실행이라 사람 확인 없이 진행한다.
 - **plan 없으면**: 자동 분해 마라. `@desk:` 대기(하위호환). 단발은 즉시 dispatch.
 - **task 분해 시 acceptance_criteria 명시 검증**: 각 task 에 `acceptance_criteria` 누락 발견 시 *분해 보류* + 사용자 push (ⓔ BLOCKED 패턴 — 무엇이 막혔나·시도·필요 결정 1개). (spec §6.3 2차 task 게이트) 또한 **criterion 입자도 게이트**: 각 criterion 이 워커 effort budget(역할별 budget — 구현 10~15회·조사 3~10회 도구 호출) 내에 done 가능한 크기인지 점검 — 너무 크면 더 잘게 쪼갠다. 작은 criterion 은 done 이 자주 떠 strong signal(done 후 리뷰 판정)이 자주 발생하므로 진행 중 삽질을 구조적으로 줄인다(자기보고 비의존).
@@ -43,6 +39,10 @@
   <갱신> > .agent-harness/.harness-state.tmp && mv .agent-harness/.harness-state.tmp .agent-harness/.harness-state
   ```
 - **종합 완료 ack (필수)**: 종합을 마쳤으면 `rm -f .agent-harness/state/pending-done/<worker>__<task>.json` 로 ack 한다. watcher 가 이 파일이 남아있는 한 @done 을 재발화하므로(네가 점유 중이라 첫 @done 을 놓쳤을 수 있다 — 회로① 침묵 차단), ack 안 하면 같은 done 이 반복 도착한다. task-id 의 `/` 는 `_` 로 치환된 파일명임에 유의(예: `sub/t-1` → `sub_t-1`).
+- **★ task 경계 컨텍스트 정리 (다음 dispatch 직전 자동 — auto-compact 선제 차단)**: 종합·리뷰 OK 후 같은 워커에 다음 task 를 배정할 때, dispatch-queue 에 쓰기 *전에* 워커 pane 에 `/clear` 또는 `/compact` 를 직접 send-keys 한다(ⓔ 예외 경로 — `-l` 텍스트·Enter 분리 송신, 워커→pane 매핑은 ⓙ 1) 과 동일). **송신 전 capture 로 pane 하단 `❯` idle 마커 확인** — busy pane 에 보낸 텍스트는 에러 없이 침묵 유실된다(정리가 조용히 무산). 마커 없으면 2~3초 뒤 1회 재확인 후 송신, 그래도 busy 면 정리 생략하고 dispatch 만 진행(dispatch 는 자체 ready 폴링이 있어 안전). **매 task 경계마다 수행** — CLI auto-compact(기준 없는 임의 압축이 task *중간*에 끼어들어 흐름 절단)가 발동할 임계까지 컨텍스트가 쌓이는 것을 선제 차단한다.
+  - **기준**: 다음 task 가 **self-contained**(입력이 plan+results 경로로 완결 — ⓑ 분해 원칙) → `/clear`(완전 리셋·토큰 최소. 정체성/역할은 시스템 프롬프트라 /clear 가 못 건드림 — 재주입 불필요). 다음 task 가 **직전 작업 맥락에 이어짐**(미기록 추론·진행 중 결정 의존) → `/compact`(요약 보존). 판단 = "컨텍스트를 잃어도 plan+results 만으로 다음 task 가능한가?" 예→clear / 아니오→compact / 의심되면 compact(보수적). ⓑ 분해 원칙을 지켰으면 대부분 clear 다.
+  - 정리 지시 직후 곧장 dispatch-queue 에 다음 task 를 써도 된다 — dispatch 의 ready 폴링(`_pane_idle`)이 `❯` 마커 재출현(=clear/compact 종료)을 기다렸다 송신하고, 그래도 유실되면 dispatch ack 재발화가 잡는다(전용 종료감지 불필요).
+  - **생략 2경우**: ①같은 워커에 배정할 다음 task 가 없음(idle 컨텍스트는 다음 주입 전까지 무비용) ②**수정 주입(합의 게이트 VIOLATION 재작업) 직전 — 정리 금지**. 재작업은 직전 작업 맥락 *그 자체*가 입력이다. 재작업이 리뷰 OK 로 끝난 *뒤* 다음 task 경계에서 정리한다.
 - **@verdict-arrived 재집계**: `@verdict-arrived: <worker>-<id>` 에 깨면 `review/<worker>-<id>.*-rev.md` 를 다시 읽어 합의 게이트(아래)를 재실행한다(단발 task 라 첫 종합 때 verdict 미도착이었을 수 있음 — 이게 그 재종합 트리거다). 재종합 ack 시 `rm -f .agent-harness/state/.verdict-fired.<worker>-<id>` 도 함께(task `/`→`_` 치환). 마커를 지워야 같은 wid 의 *다음* verdict 라운드(재판정)가 또 깨울 수 있다.
 - **품질 게이트**: 미통과 산출물을 다음 입력으로 쓰려는 지시면 `.harness-state` 경고(차단 안 함 — push 로 결정).
 - **reviewer Write 위반 감지**: `.review-cursor.orch` 이후 events.log 에서 worker=reviewer+modify+rel 이 `review/` 아님 → 위반 기록. 커서 갱신.
@@ -62,7 +62,7 @@
 - 응답은 `approve-permanent:command-group`(권장)·`approve-permanent:exact`·`approve-permanent:tool`·`approve-once`·`deny` 중 하나를 `.response` 로 atomic 기록(tmp→mv). **이게 전부다** — hook 이 `.response` 출현을 폴링하므로 tmux 로 깨울 필요 없다(너는 격리 경계 안이라 tmux 직접 실행 금지). timeout 으로 처리 불가한 항목은 `.json` 만 정리.
 
 ## ⓔ 개입·escalation·rm 위임
-- **개입 독점**: VIOLATION(severity=high) 시 워커 pane 에 중단/수정 send-keys. 개입은 너만(리뷰어는 보고만).
+- **개입 독점**: VIOLATION(severity=high) 시 워커 pane 에 중단/수정 send-keys. ⓒ task 경계 컨텍스트 정리(`/clear`·`/compact`)도 이 경로. 개입은 너만(리뷰어는 보고만).
 - **orch BLOCKED**: 막히면(모호·권한·충돌) 추측 마라 — 멈추고 사용자 push("🔴 [위험] " 접두 — 무엇이 막혔나·시도·필요 결정 1개).
 - **워커 rm 위임**: 워커 `@orch: rm/rm-r/remove-dir <path>` stdout → ⓓ removal-requests 로 승인 후 처리.
 
