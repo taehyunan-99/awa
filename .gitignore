@@ -34,6 +34,11 @@ node_modules/
 !.claude/skills/
 !.claude/skills/**
 
+# dev tooling — 이 레포 유지보수용 스킬(agentic-project-init 계열), 배포 비노출·로컬 보존
+.claude/skills/learn/
+.claude/skills/update/
+.claude/skills/guide-audit/
+
 # .awa/team.yaml 은 동적 팀 명세 — 기본 git 추적(팀 공유·구성 diff).
 # 개인 설정으로 추적 끄려면 아래 주석 해제:
 # .awa/

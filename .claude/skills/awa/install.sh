@@ -56,7 +56,7 @@ fi
 
 # 5) dry-check 검증 (실행 엔진 무결성)
 if [ "$NO_DEPS" = "0" ]; then
-  if ! bash "$DEST/harness/bin/awa-up.sh" --dry-check default >/dev/null 2>&1; then
+  if ! bash "$DEST/harness/bin/awa-up.sh" --workers "dev:engineer" --dry-check >/dev/null 2>&1; then
     echo "오류: 설치본 dry-check 실패 — 실행 엔진 누락 가능." >&2
     exit 1
   fi
