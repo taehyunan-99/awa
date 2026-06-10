@@ -14,7 +14,7 @@
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
 - 신호 10종: `@desk: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@verdict-arrived: <worker>-<id>`(→ⓒ 재집계) · `@stall: <N>초 무활동. 미완료 워커: <목록>`(→ⓙ) · `@review:`(reviewer 용 — 무시).
 - 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
-- boot 직후 1회: `.agent-harness/tasks/` 기존 파일을 `.harness-state` 와 대조해 stale 판별 — 완료 task 새 배정 마라. 모호하면 사용자 확인.
+- **boot 직후 1회 — 부트 화해(재개 판별)**: `.agent-harness/tasks/` 가 비어있지 않으면 이전 세션의 진행이 있다 — plan 재분해 금지, `tasks/*.md`(이전 분해 전체)·`results/*.md`(완료 증거) 대조로 트리 복원: results 존재=완료(재배정 금지) / tasks 만 존재=중간 중단(그 task 처음부터 재실행 — 입자도 게이트 덕에 작아서 싸다) / plan 에만 있음=미착수. `.harness-state.prev` 가 있으면 맥락 참고만(배정 전략·중단 사유) — **진실원천은 tasks/+results/ 유일**(.prev 의 status 류는 낡았을 수 있다). 복원 트리를 ⓑ③ 승인 게이트로 묻는다: "🟠 [판단] 재개: 완료 N·재실행 M·대기 K. 진행?". **전부 완료면** 재실행 없이 "plan 완료 상태" 보고 후 `@desk:` 대기(수정·추가는 단발 dispatch 경로). 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
 
 ## ⓑ @desk → 위임 계약
@@ -28,8 +28,9 @@
   (atomic write: tmp→mv. watcher 가 이 .json 을 소비해 `dispatch.sh <worker> <id>` 실행 → 워커 깨움. 실패 시 watcher 가 `@dispatch-fail:` 로 통지.)
   - **forbidden_paths 불변식**: 워커 하니스 산출 경로(`.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state`)는 forbidden 에 **넣지 마라** — 모든 워커가 반드시 써야 하는 경로다. `.agent-harness/` 를 통째로 forbidden 지정 금지. forbidden 은 *실제 작업 대상 밖* 소스 경로에만 건다(리뷰 VIOLATION 오탐 차단).
   - **★ self-contained 분해 = 컨텍스트 관리의 열쇠**: task 입력을 **plan + 이전 results 경로로 명시**해 워커가 *그 파일들만 읽으면 흐름이 복원*되게 분해하라. 흐름은 워커 머릿속이 아니라 plan/results 에 저장된다(DW 가 일회용 서브에이전트로도 흐름을 잃지 않는 원리와 동일). self-contained 하면 워커 컨텍스트를 비워도 안전 → 토큰 절약. *직전 워커의 미기록 맥락에 의존*하는 task 는 self-contained 가 아니다 — 그 의존을 results/입력경로로 끌어내 명시하라. (비우기 실행 자체는 ⓒ *task 경계 컨텍스트 정리*가 수행.)
-- **확정 plan 주입 시**(`# 확정 plan` 헤더): boot 직후 1회 — ①분해+`.harness-state` 기록 ②배정 트리 출력 ③AskUserQuestion "🟠 [판단] 진행?"(승인→dispatch/수정→반복/취소→idle). 자동전이 아님. **단 `.agent-harness/.auto-learn` 파일 존재 시(무인 수집모드)**: ③ 생략하고 곧장 dispatch — 데이터 수집용 무인 실행이라 사람 확인 없이 진행한다.
+- **확정 plan 주입 시**(`# 확정 plan` 헤더): boot 직후 1회 — ①분해+`.harness-state` 기록 ②배정 트리 출력 ③AskUserQuestion "🟠 [판단] 진행?"(승인→dispatch/수정→반복/취소→idle). 자동전이 아님. **`tasks/` 가 비어있지 않으면 ① 을 ⓐ 부트 화해로 대체**(재분해 금지 — 복원 트리로 ②③). **단 `.agent-harness/.auto-learn` 파일 존재 시(무인 수집모드)**: ③ 생략하고 곧장 dispatch — 데이터 수집용 무인 실행이라 사람 확인 없이 진행한다.
 - **plan 없으면**: 자동 분해 마라. `@desk:` 대기(하위호환). 단발은 즉시 dispatch.
+- **드레인(@desk: 멈춤 지시)**: "여기까지"·"일시정지"·"오늘 그만" 류 지시엔 **신규 dispatch 만 중단** — 진행 중 task 는 @done·종합·리뷰까지 정상 처리하고, `.harness-state` 에 중단 지점·사유 기록 후 "🟠 [판단] T<k>까지 완료, 멈췄습니다. awa-down 하셔도 됩니다" push. 재개는 다음 boot 의 부트 화해(ⓐ)가 잇는다.
 - **task 분해 시 acceptance_criteria 명시 검증**: 각 task 에 `acceptance_criteria` 누락 발견 시 *분해 보류* + 사용자 push (ⓔ BLOCKED 패턴 — 무엇이 막혔나·시도·필요 결정 1개). (spec §6.3 2차 task 게이트) 또한 **criterion 입자도 게이트**: 각 criterion 이 워커 effort budget(역할별 budget — 구현 10~15회·조사 3~10회 도구 호출) 내에 done 가능한 크기인지 점검 — 너무 크면 더 잘게 쪼갠다. 작은 criterion 은 done 이 자주 떠 strong signal(done 후 리뷰 판정)이 자주 발생하므로 진행 중 삽질을 구조적으로 줄인다(자기보고 비의존).
 
 ## ⓒ @done → 종합

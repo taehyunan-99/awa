@@ -71,7 +71,8 @@ if [ -f "$WORKSPACE/events.log" ]; then
   rm -f "$WORKSPACE/events.log" || true
 fi
 if [ -f "$WORKSPACE/.harness-state" ]; then
-  rm -f "$WORKSPACE/.harness-state" || true
+  # 삭제 대신 .prev 보존 — 다음 boot 의 부트 화해(orch.md ⓐ)가 맥락 참고용으로만 읽는다(진실원천은 tasks/+results/).
+  mv -f "$WORKSPACE/.harness-state" "$WORKSPACE/.harness-state.prev" || true
 fi
 # .review-cursor.*/.harness-task.* 글롭: bash 3.2 환경에서 2>/dev/null || true 로 안전 처리.
 rm -f "$WORKSPACE"/.review-cursor.* 2>/dev/null || true

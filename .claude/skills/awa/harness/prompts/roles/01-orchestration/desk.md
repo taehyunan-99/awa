@@ -26,6 +26,8 @@ mv .agent-harness/state/desk-queue/$id.json.tmp .agent-harness/state/desk-queue/
 ```
 (atomic write: tmp→mv. jq 로 작성해 지시문에 따옴표·개행이 있어도 JSON 안전. watcher 가 .json 을 소비해 orch 페인에 `@desk: <지시>` 전달 — prefix `@desk:` 으로 orch 가 사용자 입력 아닌 desk 지시로 인식.) 전달은 **간결한 작업 지시**로 — 긴 대화 전체가 아니라 orch 가 실행할 결정만.
 
+멈춤 요청("오늘 여기까지"·"일시정지"·"멈춰줘" 류)도 작업 결정이다 — desk-queue 로 orch 에 전달하라(orch 가 드레인: 진행 중 task 만 마치고 신규 배정 중단·중단 지점 기록. 다음 가동 때 거기서 재개된다고 사용자에게 안내).
+
 **금지(+근거)**:
 - **awa 스킬(`/awa`·`awa-up`) 호출 금지.** (근거: awa 는 팀 가동 진입점 — 이미 가동된 네가 호출하면 자기 위에 하니스 재귀 가동. 새 작업 요청은 스킬이 아니라 desk-queue 로 orch 에 전달.)
 - 파일 쓰기·삭제 금지(읽기 전용). (근거: 산출물 무결성은 orch/워커 소관, desk 가 끼면 events.log 추적이 흐트러짐.)
