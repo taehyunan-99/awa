@@ -6,7 +6,7 @@
 ![status](https://img.shields.io/badge/status-beta-yellow)
 
 <p align="center">
-  <img src="docs/charts/awa-splash.png" width="640" alt="AWA 첫 실행 화면 — 팀 구성 splash">
+  <img src="docs/charts/awa-splash.png" width="460" alt="AWA 첫 실행 화면 — 팀 구성 splash">
 </p>
 
 > 멀티 에이전트 팀이 plan을 닻 삼아 일하고, **에이전트가 에이전트를 감시한다.**
@@ -15,6 +15,8 @@ AWA는 오케스트레이션 도구가 아니라 **감독된 자율성(Supervise
 
 ---
 
+<br/><br/>
+
 ## 왜 — 에이전트에게 큰 작업을 맡기면 생기는 일
 
 | | 문제 | AWA의 답 |
@@ -22,6 +24,8 @@ AWA는 오케스트레이션 도구가 아니라 **감독된 자율성(Supervise
 | 🟥 | **False green** — 에이전트가 쓴 테스트는 에이전트가 쓴 코드의 맹점을 공유한다 | 독립 리뷰어 3종(plan 정합·품질·보안)이 **투표** — 만장일치 차단이면 자동 수정 |
 | 🟧 | **권한 폭주** — 매번 물으면 사람이 병목(실측 58회), 전부 허용하면 `rm -rf` 한 번에 끝 | 승인한 패턴은 **학습**해 다시 안 묻고, 위험 명령은 **누구도 우회 불가**로 자동 거부 |
 | 🟨 | **컨텍스트 절단** — auto-compact가 task 중간에 끼어들어 흐름을 끊는다 | task 경계마다 **선제 정리** — 흐름은 컨텍스트가 아니라 파일에 저장 |
+
+<br/><br/>
 
 ## 어떻게 — 감시 구조
 
@@ -54,6 +58,8 @@ flowchart TB
 | `permission-gated` | 권한은 매번 묻지 않고 학습 — 질문이 0으로 수렴 |
 | `deny-bounded` | 위험 명령은 사람·ORCH도 우회 불가한 한계선에서 자동 거부 |
 
+<br/><br/>
+
 ## 증거 — 숫자로
 
 동일 plan(재고·주문 트랜잭션 API, 불변식 5종)을 단일 에이전트 1회 + AWA 3회 실행한 자체 실측:
@@ -72,6 +78,8 @@ flowchart TB
 권한 질문은 학습으로 0에 수렴:
 
 ![Permission learning curve](docs/charts/h1_curve_batch.png)
+
+<br/><br/>
 
 ## 안전 모델 — 권한을 끄지 않는다
 
@@ -103,6 +111,8 @@ learned  ← 작업 중 사람이 승인한 패턴이 여기 누적 (재가동�
 
 **deny는 고정된 바닥, allow는 작업하며 자라는 천장** — 사이클이 돌수록 질문이 줄어 0으로 수렴하는 것이지, 검사가 사라지는 게 아니다.
 
+<br/><br/>
+
 ## 설치
 
 ```bash
@@ -110,6 +120,8 @@ learned  ← 작업 중 사람이 승인한 패턴이 여기 누적 (재가동�
 git clone https://github.com/taehyunan-99/awa.git
 cd awa/.claude/skills/awa && bash install.sh
 ```
+
+<br/><br/>
 
 ## 사용
 
