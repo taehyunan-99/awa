@@ -5,6 +5,10 @@
 ![tmux](https://img.shields.io/badge/tmux-3.6%2B-1BB91F)
 ![status](https://img.shields.io/badge/status-beta-yellow)
 
+<p align="center">
+  <img src="docs/charts/awa-splash.png" width="640" alt="AWA 첫 실행 화면 — 팀 구성 splash">
+</p>
+
 > 멀티 에이전트 팀이 plan을 닻 삼아 일하고, **에이전트가 에이전트를 감시한다.**
 
 AWA는 오케스트레이션 도구가 아니라 **감독된 자율성(Supervised Autonomy) 플랫폼**이다 — 자율은 에이전트에게, 검증·권한·안전은 시스템에게.
@@ -111,7 +115,3 @@ cd <프로젝트> && claude
 $ harness/bin/awa-down.sh             # 정리 (산출물 보존)
 $ harness/bin/awa-up.sh --spec .awa/team.yaml   # 재가동 — 완료분 건너뛰고 이어서
 ```
-
----
-
-**Contact** — [@taehyunan-99](https://github.com/taehyunan-99)
