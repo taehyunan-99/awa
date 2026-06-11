@@ -21,20 +21,18 @@
 
 ## 구조
 
+```mermaid
+flowchart TB
+    USER(["사용자"]) -->|"무엇을"| DESK
+    subgraph TMUX["tmux 세션 awa"]
+        DESK["DESK — 사용자 창구"] --> ORCH["ORCH — 오케스트레이터<br/>분해 · 배정 · 종합"]
+        ORCH -->|"dispatch"| WORKERS["backend-1 · backend-2 · tester-1<br/>워커 — 역할별 권한 격리"]
+        WORKERS -->|"task 완료"| REVIEWERS["alignment · quality · security<br/>투표 리뷰어 — 합의 게이트<br/>+ review-mgr — 드리프트 추적"]
+        REVIEWERS -->|"만장일치 blocking → 차단 · 자동 수정"| ORCH
+    end
 ```
-tmux 세션 awa-<project>
-┌──────────────────┬──────────────────┐
-│       ORCH       │       DESK       │   사용자는 DESK와 대화("무엇을")
-│  (오케스트레이터)  │   (사용자 창구)   │   ORCH가 분해·배정·종합("어떻게")
-├──────────────────┴──────────────────┤
-│   backend-1   backend-2   tester-1  │   워커 — 역할별 권한 격리
-├─────────────────────────────────────┤
-│  alignment   quality    security    │   투표 리뷰어 — 합의 게이트
-│             review-mgr              │   메타 리뷰 — 드리프트 추적
-└─────────────────────────────────────┘
-          ▲  파일 IPC (화면 파싱 없음)
-          │  watcher 데몬이 폴링 → 해당 pane만 깨움
-```
+
+모든 신호는 구조화된 파일 IPC로 흐른다 — 에이전트는 서로의 화면을 파싱하지 않고, watcher 데몬이 파일을 폴링해 필요한 pane만 깨운다.
 
 | 어휘 | 한 줄 |
 |---|---|
@@ -55,6 +53,8 @@ tmux 세션 awa-<project>
 | AWA 3차 | 7회* | 19% | 40분 | 9 task 클린 완주 + **false-green 2건 실차단** |
 
 > **감독 회로를 얹어도 비용은 단일 에이전트와 동급.** *3차의 7회는 결함 차단→수정 승인 등 게이트의 정당 개입.
+>
+> ⚠️ **권한 검사를 끈 게 아니다** — 모든 도구 호출은 hook 게이트를 통과한다. ask가 적은 건 명시적 allow/deny 카탈로그 + 승인 패턴 학습 때문이다. → [안전 모델](#안전-모델--권한을-끄지-않는다)
 >
 > 게이트가 잡은 false green: 테스트 64개가 전부 통과했지만 — ① JWT 키 불일치로 실 인증에선 전 요청 500 ② 테스트가 구현에 맞춰 작성돼 spec 계약 위반. **둘 다 자기보고로는 못 잡는다.**
 
@@ -86,16 +86,35 @@ $ harness/bin/awa-down.sh             # 정리 (산출물 보존)
 $ harness/bin/awa-up.sh --spec .awa/team.yaml   # 재가동 — 완료분 건너뛰고 이어서
 ```
 
-## 안전 모델
+## 안전 모델 — 권한을 끄지 않는다
 
-명령은 실행 전 4단계 분류 — LLM 판단이 개입할 수 없는 hook 레벨:
+ask가 적다고 `--dangerously-skip-permissions`가 아니다. CLI의 대화형 프롬프트 대신 **hook 레벨 게이트가 모든 도구 호출을 분류**한다 — deny 판정엔 LLM의 판단이 개입하지 않는다:
 
 ```
-danger  →  자동 거부        rm -rf · sudo · dd · curl|sh … (우회 불가)
-matrix  →  역할별 자동 허용   읽기·빌드·테스트류
+danger  →  자동 거부        deny 카탈로그 매칭 (사람·ORCH도 우회 불가)
+matrix  →  역할별 자동 허용   기본 allow 카탈로그 매칭
 auto    →  학습된 패턴       이전에 영구 승인한 것
-gray    →  사람에게 질문     승인 시 영구 학습
+gray    →  사람에게 질문     승인 시 allow 에 영구 학습 ── ask 가 여기서만 발생
 ```
+
+**deny — 기본 차단 21종** (`danger-check.sh`, 하드코딩 — 작업 중에도 변경 불가):
+
+```
+rm -rf · sudo · git push --force · git reset --hard · git clean -f
+curl|sh · wget|sh · eval stdin · fork bomb · dd 쓰기 · chmod 777
+~/.ssh · 자격증명 파일(.env 등) · 시스템 설정 쓰기 · $HOME/하니스 삭제 …
+```
+
+**allow — 기본 허용 10개 카테고리 + 학습** (`orch-auto-allow.yaml`):
+
+```
+read-only (ls·cat·grep·jq …) · version-probe · git-readonly
+safe-test (npm test …) · safe-build · dev-deps (npm install …)
+safe-fs · git-write (commit) · self-verify · harness-infra
+learned  ← 작업 중 사람이 승인한 패턴이 여기 누적 (재가동에도 유지)
+```
+
+즉 **deny는 고정된 바닥, allow는 작업하며 자라는 천장** — 사이클이 돌수록 gray(질문)가 줄어 ask가 0으로 수렴하는 것이지, 검사가 사라지는 게 아니다.
 
 ---
 
