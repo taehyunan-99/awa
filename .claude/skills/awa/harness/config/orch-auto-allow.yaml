@@ -63,6 +63,11 @@ git-readonly:
   - "Bash(git show:*)"
   - "Bash(git branch:*)"
   - "Bash(git remote:*)"
+  # git hash-object = 객체 해시 계산. 글롭이라 -w(객체 DB write)도 매칭되나 작업트리/파일시스템은
+  # 안 건드림(git 내부 object store 한정) → 가역성 검증 워커 패턴, 위험도 낮음.
+  # 첫 가동 게이트 폭주 완화(2026-06-12 llmwiki 가동). ★단일명령으로 호출해야 학습됨:
+  # `git hash-object a && git hash-object b` 복합형은 안전 prefix 도출 실패로 1회 허용 강등.
+  - "Bash(git hash-object:*)"
 safe-test:
   - "Bash(pytest:*)"
   - "Bash(python -m pytest:*)"

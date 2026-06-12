@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Write({{PROJECT_ROOT}}/**)",
-      "Edit({{PROJECT_ROOT}}/**)"
+      "Edit({{PROJECT_ROOT}}/**)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)"
     ],
     "deny": [
       "Skill(awa)",

@@ -96,7 +96,7 @@ fi
    - team.yaml 없으면 → Step 2 조합 인터뷰로 진행.
 
 3. **Step 2 — Plan + 작업/조합 인터뷰 (SKILL chat):**
-   - **Auto-discover** (9th review [CRIT-22]): plan 은 사용자 프로젝트 산출물이므로 PROJECT_ROOT(Step 1 에서 결정) 기준으로 검색한다 — `bash -c "ls -t \"$PROJECT_ROOT/docs/superpowers/plans\"/*.md 2>/dev/null | head -1"`. If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip. plan 없으면 사용자에게 경로 입력을 요청한다.
+   - **Auto-discover** (9th review [CRIT-22]; 검색경로 정정 2026-06-12): plan 은 사용자 프로젝트 산출물이므로 PROJECT_ROOT(Step 1 에서 결정) 기준으로 **우선순위 순서**로 검색한다 — ①`docs/plan.md`(단일 파일) → ②`docs/plans/*.md`(최신순) → ③`docs/superpowers/plans/*.md`(최신순, superpowers 플러그인 사용 시). 첫 발견을 채택(★디렉토리 우선순위 보장 — `ls -t` 를 디렉토리별로 *순차* 실행해야 함. 한 ls 에 두 경로를 같이 주면 mtime 통합정렬돼 우선순위가 깨짐): `bash -c 'R="$PROJECT_ROOT"; [ -f "$R/docs/plan.md" ] && echo "$R/docs/plan.md" || ls -t "$R/docs/plans"/*.md 2>/dev/null | head -1 | grep . || ls -t "$R/docs/superpowers/plans"/*.md 2>/dev/null | head -1'`. (superpowers 는 외부 플러그인이라 일반 프로젝트는 `docs/plans/` 를 쓰므로 그쪽을 우선.) If found, ask user "Use this plan? <path>" (y/n). User can also paste different path or skip. plan 없으면 사용자에게 경로 입력을 요청한다.
    - If user provides plan → Agent tool 4-axis review:
      - prompt: `references/review-prompt.md` + plan body
      - subagent_type: `general-purpose`
@@ -125,7 +125,7 @@ fi
      - SKILL 이 자유 프롬프트의 **난이도**를 판단한다. 복잡 신호: 다수 도메인(인증+결제+주문 등)·상태 전이·동시성/멱등성·불변식 다수·여러 task 로 쪼개질 규모·"전부"/"시스템"류 범위. 단순 신호: 단일 함수/엔드포인트·버그 1건·문구 수정·조사 1건.
      - **복잡하다고 판단되면 plan 작성을 적극 권유하고 AWA 를 종료한다** (조립·launch 안 함):
        - AskUserQuestion: "이 작업은 복잡해 보입니다(근거: <다도메인/상태전이/불변식 등 구체>). AWA 의 강점은 **검증된 plan 에 정박**해 워커가 딴 길로 새지 않게 alignment 리뷰어가 감시하고, plan 자체가 틀리면 `@plan-defect` 로 방향을 고치는 회로입니다 — plan 없이 자연어로 진행하면 이 회로가 약해집니다. 먼저 plan 을 작성하고 다시 `/awa` 로 오시는 걸 권합니다. 어떻게 할까요?"
-       - 선택지: **(1) plan 먼저 작성 (권장)** → SKILL 이 "`/brainstorm` 또는 superpowers brainstorming→writing-plans 로 plan 을 만든 뒤 `docs/superpowers/plans/` 에 저장하고 다시 `/awa` 실행하세요" 안내 후 **AWA 종료(launch 안 함)** / **(2) 그래도 자연어로 진행** → 아래 조합 인터뷰로 계속(task.md 경로).
+       - 선택지: **(1) plan 먼저 작성 (권장)** → SKILL 이 "plan 을 만든 뒤 `docs/plans/` 에 저장하고(또는 `docs/plan.md`) 다시 `/awa` 실행하세요. (superpowers 플러그인을 쓰면 `/brainstorm`→writing-plans 로 `docs/superpowers/plans/` 에 저장해도 자동검색됩니다.)" 안내 후 **AWA 종료(launch 안 함)** / **(2) 그래도 자연어로 진행** → 아래 조합 인터뷰로 계속(task.md 경로).
        - **근거: plan 작성은 AWA 책임 밖**(SKILL.md 단일책임 — "Plan writing is external"). AWA 가 안에서 plan 까지 만들면 책임 경계가 무너진다. 권유 → 종료 → 사용자가 plan 작성 → plan 경로로 재진입이 깔끔하다.
      - **단순하면** 게이트 없이 곧장 아래 조합 인터뷰로 (자유 프롬프트 = 간단 작업 신호, task.md 경로 유지).
    - **조합 인터뷰** — `references/interview.md` 절차 수행:
