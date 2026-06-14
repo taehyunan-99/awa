@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWA 사용 가이드 — Agents Watching Agents</title>
+<meta name="description" content="AWA(Agents Watching Agents) 사용 가이드 — 설치부터 팀 조립, 감시 회로, 안전 모델까지.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ═══════════════ 상단 네비 ═══════════════ -->
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" aria-label="메뉴" aria-expanded="false" aria-controls="sidebar">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <a class="brand" href="#top"><span class="wordmark">A<span class="dot-a">W</span>A</span><span class="brand-sub">사용 가이드</span></a>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="가이드 테마">
+    <button class="tab" role="tab" data-tab="start" aria-selected="true">시작하기</button>
+    <button class="tab" role="tab" data-tab="how" aria-selected="false">작동 원리</button>
+    <button class="tab" role="tab" data-tab="ops" aria-selected="false">운영 · 관리</button>
+    <button class="tab" role="tab" data-tab="ref" aria-selected="false">명령어</button>
+  </nav>
+  <div class="spacer"></div>
+  <a class="gh" href="https://github.com/taehyunan-99/awa" target="_blank" rel="noopener">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+    GitHub
+  </a>
+</header>
+
+<div class="layout" id="top">
+
+  <!-- ═══════════════ 좌측 사이드바 (N1, 탭별) ═══════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <nav>
+      <div class="side-group" data-tab="start">
+        <div class="g-title">시작하기</div>
+        <a href="#intro"><span class="num">·</span> AWA란</a>
+        <a href="#install"><span class="num">1</span> 설치</a>
+        <a href="#start"><span class="num">2</span> /awa 첫 실행</a>
+        <a href="#interview"><span class="num">3</span> 팀 조립 인터뷰</a>
+        <a href="#autostart"><span class="num">4</span> 작업 자동 착수</a>
+      </div>
+      <div class="side-group" data-tab="how" hidden>
+        <div class="g-title">작동 원리</div>
+        <a href="#watch"><span class="num">·</span> 감시 4축</a>
+        <a href="#gate"><span class="num">·</span> 합의 게이트</a>
+        <a href="#grades"><span class="num">·</span> 사람 호출 4등급</a>
+        <a href="#safety"><span class="num">·</span> 안전 모델</a>
+        <a href="#lists"><span class="num">·</span> 허용·차단 리스트</a>
+      </div>
+      <div class="side-group" data-tab="ops" hidden>
+        <div class="g-title">운영 · 관리</div>
+        <a href="#multiproject"><span class="num">1</span> 멀티프로젝트 동시 진행</a>
+        <a href="#dashboard"><span class="num">2</span> 멀티뷰 관제탑</a>
+        <a href="#resume"><span class="num">3</span> 재개 · 재접속</a>
+        <a href="#bookmarks"><span class="num">4</span> 프로젝트 북마크</a>
+        <a href="#drain"><span class="num">5</span> 드레인 · 정리</a>
+      </div>
+      <div class="side-group" data-tab="ref" hidden>
+        <div class="g-title">명령어 레퍼런스</div>
+        <a href="#ref-awa"><span class="num">·</span> /awa 슬래시 명령</a>
+        <a href="#ref-dash"><span class="num">·</span> /awa dash 인자</a>
+        <a href="#ref-bookmarks"><span class="num">·</span> /awa bookmarks 인자</a>
+        <a href="#ref-scripts"><span class="num">·</span> 스크립트 · 플래그</a>
+        <a href="#ref-files"><span class="num">·</span> 주요 파일 위치</a>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ═══════════════ 본문 ═══════════════ -->
+  <main class="content">
+
+  <!-- ╔══════════ 탭 A — 시작하기 ══════════╗ -->
+  <div class="tab-panel" data-tab="start">
+
+    <!-- ──────── HERO / INTRO ──────── -->
+    <section class="section" id="intro">
+      <div class="eyebrow">Agents Watching Agents</div>
+      <h1 class="page-title">에이전트가 에이전트를 감시한다</h1>
+      <p class="lead">AWA는 오케스트레이션 도구가 아니라 <strong>감독된 자율성(Supervised Autonomy) 플랫폼</strong>입니다. <br/>자율은 에이전트에게, 검증·권한·안전은 시스템에게.</p>
+
+      <div class="terminal" style="margin-top:32px">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">tmux attach — _DASHBOARD</span>
+          <span class="tb-tag">가동 후 첫 화면</span>
+        </div>
+        <div class="terminal-body splash">
+<div class="line" style="font-size:38px; font-weight:700; letter-spacing:.14em; line-height:1.1"><span class="t-cyan" style="text-shadow:0 0 24px rgba(43,217,200,.3)">A W A</span></div>
+<div class="line" style="margin-top:14px; color:var(--term-text-3); letter-spacing:.16em; font-size:12px">Agents <span class="t-dim">Watching</span> Agents</div>
+<div class="splash-divider"><span>팀 구성</span></div>
+<div class="splash-team">
+  <div class="st-row"><span class="t-cyan">ORCH</span><span class="t-w">팀 감독</span><span class="t-mut">opus</span></div>
+  <div class="st-row"><span class="t-cyan">DESK</span><span class="t-w">사용자 창구</span><span class="t-mut">sonnet</span></div>
+  <div class="st-row"><span class="t-cyan">backend-1</span><span class="t-w">개발</span><span class="t-mut">sonnet</span></div>
+  <div class="st-row"><span class="t-cyan">tester-1</span><span class="t-w">품질 검증</span><span class="t-mut">sonnet</span></div>
+  <div class="st-row"><span class="t-cyan">alignment-rev</span><span class="t-w">plan 정합</span><span class="t-mut">opus</span></div>
+  <div class="st-row"><span class="t-cyan">security-rev</span><span class="t-w">보안 검토</span><span class="t-mut">opus</span></div>
+  <div class="st-row"><span class="t-cyan">review-mgr</span><span class="t-w">드리프트</span><span class="t-mut">sonnet</span></div>
+</div>
+<div class="line" style="margin-top:24px; color:var(--term-amber)">[아무 키] 또는 5초 뒤 시작<span class="t-cursor" aria-hidden="true"></span></div>
+        </div>
+      </div>
+
+      <h2 class="sub-title" id="why">왜 — 에이전트에게 큰 작업을 맡기면 생기는 일</h2>
+      <p>AI 에이전트 하나에게 큰 작업을 맡기면 세 가지가 반복됩니다. AWA는 각각에 구조적인 답을 둡니다.</p>
+      <div class="card-grid c3">
+        <div class="card feature-card">
+          <div class="fc-label">🟥 False green</div>
+          <div class="fc-title">스스로의 맹점</div>
+          <div class="fc-body">에이전트가 쓴 테스트는 에이전트가 쓴 코드의 맹점을 공유합니다. → <strong>독립 리뷰어 3종</strong>이 투표, 만장일치 차단이면 자동 수정.</div>
+        </div>
+        <div class="card feature-card">
+          <div class="fc-label">🟧 권한 폭주</div>
+          <div class="fc-title">병목 vs 사고</div>
+          <div class="fc-body">매번 물으면 사람이 병목(실측 58회), 전부 허용하면 <code>rm -rf</code> 한 번에 끝. → 승인 패턴은 <strong>학습</strong>, 위험 명령은 <strong>우회 불가</strong>.</div>
+        </div>
+        <div class="card feature-card">
+          <div class="fc-label">🟨 컨텍스트 절단</div>
+          <div class="fc-title">흐름이 끊긴다</div>
+          <div class="fc-body">auto-compact가 task 중간에 끼어들어 흐름을 끊습니다. → task 경계마다 <strong>선제 정리</strong>, 흐름은 파일에 저장.</div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">📊</span>
+        <div class="co-body"><strong>비용은 단일 에이전트와 동급.</strong> <br>동일 plan을 단일 에이전트 1회 + AWA 3회(n=3) 실측 — 사람 개입 58회 → 2회(28배↓), 토큰 사용량은 비슷, 그러면서 false-green 2건을 실제로 차단했습니다. <br><strong>7명인데 토큰이 동급인 이유:</strong> 리뷰어는 전체 맥락이 아니라 diff와 <code>results/</code>만 읽고, 게이트가 재작업을 줄여 그만큼 상쇄됩니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 1. 설치 ──────── -->
+    <section class="section" id="install">
+      <div class="eyebrow"><span class="step-no">STEP 1</span> 설치</div>
+      <h2 class="sec-title">설치</h2>
+      <p>AWA는 Claude Code 스킬로 설치됩니다. 먼저 네 가지 의존성이 필요합니다 — 하나라도 없으면 런타임에 조용히 실패하므로 먼저 확인하세요.</p>
+
+      <div class="card-grid c2">
+        <div class="card feature-card">
+          <div class="fc-label">필수 의존성</div>
+          <div class="fc-body" style="margin-top:8px">
+            <span class="badge neutral" style="margin:2px 4px 2px 0">tmux</span>
+            <span class="badge neutral" style="margin:2px 4px 2px 0">jq</span>
+            <span class="badge neutral" style="margin:2px 4px 2px 0">claude</span>
+            <span class="badge neutral" style="margin:2px 4px 2px 0">uuidgen</span>
+            <div style="margin-top:10px">tmux는 멀티 에이전트 페인, jq는 신호 파싱, claude는 워커 프로세스,<br>uuidgen은 세션 ID에 쓰입니다.</div>
+          </div>
+        </div>
+        <div class="card feature-card">
+          <div class="fc-label">설치 방식</div>
+          <div class="fc-body" style="margin-top:8px"><code>install.sh</code>가 의존성을 검사한 뒤 <code>~/.claude/skills/awa</code>로 복사 <br>설치합니다. 영역 가이드(AGENTS.md 등)는 제외됩니다.</div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">terminal — bash</span>
+          <button class="tb-copy" type="button" aria-label="명령 복사"><span aria-hidden="true">⧉</span> 복사</button>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-cmt"># 의존성: tmux · jq · claude (Claude Code CLI) · uuidgen</span></div>
+<div class="line"><span class="t-prompt">$</span> git clone https://github.com/taehyunan-99/awa.git</div>
+<div class="line"><span class="t-prompt">$</span> cd awa/.claude/skills/awa</div>
+<div class="line"><span class="t-prompt">$</span> bash install.sh</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-green">✓</span> <span class="t-w">의존성 확인 — tmux, jq, claude, uuidgen</span></div>
+<div class="line"><span class="t-green">✓</span> <span class="t-w">설치 완료 → ~/.claude/skills/awa</span></div>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="co-icon" aria-hidden="true">⚠️</span>
+        <div class="co-body">의존성이 하나라도 빠지면 <code>install.sh</code>가 <strong>설치 전에 멈춥니다</strong>. macOS는 <code>brew install tmux jq</code>, Claude Code CLI는 <a href="https://docs.claude.com/claude-code" target="_blank" rel="noopener">공식 문서</a>를 참고하세요.</div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">📍</span>
+        <div class="co-body"><strong>설치하고 나면 clone 폴더는 지워도 됩니다.</strong> AWA는 <code>~/.claude/skills/awa</code>로 복사되므로, <br>이후로는 <strong>작업하려는 아무 프로젝트 폴더</strong>에서 <code>claude</code>를 열고 <code>/awa</code>만 치면 됩니다 — clone 위치와 무관합니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 2. /awa 첫 실행 ──────── -->
+    <section class="section" id="start">
+      <div class="eyebrow"><span class="step-no">STEP 2</span> 시작하기</div>
+      <h2 class="sec-title">/awa 첫 실행</h2>
+      <p>작업할 프로젝트 폴더에서 Claude Code를 띄우고 <code>/awa</code>를 입력하면, 인터뷰가 시작됩니다. <br>AWA는 항상 <strong>현재 폴더가 아니라 사용자가 고른 프로젝트 폴더</strong>에서 동작하므로, 어디서 실행하든 안전합니다.</p>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">🧭</span>
+        <div class="co-body"><strong><code>/awa</code> 슬래시 명령 하나면 충분합니다.</strong> 인터뷰가 내부적으로 <code>awa-up.sh</code>를 호출해 팀을 띄웁니다 <br><code>harness/bin/*.sh</code>를 직접 칠 일은 자동화·고급 용도뿐입니다. 인터뷰가 출력하는 명령을 실행할 땐 Claude Code 입력창에서 <strong><code>!</code>를 앞에 붙여</strong>(예: <code>!awa-up.sh …</code>) 그 자리에서 셸로 실행합니다. <br><em>이 가이드에서 <code>$</code>는 일반 터미널, <code>&gt;</code>는 Claude Code 입력창을 뜻합니다.</em></div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">myapp — claude</span>
+          <button class="tb-copy" type="button" aria-label="명령 복사"><span aria-hidden="true">⧉</span> 복사</button>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-prompt">$</span> cd ~/projects/myapp</div>
+<div class="line"><span class="t-prompt">$</span> claude</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-prompt">&gt;</span> <span class="t-w">/awa</span></div>
+<div class="line"><span class="t-cmt">  인터뷰가 작업을 보고 필요한 역할만 조립합니다…</span></div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">💡</span>
+        <div class="co-body">팀은 <strong>고정 프리셋이 아닙니다.</strong> <code>/awa</code> 인터뷰가 작업을 분석해 필요한 역할만 조립하고 <span class="filepath">📄 .awa/team.yaml</span>로 저장합니다. <br>다음에 같은 폴더에서 <code>/awa</code>를 다시 실행하면 이 구성을 그대로 이어서 띄울 수 있습니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 3. 팀 조립 인터뷰 ──────── -->
+    <section class="section" id="interview">
+      <div class="eyebrow"><span class="step-no">STEP 3</span> 팀 조립</div>
+      <h2 class="sec-title">팀 조립 인터뷰</h2>
+      <p>인터뷰는 채팅으로 진행됩니다. 프로젝트 폴더를 정하고, plan을 검토하고, 작업에 맞는 팀을 조립한 뒤 띄울 명령을 출력합니다. <br>모든 단계는 <strong>사용자 확인을 거칩니다</strong>.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-h">프로젝트 폴더 선택</div>
+          <div class="step-b"><p>워커들이 읽고 수정할 폴더를 고릅니다. 현재 터미널 폴더를 후보로 제시하거나, 경로를 직접 입력하거나, 저장된 북마크에서 고를 수 있습니다. <br>git 저장소가 아니면 <code>git init</code>을, <code>.awa/</code> 추적 여부를 확인합니다.</p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">plan 검토 (4축 리뷰) · 난이도 게이트</div>
+          <div class="step-b"><p><code>docs/plan.md</code> → <code>docs/plans/</code> → <code>docs/superpowers/plans/</code> 순으로 plan을 자동 탐색합니다. <br>plan을 찾으면 <strong>완결성·실행가능성·기술건전성·검증가능성</strong> 4축으로 리뷰하고, 결함이 있으면 수정안을 제안합니다.</p><p>plan이 없으면 자연어로 작업을 설명할 수 있습니다. 단, 다도메인·상태 전이·불변식이 많은 <strong>복잡한 작업이면 난이도 게이트가 plan 작성을 먼저 권유</strong>합니다. <br>plan 없는 큰 작업은 감시의 닻(plan-anchored)이 약해지기 때문입니다. "그래도 자연어로 진행"을 고르면 계속할 수 있습니다.</p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">역할 자율 조립</div>
+          <div class="step-b"><p>AWA가 작업을 분석해 역할 카탈로그에서 필요한 역할만 골라 팀을 조립하고 <strong>근거를 설명</strong>합니다. 정적 템플릿을 통째로 던지지 않습니다. <br>예: <em>"메모 웹앱이라 frontend·backend·infra 3명, plan 정합·품질 리뷰어를 붙였습니다. 인증/DB 불필요라 security 워커는 뺐습니다."</em></p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">가감 · 리뷰 수위 · 저장</div>
+          <div class="step-b"><p>역할을 더하거나 빼고, 리뷰 수위를 정한 뒤 <span class="filepath">📄 .awa/team.yaml</span>에 저장합니다.</p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">모드 선택 (단일 / 멀티뷰)</div>
+          <div class="step-b"><p>마지막으로 모드를 고르면 띄울 명령이 출력됩니다. <strong>이미 떠 있는 AWA 팀이 없으면 단일(single)로 자동 진행</strong>하고, 하나라도 있으면 단일과 멀티뷰 중 고릅니다. <br>멀티뷰는 여러 프로젝트를 한 관제탑(<code>_DASHBOARD</code>)에 모아 동시에 감시하는 모드입니다(자세히는 <a href="#dashboard" data-goto="ops">운영·관리 › 멀티뷰 관제탑</a>).</p></div>
+        </div>
+      </div>
+
+      <h3 class="sub-title">역할 카탈로그</h3>
+      <p>조립의 원자 단위입니다. 권한은 역할에서 자동으로 파생됩니다. <br><strong>워커</strong>는 작업 경로만 쓰기 가능하고, <strong>리뷰어·review-mgr</strong>은 읽기 전용입니다. <br>ORCH가 작업을 보고 이 카탈로그에서 필요한 역할만 골라 조립합니다.</p>
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">🏷️</span>
+        <div class="co-body"><strong>역할명과 화면 속 이름은 같은 것입니다.</strong> 같은 역할이 여럿이면 <code>backend-1</code>·<code>backend-2</code>처럼 번호가 붙고, 리뷰어는 화면에서 <code>alignment-rev</code>·<code>quality-rev</code>·<code>security-rev</code>로 줄여 표시됩니다 — 아래 <code>reviewer-alignment</code> 등과 동일물입니다.</div>
+      </div>
+      <div class="card role-card">
+        <div class="role-table">
+          <div class="rt-head">워커 <span class="rt-perm">작업 경로 쓰기 가능</span></div>
+          <div class="rt-row"><div class="rt-name">engineer</div><div class="rt-desc">범용 구현 워커. 도메인을 가리지 않습니다.<br>셸 스크립트·설정 파일·빌드 글루·자동화 등 frontend/backend/infra로 딱 떨어지지 않는 일을 맡습니다. <br>작업이 단순하거나 한 명이면 충분할 때 기본 선택.</div></div>
+          <div class="rt-row"><div class="rt-name">frontend</div><div class="rt-desc">UI·클라이언트 구현 전담. 컴포넌트·상태·스타일·접근성 등 화면 쪽 작업. 풀스택 작업에서 backend·infra와 분업합니다.</div></div>
+          <div class="rt-row"><div class="rt-name">backend</div><div class="rt-desc">서버·API·도메인 로직·데이터 계층 구현. "API만 만들면 되는" 작업이면 frontend 없이 backend 한 명만 조립되기도 합니다.</div></div>
+          <div class="rt-row"><div class="rt-name">infra</div><div class="rt-desc">배포·CI·컨테이너·환경 설정 등 인프라 작업. 코드와 운영 사이를 잇습니다.</div></div>
+          <div class="rt-row"><div class="rt-name">tester</div><div class="rt-desc">테스트 작성 전담 워커. 구현 워커와 <strong>분리</strong>돼 있어, 구현자가 자기 코드에 맞춰 테스트를 쓰는 false-green을 구조적으로 줄입니다.</div></div>
+          <div class="rt-row"><div class="rt-name">security</div><div class="rt-desc">보안 점검·코드 감사 <em>워커</em>. 실제로 수정·강화 작업을 합니다. (게이트에서 투표하는 security 리뷰어와는 별개 역할.)</div></div>
+          <div class="rt-row"><div class="rt-name">researcher</div><div class="rt-desc">조사·비교 전담 — <strong>읽기 전용</strong>. 코드를 바꾸지 않고 코드베이스 탐색·기술 비교·근거 수집만 합니다.</div></div>
+
+          <div class="rt-head">투표 리뷰어 <span class="rt-perm">읽기 전용 · 합의 게이트의 표</span></div>
+          <div class="rt-row"><div class="rt-name">reviewer-alignment</div><div class="rt-desc">결과물이 <strong>plan의 의도·기준</strong>에서 벗어나지 않았는지 검토. "요구한 것과 다른 걸 잘 만든" 드리프트를 잡는 표.</div></div>
+          <div class="rt-row"><div class="rt-name">reviewer-quality</div><div class="rt-desc">구현의 <strong>견고함과 테스트의 실효성</strong>을 검토. 통과하는 테스트가 실제로 무엇을 보장하는지까지 봅니다.</div></div>
+          <div class="rt-row"><div class="rt-name">reviewer-security</div><div class="rt-desc">취약점·권한 누수·계약 위반을 검토하는 표. 각 리뷰어는 <strong>독립 컨텍스트</strong>에서 판단해 한 명의 단독 거부권이 아니라 합의를 만듭니다.</div></div>
+
+          <div class="rt-head">관리 <span class="rt-perm">읽기 전용 · 투표권 없음</span></div>
+          <div class="rt-row"><div class="rt-name">review-mgr</div><div class="rt-desc">리뷰어들의 표를 <strong>집계</strong>하고 작업의 드리프트를 시계열로 추적하는 관리자. 직접 투표하지는 않습니다. <br>투표 리뷰어가 2명 이상이면 자동으로 따라붙습니다.</div></div>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="co-icon" aria-hidden="true">🗳️</span>
+        <div class="co-body"><strong>투표 리뷰어는 0명 또는 2명+ 만 됩니다.</strong> 1명은 합의가 아니라 단독 거부권이라 불변식 위반으로 거부됩니다. <br>리뷰를 가볍게 하려면 무리뷰(0명), 둘 거면 최소 2종(예: alignment+quality)을 붙이세요. 2명+면 <code>review-mgr</code>가 자동으로 따라옵니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 4. 작업 자동 착수 ──────── -->
+    <section class="section" id="autostart">
+      <div class="eyebrow"><span class="step-no">STEP 4</span> 자동 착수</div>
+      <h2 class="sec-title">작업 자동 착수</h2>
+      <p>인터뷰가 끝나면 출력된 명령을 <code>!</code>로 실행해 팀을 띄웁니다. <br>이때 <strong>plan(또는 자연어 작업)이 있으면 ORCH가 가동 직후 그 작업을 자동으로 시작</strong>합니다. 사람이 다시 지시할 필요가 없습니다.</p>
+
+      <div class="card-grid c2">
+        <div class="card feature-card">
+          <div class="fc-label">plan 파일</div>
+          <div class="fc-title">검증된 작업 정의</div>
+          <div class="fc-body">4축 리뷰를 통과한 plan이 <code>--plan</code>으로 주입됩니다. <br>ORCH가 task로 분해해 배정합니다.</div>
+        </div>
+        <div class="card feature-card">
+          <div class="fc-label">자연어 작업</div>
+          <div class="fc-title">.awa/task.md</div>
+          <div class="fc-body">plan 없이 자연어로 설명한 작업은 <span class="filepath">task.md</span>로 저장돼 같은 경로로 주입됩니다. <em>(없으면 ORCH는 idle 대기)</em></div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">_DASHBOARD — ORCH</span>
+          <span class="tb-tag">가동 직후</span>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-cyan">ORCH</span> <span class="t-mut">plan 주입 감지 → 분해 시작</span></div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-w">재고·주문 트랜잭션 API</span> <span class="t-mut">→ 9 task</span></div>
+<div class="term-grid tree">
+  <div class="tg-row"><span class="t-mut">├─ T1</span><span class="t-w tg-flex">스키마 정의</span><span class="t-green">backend-1</span></div>
+  <div class="tg-row"><span class="t-mut">├─ T2</span><span class="t-w tg-flex">트랜잭션 처리</span><span class="t-green">backend-1</span></div>
+  <div class="tg-row"><span class="t-mut">├─ T3</span><span class="t-w tg-flex">멱등성 키</span><span class="t-green">backend-2</span></div>
+  <div class="tg-row"><span class="t-mut">└─ …</span><span class="t-mut tg-flex">+6 task</span><span class="t-mut">—</span></div>
+</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-amber">🟠 [판단]</span> <span class="t-w">위 배정 트리로 진행할까요?</span> <span class="t-mut">(승인 1회)</span></div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">✋</span>
+        <div class="co-body">자동 착수라도 <strong>첫 배정 트리는 승인 1회를 거칩니다.</strong> 이후로는 자율 진행하며, 판단이 필요할 때만 등급(<a href="#grades" data-goto="how">작동 원리 › 사람 호출 4등급</a>)으로 사람을 부릅니다.</div>
+      </div>
+    </section>
+
+  </div><!-- ╚══════════ 탭 A 끝 ══════════╝ -->
+
+  <!-- ╔══════════ 탭 B — 작동 원리 ══════════╗ -->
+  <div class="tab-panel" data-tab="how" hidden>
+
+    <!-- ──────── 5. 감시 4축 ──────── -->
+    <section class="section" id="watch">
+      <div class="eyebrow"><span class="step-no how">작동 원리</span> 감시 회로</div>
+      <h2 class="sec-title">감시 4축</h2>
+      <p>워커의 "끝났다"는 그대로 믿지 않습니다. 모든 신호는 파일 IPC로 흐르며(화면 파싱 없음), 감시는 네 축으로 상시 작동합니다. 이것이 AWA의 정체성입니다.</p>
+
+      <div class="axes">
+        <div class="axis-row">
+          <div class="ax-key">plan-anchored</div>
+          <div class="ax-desc">plan은 읽고 버리는 문서가 아니라 <strong>전 구간의 닻</strong> — task마다 기준 명시·검증</div>
+        </div>
+        <div class="axis-row">
+          <div class="ax-key">drift-tracked</div>
+          <div class="ax-desc">의도에서 벗어나는 순간을 <strong>시계열로 상시 추적</strong></div>
+        </div>
+        <div class="axis-row">
+          <div class="ax-key">permission-gated</div>
+          <div class="ax-desc">권한은 매번 묻지 않고 <strong>학습</strong> — 질문이 0으로 수렴</div>
+        </div>
+        <div class="axis-row">
+          <div class="ax-key">deny-bounded</div>
+          <div class="ax-desc">위험 명령은 <strong>사람·ORCH도 우회 불가</strong>한 한계선에서 자동 거부</div>
+        </div>
+      </div>
+
+      <h3 class="sub-title">task 라이프사이클</h3>
+      <p>각 task는 분해 → 작업 → 리뷰 → 완료의 공정을 거칩니다. 리뷰에서 합의 차단이 나오면 사람 없이 <strong>작업 단계로 되돌아가 자동 수정</strong>됩니다.</p>
+
+      <div class="pipeline">
+        <div class="pl-track">
+          <div class="pl-stage"><div class="pl-node cyan">분해</div><div class="pl-cap">ORCH</div></div>
+          <div class="pl-arrow" style="--d:0s"></div>
+          <div class="pl-stage" data-node="work"><div class="pl-node">작업</div><div class="pl-cap">워커</div></div>
+          <div class="pl-arrow" style="--d:.8s"></div>
+          <div class="pl-stage" data-node="review"><div class="pl-node amber">리뷰</div><div class="pl-cap">투표 리뷰어</div></div>
+          <div class="pl-arrow" style="--d:1.6s"></div>
+          <div class="pl-stage"><div class="pl-node green">완료</div><div class="pl-cap">@done</div></div>
+        </div>
+        <!-- 피드백 루프 — 리뷰 합의 차단 시 작업 단계로 되돌아간다(ㄷ자 회귀선) -->
+        <div class="pl-feedback">
+          <svg class="pl-fb-svg" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true">
+            <path class="pl-fb-path" d="M 62.5 1 V 16 H 37.5 V 4" fill="none"/>
+          </svg>
+          <svg class="pl-fb-arrow" width="13" height="9" viewBox="0 0 13 9" aria-hidden="true">
+            <path d="M 1.5 8 L 6.5 1.5 L 11.5 8" fill="none"/>
+          </svg>
+          <span class="pl-fb-label">합의 차단 → 작업으로 되돌아가 자동 수정</span>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 6. 합의 게이트 ──────── -->
+    <section class="section" id="gate">
+      <div class="eyebrow"><span class="step-no how">작동 원리</span> 합의</div>
+      <h2 class="sec-title">합의 게이트</h2>
+      <p>task가 끝날 때마다 투표 리뷰어 3종이 <strong>각자 독립 컨텍스트</strong>에서 차단 투표를 합니다. 한 명의 단독 거부권이 아니라 합의입니다. <br>만장일치 차단이면 사람 없이 수정시키고, 의견이 갈리면 사람을 부릅니다.</p>
+
+      <div class="card-grid c3">
+        <div class="card feature-card">
+          <div class="fc-label">alignment</div>
+          <div class="fc-title">plan 정합</div>
+          <div class="fc-body">결과물이 plan의 의도·기준에서 벗어나지 않았는지 검토.</div>
+        </div>
+        <div class="card feature-card">
+          <div class="fc-label">quality</div>
+          <div class="fc-title">코드 품질</div>
+          <div class="fc-body">구현의 견고함·테스트의 실효성을 검토.</div>
+        </div>
+        <div class="card feature-card">
+          <div class="fc-label">security</div>
+          <div class="fc-title">보안</div>
+          <div class="fc-body">취약점·권한 누수·계약 위반을 검토.</div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">합의 게이트 — T3 멱등성</span>
+          <span class="tb-tag">실차단 예시</span>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-mut"># 워커: 테스트 64개 전부 통과 — "끝났다"</span></div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-cyan">alignment-rev</span>  <span class="t-red">blocking</span> <span class="t-mut">spec 계약 위반 — 테스트가 구현에 맞춰 작성됨</span></div>
+<div class="line"><span class="t-cyan">quality-rev</span>    <span class="t-red">blocking</span> <span class="t-mut">JWT 키 불일치 — 실 인증에선 전 요청 500</span></div>
+<div class="line"><span class="t-cyan">security-rev</span>   <span class="t-red">blocking</span> <span class="t-mut">IDOR — 타 사용자 자원 접근 가능</span></div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-amber">⟳</span> <span class="t-w">만장일치 차단 → 자동 수정 지시 (사람 개입 0)</span></div>
+        </div>
+      </div>
+
+      <div class="callout danger">
+        <span class="co-icon" aria-hidden="true">🎯</span>
+        <div class="co-body"><strong>게이트가 잡은 false green:</strong> 테스트 64개가 전부 통과했지만 <br>① JWT 키 불일치로 실 인증에선 전 요청 500 ② 테스트가 구현에 맞춰 작성돼 spec 계약 위반. <br><strong>둘 다 자기보고로는 못 잡습니다.</strong></div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 7. 사람 호출 4등급 ──────── -->
+    <section class="section" id="grades">
+      <div class="eyebrow"><span class="step-no how">작동 원리</span> 사람 호출</div>
+      <h2 class="sec-title">사람을 부르는 4등급</h2>
+      <p>AWA는 판단이 필요할 때만 사람을 부르고, 질문 앞에 <strong>등급 이모지</strong>를 붙여 시선을 유도합니다. <br>🔴를 보면 자세히 보고, 🟢는 추천 그대로 가볍게 승인하면 됩니다.</p>
+
+      <div class="grades">
+        <div class="grade red">
+          <div class="g-emoji" aria-hidden="true">🔴</div>
+          <div class="g-main">
+            <div class="g-name">위험 · 되돌리기 어려움</div>
+            <div class="g-desc">danger 거부 통지 · 합의 게이트 차단 · plan 결함(방향 수정) · BLOCKED · 반복 정체</div>
+          </div>
+          <div class="g-tag">[위험]</div>
+        </div>
+        <div class="grade amber">
+          <div class="g-emoji" aria-hidden="true">🟠</div>
+          <div class="g-main">
+            <div class="g-name">판단 필요 (흐름상)</div>
+            <div class="g-desc">확정 plan 진행 승인 · 드리프트 검토 요청</div>
+          </div>
+          <div class="g-tag">[판단]</div>
+        </div>
+        <div class="grade blue">
+          <div class="g-emoji" aria-hidden="true">🔵</div>
+          <div class="g-main">
+            <div class="g-name">권한 확장</div>
+            <div class="g-desc">패턴 영구 학습 — 한 번 승인하면 이후 계속 자동 허용. 반대로 <strong>"never"</strong>를 고르면 그 패턴을 영구 거부 목록에 넣어 다시 묻지 않습니다(특정 동작을 못 박아 차단).</div>
+          </div>
+          <div class="g-tag">[권한]</div>
+        </div>
+        <div class="grade green">
+          <div class="g-emoji" aria-hidden="true">🟢</div>
+          <div class="g-main">
+            <div class="g-name">자동 승인 가능</div>
+            <div class="g-desc">gray 권한 게이트 단순 승인 — 추천 그대로 눌러도 무방</div>
+          </div>
+          <div class="g-tag">[승인]</div>
+        </div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 8. 안전 모델 ──────── -->
+    <section class="section" id="safety">
+      <div class="eyebrow"><span class="step-no how">작동 원리</span> 안전</div>
+      <h2 class="sec-title">안전 모델 — 권한을 끄지 않는다</h2>
+      <p>ask가 적다고 <code>--dangerously-skip-permissions</code>가 아닙니다. CLI의 대화형 프롬프트 대신 <strong>hook 레벨 게이트가 모든 도구 호출을 분류</strong>합니다. <br>deny 판정엔 LLM의 판단이 개입하지 않습니다.</p>
+
+      <div class="classify">
+        <div class="cl-card deny">
+          <div class="cl-key">danger</div>
+          <div class="cl-verb">자동 거부</div>
+          <div class="cl-desc">deny 카탈로그 매칭. 사람·ORCH도 우회 불가.</div>
+        </div>
+        <div class="cl-card matrix">
+          <div class="cl-key">matrix</div>
+          <div class="cl-verb">역할별 자동 허용</div>
+          <div class="cl-desc">기본 allow 카탈로그 매칭.</div>
+        </div>
+        <div class="cl-card auto">
+          <div class="cl-key">auto</div>
+          <div class="cl-verb">학습된 패턴</div>
+          <div class="cl-desc">이전에 영구 승인한 것.</div>
+        </div>
+        <div class="cl-card gray">
+          <div class="cl-key">gray</div>
+          <div class="cl-verb">사람에게 질문</div>
+          <div class="cl-desc">승인 시 allow에 영구 학습. ask가 여기서만 발생.</div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">📈</span>
+        <div class="co-body"><strong>deny는 고정된 바닥, allow는 작업하며 자라는 천장.</strong> 사이클이 돌수록 질문이 줄어 0으로 수렴하는 것이지, 검사가 사라지는 게 아닙니다. <br>실측: 권한 질문이 2 → 0으로 수렴.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 9. 허용·차단 리스트 ──────── -->
+    <section class="section" id="lists">
+      <div class="eyebrow"><span class="step-no">STEP 5</span> 리스트 관리</div>
+      <h2 class="sec-title">허용 · 차단 리스트</h2>
+      <p>게이트의 판정 기준은 두 개의 리스트입니다 — 고정된 <strong>deny</strong>와 자라나는 <strong>allow</strong>. 어디에 있고 어떻게 관리하는지 정리합니다.</p>
+
+      <h3 class="sub-title">deny — 기본 차단 21종 (하드코딩, 작업 중 변경 불가)</h3>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">harness/bin/danger-check.sh</span>
+          <span class="tb-tag">읽기 전용</span>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-red">rm -rf</span> · <span class="t-red">sudo</span> · <span class="t-red">git push --force</span> · <span class="t-red">git reset --hard</span> · <span class="t-red">git clean -f</span></div>
+<div class="line"><span class="t-red">curl|sh</span> · <span class="t-red">wget|sh</span> · <span class="t-red">eval stdin</span> · <span class="t-red">fork bomb</span> · <span class="t-red">dd 쓰기</span> · <span class="t-red">chmod 777</span></div>
+<div class="line"><span class="t-red">~/.ssh</span> · <span class="t-red">자격증명 파일(.env 등)</span> · <span class="t-red">시스템 설정 쓰기</span> · <span class="t-red">$HOME/하니스 삭제</span> …</div>
+        </div>
+      </div>
+
+      <h3 class="sub-title">allow — 기본 허용 10 카테고리 + 학습</h3>
+      <p>역할별로 자동 허용되는 카테고리입니다. 카탈로그는 <span class="filepath">📄 harness/config/orch-auto-allow.yaml</span>에 있고, 작업 중 승인한 패턴은 런타임 <span class="filepath">📄 .agent-harness/learned-allow.yaml</span>에 누적됩니다(재가동에도 유지).</p>
+      <div class="card">
+        <div style="display:flex; flex-wrap:wrap; gap:10px">
+          <span class="badge accent">read-only</span>
+          <span class="badge accent">version-probe</span>
+          <span class="badge accent">git-readonly</span>
+          <span class="badge accent">safe-test</span>
+          <span class="badge accent">safe-build</span>
+          <span class="badge accent">dev-deps</span>
+          <span class="badge accent">safe-fs</span>
+          <span class="badge accent">git-write</span>
+          <span class="badge accent">self-verify</span>
+          <span class="badge accent">harness-infra</span>
+          <span class="badge success"><span class="bdot" style="background:var(--color-success)"></span>learned ← 승인 패턴 누적</span>
+        </div>
+      </div>
+
+      <h3 class="sub-title">리스트를 보고 관리하기</h3>
+      <p>허용 카탈로그는 git 추적되는 원본 파일이므로 직접 열어 확인·수정할 수 있습니다. 차단 리스트는 안전을 위해 코드에 하드코딩돼 있어 작업 중 변경되지 않습니다.</p>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">terminal — bash</span>
+          <button class="tb-copy" type="button" aria-label="명령 복사"><span aria-hidden="true">⧉</span> 복사</button>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-cmt"># 허용 카탈로그 보기 (역할별 자동 허용 규칙)</span></div>
+<div class="line"><span class="t-prompt">$</span> cat harness/config/orch-auto-allow.yaml</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-cmt"># 작업 중 학습된 허용 패턴 보기 (런타임, 재가동에도 유지)</span></div>
+<div class="line"><span class="t-prompt">$</span> cat .agent-harness/learned-allow.yaml</div>
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <span class="co-icon" aria-hidden="true">🔒</span>
+        <div class="co-body"><strong>차단 21종은 작업 중 우회·해제할 수 없습니다.</strong> 사람도 ORCH도 못 끕니다 — 이것이 <code>deny-bounded</code>의 핵심입니다. <br>허용 카탈로그를 넓히고 싶으면 git 추적되는 원본 yaml을 직접 수정하세요(런타임 파일이 아니라 원본에서).</div>
+      </div>
+    </section>
+
+  </div><!-- ╚══════════ 탭 B 끝 ══════════╝ -->
+
+  <!-- ╔══════════ 탭 C — 운영 · 관리 ══════════╗ -->
+  <div class="tab-panel" data-tab="ops" hidden>
+
+    <!-- ──────── 1. 멀티프로젝트 동시 진행 ──────── -->
+    <section class="section" id="multiproject">
+      <div class="eyebrow"><span class="step-no">STEP 1</span> 멀티프로젝트</div>
+      <h2 class="sec-title">멀티프로젝트 동시 진행</h2>
+      <p>AWA는 한 번에 한 프로젝트만 다루지 않습니다. 서로 다른 폴더에서 팀을 각각 띄우면, <strong>세션 이름이 폴더 이름으로 자동 분리</strong>(<code>awa-&lt;폴더명&gt;</code>)되어 독립된 팀으로 동시에 굴러갑니다. <br>한 프로젝트의 작업이 다른 프로젝트에 새지 않습니다.</p>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">terminal — bash</span>
+          <button class="tb-copy" type="button" aria-label="명령 복사"><span aria-hidden="true">⧉</span> 복사</button>
+        </div>
+        <div class="terminal-body">
+<div class="line"><span class="t-cmt"># 프로젝트 A 팀 — 세션 awa-projA 로 자동 격리</span></div>
+<div class="line"><span class="t-prompt">$</span> awa-up.sh --spec /path/projA/.awa/team.yaml --project /path/projA</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-cmt"># 프로젝트 B 팀 — 세션 awa-projB, A 와 완전 독립</span></div>
+<div class="line"><span class="t-prompt">$</span> awa-up.sh --spec /path/projB/.awa/team.yaml --project /path/projB</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-green">✓</span> <span class="t-w">awa-projA</span> <span class="t-mut">·</span> <span class="t-green">✓</span> <span class="t-w">awa-projB</span> <span class="t-mut">— 두 팀 동시 가동</span></div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">🧩</span>
+        <div class="co-body"><strong>실무에선 <code>/awa</code> 인터뷰가 이 과정을 대신합니다.</strong> 프로젝트마다 <code>/awa</code>를 실행해 폴더를 고르면 위 명령을 알아서 만들어 줍니다. <br>폴더 이름이 같아 충돌하면(<code>awa-app</code> 둘) <code>SESSION_OVERRIDE="awa-app2"</code>를 앞에 붙여 이름을 구분합니다.</div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">🛰️</span>
+        <div class="co-body">여러 팀이 동시에 돌면 화면을 오가기 번거롭습니다. 그래서 <strong>여러 프로젝트를 한 화면에 모으는 관제탑</strong>이 있습니다.
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 2. 멀티뷰 관제탑 ──────── -->
+    <section class="section" id="dashboard">
+      <div class="eyebrow"><span class="step-no">STEP 2</span> 멀티뷰</div>
+      <h2 class="sec-title">멀티뷰 관제탑</h2>
+      <p>여러 프로젝트의 ORCH·DESK 화면만 뽑아 <strong>한 윈도우 그리드(<code>_DASHBOARD</code>)에 모아</strong> 동시에 감시합니다. 첫 화면에서 본 그 대시보드입니다. <br>프로젝트마다 한 줄(왼쪽 ORCH, 오른쪽 DESK), 한 윈도우에 3개까지, 그 이상은 다음 페이지로 넘어갑니다.</p>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">_DASHBOARD — 2 projects</span>
+          <span class="tb-tag">멀티뷰</span>
+        </div>
+        <div class="terminal-body">
+<div class="term-grid dash">
+  <div class="tg-row"><span class="t-mut">projA</span><span class="t-cyan">ORCH</span><span class="t-w tg-flex">분해·배정·종합</span><span class="t-cyan">DESK</span><span class="t-w">사용자 창구</span></div>
+  <div class="tg-row"><span class="t-mut">projB</span><span class="t-cyan">ORCH</span><span class="t-w tg-flex">리뷰 종합 중</span><span class="t-cyan">DESK</span><span class="t-w">대기</span></div>
+</div>
+<div class="line">&nbsp;</div>
+<div class="line"><span class="t-mut"># 한 화면에서 두 프로젝트를 동시에 감시</span></div>
+        </div>
+      </div>
+
+      <h3 class="sub-title">관제탑 명령</h3>
+      <div class="card cmd-ref ops">
+        <div class="cr-row"><div class="cr-cmd">/awa dash merge &lt;A&gt; &lt;B&gt;</div><div>여러 세션을 새 관제탑으로 모음</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash add &lt;C&gt;</div><div>이미 떠 있는 관제탑에 한 프로젝트 추가</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash detach &lt;proj&gt;</div><div>한 프로젝트를 관제탑에서 떼어 원래 세션으로 복원</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash split</div><div>전부 복원하고 관제탑을 닫음</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash kill &lt;proj&gt;</div><div>관제탑에서 떼고 그 프로젝트 팀까지 종료</div></div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">📺</span>
+        <div class="co-body">인터뷰에서 <strong>멀티뷰 모드</strong>를 고르면(이미 떠 있는 팀이 있을 때만 물어봅니다) 새 팀이 자동으로 관제탑에 합류합니다. <br>진입은 <code>tmux attach -t _DASHBOARD</code></div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 3. 재개 · 재접속 ──────── -->
+    <section class="section" id="resume">
+      <div class="eyebrow"><span class="step-no">STEP 3</span> 재개</div>
+      <h2 class="sec-title">재개 · 재접속</h2>
+      <p>세션은 일회용이지만 <strong>흐름은 컨텍스트가 아니라 파일에 저장</strong>됩니다. 그래서 두 가지로 "이어서" 할 수 있습니다. <br>살아있는 팀에 다시 접속하거나, 정리했던 팀을 다시 띄우거나.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-h">살아있는 팀에 재접속 (Step 0)</div>
+          <div class="step-b"><p><code>/awa</code>를 실행하면 가장 먼저 <strong>지금 떠 있는 팀 목록</strong>을 보여줍니다. 하나를 고르면 새로 띄우지 않고 바로 <code>tmux attach</code>로 들어갑니다. <br>잠깐 자리를 비웠다 돌아올 때의 경로입니다.</p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">이전 구성으로 다시 띄우기</div>
+          <div class="step-b"><p>떠 있는 팀이 없으면, 같은 폴더의 <span class="filepath">📄 .awa/team.yaml</span>이 남아 있을 때 <strong>이전 팀 구성을 그대로 재사용</strong>할지 물어봅니다. 인터뷰를 다시 거치지 않습니다.</p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">중단 지점부터 이어서</div>
+          <div class="step-b"><p>다시 띄우면 ORCH가 완료 증거(<code>results/</code>)를 대조해 <strong>완료한 작업은 건너뛰고</strong> 중단 지점부터 재개합니다. 같은 작업을 다시 하지 않습니다.</p></div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">🔁</span>
+        <div class="co-body"><strong>우선순위:</strong> 살아있는 세션 접속 &gt; 이전 team.yaml 재사용 &gt; 새 인터뷰. 세션 상태를 따로 저장/복원하지 않으므로, 가이드·프롬프트 수정은 항상 git 추적되는 원본 파일에서 하세요. 세션은 <code>prompts/</code> + <code>.awa/team.yaml</code>로부터 매번 재생성됩니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 4. 프로젝트 북마크 ──────── -->
+    <section class="section" id="bookmarks">
+      <div class="eyebrow"><span class="step-no">STEP 4</span> 북마크</div>
+      <h2 class="sec-title">프로젝트 북마크</h2>
+      <p>여러 프로젝트를 오가다 보면 매번 긴 경로를 입력하기 번거롭습니다. AWA는 <strong>팀을 띄울 때마다 그 프로젝트 경로를 북마크에 자동으로 기록</strong>하고, 별칭을 붙이면 <code>/awa</code> 폴더 선택에서 경로 대신 별칭만 입력하면 됩니다.</p>
+
+      <div class="card cmd-ref ops">
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks list</div><div>저장된 프로젝트 전체 보기 (없어진 경로는 stale 표시)</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks set-alias</div><div>프로젝트에 짧은 별칭 부여·변경</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks remove</div><div>번호로 삭제 (<code>1,3</code> 또는 <code>all</code>)</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks prune</div><div>없어진 경로(stale) 일괄 정리</div></div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">💾</span>
+        <div class="co-body">북마크는 <span class="filepath">📄 ~/.config/awa/bookmarks.tsv</span>에 저장됩니다. <br>프로젝트 폴더가 아니라 사용자 홈 설정이라 <strong>AWA를 다시 설치해도 북마크와 학습된 권한은 보존</strong>됩니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 5. 드레인 · 정리 ──────── -->
+    <section class="section" id="drain">
+      <div class="eyebrow"><span class="step-no">STEP 5</span> 마무리</div>
+      <h2 class="sec-title">드레인 · 정리</h2>
+      <p>작업을 중간에 끊지 않고 깔끔하게 멈추는 흐름입니다. 진행 중인 것만 마무리하게 두고(드레인), 세션을 정리하면(산출물은 보존) 다음에 이어서 띄울 수 있습니다.</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="step-h">드레인 — 진행 중인 것만 마치고 정지</div>
+          <div class="step-b"><p>DESK 화면에 <em>"오늘은 여기까지"</em>·"일시정지"처럼 자연어로 말하면, ORCH가 <strong>신규 배정만 중단</strong>합니다. <br>이미 진행 중인 task는 리뷰·종합까지 정상 처리하고 중단 지점을 기록합니다.</p></div>
+        </div>
+        <div class="step">
+          <div class="step-h">정리 — 산출물 보존</div>
+          <div class="step-b"><p><code>/awa down</code> 메뉴로 정리할 세션을 고르면 tmux 세션과 런타임 파일을 정리합니다. 코드·결과물 같은 <strong>산출물은 그대로 남습니다</strong>.</p></div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="tb-dot r"></span><span class="tb-dot y"></span><span class="tb-dot g"></span>
+          <span class="tb-title">terminal</span>
+          <button class="tb-copy" type="button" aria-label="명령 복사"><span aria-hidden="true">⧉</span> 복사</button>
+        </div>
+        <div class="terminal-body">
+<div class="term-grid cmd">
+  <div class="tg-row"><span class="tg-flex"><span class="t-prompt">&gt;</span> <span class="t-w">오늘은 여기까지</span></span><span class="t-cmt"># DESK 에 — 드레인(진행분만 마치고 정지)</span></div>
+  <div class="tg-row"><span class="tg-flex"><span class="t-prompt">&gt;</span> <span class="t-w">/awa down</span></span><span class="t-cmt"># 정리 메뉴 (산출물 보존)</span></div>
+  <div class="tg-row"><span class="tg-flex"><span class="t-prompt">&gt;</span> <span class="t-w">/awa</span></span><span class="t-cmt"># 다음 날 — 중단 지점부터 재개</span></div>
+</div>
+        </div>
+      </div>
+
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">♻️</span>
+        <div class="co-body">멈췄다 이어도 손실이 없는 건 흐름이 파일(<code>tasks/</code>·<code>results/</code>)에 있기 때문입니다. 그래서 "오늘 여기까지 → 정리 → 내일 재개"가 자연스러운 일상 루틴이 됩니다.</div>
+      </div>
+    </section>
+
+  </div><!-- ╚══════════ 탭 C 끝 ══════════╝ -->
+
+  <!-- ╔══════════ 탭 D — 명령어 레퍼런스 ══════════╗ -->
+  <div class="tab-panel" data-tab="ref" hidden>
+
+    <!-- ──────── /awa 슬래시 명령 ──────── -->
+    <section class="section" id="ref-awa">
+      <div class="eyebrow">Command Reference</div>
+      <h2 class="sec-title">/awa 슬래시 명령</h2>
+      <p>AWA의 모든 동작은 <code>/awa</code> 한 명령에서 출발합니다. 인자에 따라 발진·정리·관제·북마크로 갈라집니다. <br><strong>팀을 띄우거나 접속하는 것만 사용자가 <code>!</code>로 직접 실행</strong>하고, 나머지 관리 명령은 Claude가 바로 실행합니다.</p>
+      <div class="card cmd-ref">
+        <div class="cr-row cr-head"><div>명령</div><div>하는 일</div><div>실행</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa</div><div>팀 조립 인터뷰 → 발진. 살아있는 세션이 있으면 먼저 이어하기(Step 0)를 제안</div><div><span class="badge accent">! 발진</span></div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa down</div><div>세션 정리 메뉴 — 여러 세션을 골라 종료(산출물 보존)</div><div><span class="badge neutral">자동</span></div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash [인자]</div><div>멀티뷰 관제탑 — 여러 프로젝트를 한 화면에 모아 동시 감시</div><div><span class="badge neutral">자동</span></div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks [인자]</div><div>프로젝트 북마크 관리 — 목록·별칭·삭제·정리</div><div><span class="badge neutral">자동</span></div></div>
+      </div>
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">⌨️</span>
+        <div class="co-body"><strong><code>!</code>는 Claude Code 입력창에서 셸 명령을 실행하는 접두입니다.<br></strong> 이 가이드 표기: <code>$</code> 일반 터미널 · <code>&gt;</code> Claude Code 입력창 · <code>[ ]</code> 선택 인자 · <code>&lt; &gt;</code> 채워 넣는 값.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── /awa dash 인자 ──────── -->
+    <section class="section" id="ref-dash">
+      <div class="eyebrow">dash</div>
+      <h2 class="sec-title">/awa dash 인자</h2>
+      <p>여러 프로젝트의 ORCH·DESK 화면을 한 그리드(<code>_DASHBOARD</code>)에 모으는 관제탑 명령입니다.</p>
+      <div class="card cmd-ref ops">
+        <div class="cr-row"><div class="cr-cmd">/awa dash merge &lt;A&gt; &lt;B&gt; …</div><div>여러 세션을 새 관제탑으로 모음</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash add &lt;세션&gt;</div><div>이미 떠 있는 관제탑에 한 프로젝트 추가</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash detach &lt;proj&gt;</div><div>한 프로젝트를 관제탑에서 떼어 원래 세션으로 복원</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash split</div><div>전부 복원하고 관제탑을 닫음</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa dash kill &lt;proj&gt;</div><div>관제탑에서 떼고 그 프로젝트 팀까지 종료</div></div>
+      </div>
+      <div class="callout tip">
+        <span class="co-icon" aria-hidden="true">📺</span>
+        <div class="co-body">진입은 <code>tmux attach -t _DASHBOARD</code>. 프로젝트당 한 줄(좌 ORCH·우 DESK), 한 윈도우에 3개까지, 그 이상은 다음 페이지로 넘어갑니다.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── /awa bookmarks 인자 ──────── -->
+    <section class="section" id="ref-bookmarks">
+      <div class="eyebrow">bookmarks</div>
+      <h2 class="sec-title">/awa bookmarks 인자</h2>
+      <p>팀을 띄울 때마다 프로젝트 경로가 자동 등록됩니다. 별칭을 붙이면 <code>/awa</code> 폴더 선택에서 경로 대신 별칭만 입력하면 됩니다.</p>
+      <div class="card cmd-ref ops">
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks list</div><div>저장된 프로젝트 전체 보기 (없어진 경로는 stale 표시)</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks set-alias</div><div>프로젝트에 짧은 별칭 부여·변경</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks remove</div><div>번호로 삭제 (<code>1,3</code> 또는 <code>all</code>)</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks prune</div><div>없어진 경로(stale) 일괄 정리</div></div>
+        <div class="cr-row"><div class="cr-cmd">/awa bookmarks</div><div>인자 없이 — 대화형 메뉴</div></div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 스크립트 · 플래그 ──────── -->
+    <section class="section" id="ref-scripts">
+      <div class="eyebrow">scripts</div>
+      <h2 class="sec-title">스크립트 · 플래그 (고급)</h2>
+      <p><code>/awa</code> 인터뷰가 내부적으로 호출하는 하니스 스크립트입니다. 보통 직접 칠 일은 없지만, 자동화나 멀티프로젝트를 스크립트로 다룰 때 씁니다.</p>
+      <div class="card cmd-ref ops">
+        <div class="cr-row"><div class="cr-cmd">awa-up.sh --spec &lt;team.yaml&gt;</div><div>팀 발진. <code>team.yaml</code> 구성으로 세션을 띄움</div></div>
+        <div class="cr-row"><div class="cr-cmd">awa-up.sh --project &lt;경로&gt;</div><div>워커가 작업할 프로젝트 폴더 지정 (세션명 <code>awa-&lt;폴더명&gt;</code>)</div></div>
+        <div class="cr-row"><div class="cr-cmd">awa-up.sh --plan &lt;plan.md&gt;</div><div>plan(또는 task.md)을 주입 → ORCH 자동 착수</div></div>
+        <div class="cr-row"><div class="cr-cmd">SESSION_OVERRIDE=&lt;이름&gt;</div><div>폴더명이 겹칠 때 세션 이름을 직접 지정(앞에 붙임)</div></div>
+        <div class="cr-row"><div class="cr-cmd">awa-down.sh --project &lt;경로&gt;</div><div>해당 프로젝트 세션·런타임 정리(산출물 보존)</div></div>
+      </div>
+      <div class="callout warn">
+        <span class="co-icon" aria-hidden="true">⚠️</span>
+        <div class="co-body">스크립트는 <code>~/.claude/skills/awa/harness/bin/</code>에 있습니다. <br>발진·attach만 사용자 <code>!</code> 필수이고, 정리·관제·북마크는 Claude가 자동 실행합니다. <br>가이드·프롬프트 수정은 항상 git 추적되는 원본에서 하세요.</div>
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ──────── 주요 파일 위치 ──────── -->
+    <section class="section" id="ref-files">
+      <div class="eyebrow">files</div>
+      <h2 class="sec-title">주요 파일 위치</h2>
+      <p>설정·학습·북마크가 어디 저장되는지 — 프로젝트 폴더(<code>.awa/</code>)와 사용자 홈(<code>~/.config/awa</code>)으로 나뉩니다.</p>
+      <div class="card cmd-ref ops">
+        <div class="cr-row"><div class="cr-cmd">&lt;프로젝트&gt;/.awa/team.yaml</div><div>인터뷰가 만든 팀 구성. 재호출·공유용(git 추적 가능)</div></div>
+        <div class="cr-row"><div class="cr-cmd">&lt;프로젝트&gt;/.awa/task.md</div><div>자연어 작업 지시(plan 없을 때). ORCH 자동 착수 대상</div></div>
+        <div class="cr-row"><div class="cr-cmd">~/.config/awa/bookmarks.tsv</div><div>프로젝트 북마크. 재설치에도 보존</div></div>
+        <div class="cr-row"><div class="cr-cmd">harness/config/orch-auto-allow.yaml</div><div>역할별 자동 허용 카탈로그(원본, git 추적)</div></div>
+        <div class="cr-row"><div class="cr-cmd">.agent-harness/learned-allow.yaml</div><div>작업 중 학습한 허용 패턴(런타임, 재가동 유지)</div></div>
+        <div class="cr-row"><div class="cr-cmd">harness/bin/danger-check.sh</div><div>차단 21종 하드코딩(읽기 전용, 작업 중 변경 불가)</div></div>
+      </div>
+    </section>
+
+  </div><!-- ╚══════════ 탭 D 끝 ══════════╝ -->
+
+  </main>
+
+</div>
+
+<footer class="footer">
+  <strong>AWA — Agents Watching Agents</strong> · 감독된 자율성 플랫폼<br>
+  <a href="https://github.com/taehyunan-99/awa" target="_blank" rel="noopener">github.com/taehyunan-99/awa</a>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
