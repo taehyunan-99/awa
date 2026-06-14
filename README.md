@@ -4,9 +4,14 @@
 ![shell](https://img.shields.io/badge/bash-3.2%2B-89e051)
 ![tmux](https://img.shields.io/badge/tmux-3.6%2B-1BB91F)
 ![status](https://img.shields.io/badge/status-beta-yellow)
+[![guide](https://img.shields.io/badge/사용%20가이드-awa--project.netlify.app-2BA8A0)](https://awa-project.netlify.app/)
 
 <p align="center">
   <img src="docs/charts/awa-splash.png" width="460" alt="AWA 첫 실행 화면 — 팀 구성 splash">
+</p>
+
+<p align="center">
+  <strong>📖 <a href="https://awa-project.netlify.app/">시작부터 끝까지 — 사용 가이드</a></strong>
 </p>
 
 > 멀티 에이전트 팀이 plan을 닻 삼아 일하고, **에이전트가 에이전트를 감시한다.**
@@ -132,6 +137,8 @@ cd <프로젝트> && claude
 
 1. **DESK**에 작업을 말한다 → ORCH가 분해·배정 트리를 보여주고 승인 1회
 2. 이후 자율 진행 — 판단 필요할 때만 등급(🔴위험 🟠판단 🔵권한 🟢승인)으로 사람을 부름
+
+> 설치부터 운영·모든 명령어까지 — 전체 사용법은 **[사용 가이드](https://awa-project.netlify.app/)**에서 단계별로 확인할 수 있다.
 
 ```bash
 > 오늘은 여기까지                      # 드레인 — 진행 중 task만 마치고 정지
