@@ -1,0 +1,26 @@
+# Netlify 배포 설정 — AWA 가이드 정적 사이트
+# 사이트 소스는 리포 루트가 아니라 site/ 안에 있으므로 publish 를 site 로 지정한다.
+# 빌드 단계가 없는 순수 정적(HTML/CSS/JS)이라 build.command 는 비운다.
+
+[build]
+  publish = "site"
+  command = ""
+
+# 정적 자산 캐시·기본 보안 헤더
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# styles.css / app.js 는 파일명이 고정이라 장기 캐시 대신 재검증 위주로(배포 즉시 반영)
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
