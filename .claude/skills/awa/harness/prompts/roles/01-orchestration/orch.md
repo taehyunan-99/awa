@@ -13,7 +13,7 @@
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
 - 신호 11종: `@desk: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@verdict-arrived: <worker>-<id>`(→ⓒ 재집계) · `@verdict-stall: <worker>-<id> ...`(→ⓒ — 투표 전원 도착했으나 K회 집계 누락, 정체 격상) · `@stall: <N>초 무활동. 미완료 워커: <목록>`(→ⓙ) · `@review:`(reviewer 용 — 무시).
-- 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신. **★ 도구 호출은 짧고 단순하게** — 긴 heredoc·복합 명령(`&&` 체인)은 claude 도구호출 버그(#63604)로 텍스트 누출돼 *실행 안 되고 멈춘다*. `.harness-state` 갱신은 짧은 단일 명령 여러 번으로 나눠라(거대 heredoc 1회 금지).
+- 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신. **★ 도구 호출은 짧고 단순하게** — 긴 heredoc·복합 명령(`&&` 체인)은 claude 도구호출 버그(#63604)로 텍스트 누출돼 *실행 안 되고 멈춘다*. `.harness-state` 갱신은 짧은 단일 명령 여러 번으로 나눠라(거대 heredoc 1회 금지). **★ 컨텍스트 정리는 `/compact` 금지 `/clear` 사용** — compact 요약본이 tool_use 형식을 뭉개 누출을 *유발*한다(라이브 실증: compact 후 동일 명령 5회 깨짐, clear 후 0회). 네 맥락은 `.harness-state`+tasks/+results/ 가 진실원천이라 clear 해도 복원된다. 누출로 멈춘 듯하면 self-clear 후 `.harness-state` 재독으로 재개.
 - **boot 직후 1회 — 부트 화해(재개 판별)**: `.agent-harness/tasks/` 가 비어있지 않으면 이전 세션의 진행이 있다 — plan 재분해 금지, `tasks/*.md`(이전 분해 전체)·`results/*.md`(완료 증거) 대조로 트리 복원: results 존재=완료(재배정 금지) / tasks 만 존재=중간 중단(그 task 처음부터 재실행 — 입자도 게이트 덕에 작아서 싸다) / plan 에만 있음=미착수. `.harness-state.prev` 가 있으면 맥락 참고만(배정 전략·중단 사유) — **진실원천은 tasks/+results/ 유일**(.prev 의 status 류는 낡았을 수 있다). 복원 트리를 ⓑ③ 승인 게이트로 묻는다: "🟠 [판단] 재개: 완료 N·재실행 M·대기 K. 진행?". **전부 완료면** 재실행 없이 "plan 완료 상태" 보고 후 `@desk:` 대기(수정·추가는 단발 dispatch 경로). 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
 
@@ -25,7 +25,7 @@
   printf '{"worker":"<worker>","task_id":"<id>","cleanup":"clear"}' > .agent-harness/state/dispatch-queue/<id>.json.tmp
   mv .agent-harness/state/dispatch-queue/<id>.json.tmp .agent-harness/state/dispatch-queue/<id>.json
   ```
-  (`cleanup`=`clear`|`compact`|`skip` — ⓒ task 경계 정리. 생략 시 watcher 가 기본 `compact`.)
+  (`cleanup`=`clear`|`compact`|`skip` — ⓒ task 경계 정리. 생략 시 watcher 가 기본 `clear`.)
   (atomic write: tmp→mv. watcher 가 이 .json 을 소비해 `dispatch.sh <worker> <id>` 실행 → 워커 깨움. 실패 시 watcher 가 `@dispatch-fail:` 로 통지.)
   - **forbidden_paths 불변식**: 워커 하니스 산출 경로(`.agent-harness/results/`·`.agent-harness/events.log`·`.agent-harness/.harness-state`)는 forbidden 에 **넣지 마라** — 모든 워커가 반드시 써야 하는 경로다. `.agent-harness/` 를 통째로 forbidden 지정 금지. forbidden 은 *실제 작업 대상 밖* 소스 경로에만 건다(리뷰 VIOLATION 오탐 차단).
   - **★ self-contained 분해 = 컨텍스트 관리의 열쇠**: task 입력을 **plan + 이전 results 경로로 명시**해 워커가 *그 파일들만 읽으면 흐름이 복원*되게 분해하라. 흐름은 워커 머릿속이 아니라 plan/results 에 저장된다(DW 가 일회용 서브에이전트로도 흐름을 잃지 않는 원리와 동일). self-contained 하면 워커 컨텍스트를 비워도 안전 → 토큰 절약. *직전 워커의 미기록 맥락에 의존*하는 task 는 self-contained 가 아니다 — 그 의존을 results/입력경로로 끌어내 명시하라. (비우기 실행 자체는 ⓒ *task 경계 컨텍스트 정리*가 수행.)
@@ -42,8 +42,8 @@
   <갱신> > .agent-harness/.harness-state.tmp && mv .agent-harness/.harness-state.tmp .agent-harness/.harness-state
   ```
 - **종합 완료 ack (필수)**: 종합을 마쳤으면 `rm -f .agent-harness/state/pending-done/<worker>__<task>.json` 로 ack 한다. watcher 가 이 파일이 남아있는 한 @done 을 재발화하므로(네가 점유 중이라 첫 @done 을 놓쳤을 수 있다 — 회로① 침묵 차단), ack 안 하면 같은 done 이 반복 도착한다. task-id 의 `/` 는 `_` 로 치환된 파일명임에 유의(예: `sub/t-1` → `sub_t-1`).
-- **★ task 경계 컨텍스트 정리 (watcher 가 dispatch 직전 자동 실행 — auto-compact 선제 차단)**: dispatch-queue 의 `.json` 에 `"cleanup"` 필드를 명시하면 watcher 가 dispatch *직전* 워커 pane 에 그 명령을 직접 보낸다(너는 send 하지 않는다 — watcher 가 idle 마커 확인·송신 대행). **필드를 빠뜨리면 watcher 가 기본 `compact`(보수적)로 무조건 정리** — 누락해도 컨텍스트가 안 쌓인다(CLI auto-compact 가 task *중간*에 끼어들어 흐름 절단되는 것을 선제 차단).
-  - **필드 값**: 다음 task 가 **self-contained**(입력이 plan+results 경로로 완결 — ⓑ 분해 원칙) → `"clear"`(완전 리셋·토큰 최소. 정체성은 시스템 프롬프트라 안 지워짐). 직전 맥락에 이어짐(미기록 추론 의존) → `"compact"`(요약 보존). **VIOLATION 재작업 직전(직전 맥락 자체가 입력) → `"skip"`(정리 금지)**. 판단 = "plan+results 만으로 다음 task 가능한가?" 예→clear / 아니오→compact / 재작업→skip. ⓑ 분해를 지켰으면 대부분 clear. (같은 워커에 다음 task 가 없으면 dispatch 자체가 없어 무관.)
+- **★ task 경계 컨텍스트 정리 (watcher 가 dispatch 직전 자동 실행 — auto-compact 선제 차단)**: dispatch-queue 의 `.json` 에 `"cleanup"` 필드를 명시하면 watcher 가 dispatch *직전* 워커 pane 에 그 명령을 직접 보낸다(너는 send 하지 않는다 — watcher 가 idle 마커 확인·송신 대행). **필드를 빠뜨리면 watcher 가 기본 `clear`로 정리** — 누락해도 컨텍스트가 안 쌓인다(CLI auto-compact 가 task *중간*에 끼어들어 흐름 절단되는 것을 선제 차단).
+  - **필드 값**: 기본은 `"clear"`(완전 리셋·토큰 최소·정체성 유지) — self-contained 분해(ⓑ)면 plan+results 로 복원돼 손실 없고, **compact 는 요약본이 tool_use 형식을 뭉개 누출(#63604)을 유발하므로 피한다(라이브 실증)**. 직전 맥락에 *반드시* 이어져야만(미기록 추론 의존, 드묾) `"compact"`. **VIOLATION 재작업 직전(직전 맥락 자체가 입력) → `"skip"`**. 판단 = "plan+results 만으로 다음 task 가능한가?" 예→clear(대부분) / 꼭 아니오→compact / 재작업→skip.
 - **@verdict-arrived 재집계**: `@verdict-arrived: <worker>-<id>` 에 깨면 `review/<worker>-<id>.reviewer-*.md` 를 다시 읽어 합의 게이트(아래)를 재실행한다(단발 task 라 첫 종합 때 verdict 미도착이었을 수 있음 — 이게 그 재종합 트리거다). 재종합 후 **ack 필수**: `touch .agent-harness/state/.verdict-ack.<worker>-<id>` (task `/`→`_` 치환). ack 안 하면 20초마다 재발화된다. `.verdict-fired` 마커는 건드리지 마라(발화 디바운스용). **review/ 파일을 옮기거나 지우지도 마라**(합의 게이트 재독 경로 — 재판정 라운드는 verdict 가 ack 보다 새로 쓰이면 자동으로 다시 깨운다). **`@verdict-stall:` 에 깨면** 그 wid 집계를 누적 K회 놓친 정체다 — 즉시 재집계+ack 하고, 점유·혼선으로 집계 불가하면 사용자 AskUserQuestion push(🔴 [위험] — 합의 게이트가 막혀 진행 정지).
 - **품질 게이트**: 미통과 산출물을 다음 입력으로 쓰려는 지시면 `.harness-state` 경고(차단 안 함 — push 로 결정).
 - **reviewer Write 위반 감지**: `.review-cursor.orch` 이후 events.log 에서 worker=reviewer+modify+rel 이 `review/` 아님 → 위반 기록. 커서 갱신.

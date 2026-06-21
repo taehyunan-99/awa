@@ -64,24 +64,20 @@ if [ ! -f "$TASK_FILE" ]; then
   exit 1
 fi
 
-# 워커/리뷰어 → 페인: window 0(team)·1(review) 양쪽에서 pane title 로 찾는다.
+# 워커/리뷰어 → 페인: 세션의 전 window 를 pane title 로 스캔한다.
+# (이전엔 window 0·1 만 봤으나 review window 가 2 에 배치된 레이아웃에서 리뷰어를
+#  못 찾아 dispatch 실패했다. window 인덱스 하드코딩 대신 list-panes -a 로 전수 조회.)
 TARGET=""
-for win in 0 1; do
-  tmux has-session -t "$SESSION" 2>/dev/null || break
-  if ! tmux list-windows -t "$SESSION" -F '#{window_index}' | grep -qx "$win"; then
-    continue
+tmux has-session -t "$SESSION" 2>/dev/null || { echo "오류: 세션 '$SESSION' 없음." >&2; exit 1; }
+while IFS=$'\t' read -r ptarget ptitle; do
+  if [ "$ptitle" = "$WORKER" ]; then
+    TARGET="$ptarget"
+    break
   fi
-  while IFS=$'\t' read -r pidx ptitle; do
-    if [ "$ptitle" = "$WORKER" ]; then
-      TARGET="$SESSION:$win.$pidx"
-      break
-    fi
-  done < <(tmux list-panes -t "$SESSION:$win" -F $'#{pane_index}\t#{pane_title}')
-  [ -n "$TARGET" ] && break
-done
+done < <(tmux list-panes -s -t "$SESSION" -F $'#{session_name}:#{window_index}.#{pane_index}\t#{pane_title}')
 
 if [ -z "$TARGET" ]; then
-  echo "오류: 워커/리뷰어 '$WORKER' 페인을 찾을 수 없음 (window 0·1 조회)." >&2
+  echo "오류: 워커/리뷰어 '$WORKER' 페인을 찾을 수 없음 (세션 '$SESSION' 전 window 조회)." >&2
   exit 1
 fi
 

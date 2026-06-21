@@ -92,6 +92,11 @@ rm -rf "${STATE_DIR:?STATE_DIR unset}/pending-asks" \
        "${STATE_DIR}/incidents" \
        "${STATE_DIR}/removal-requests" 2>/dev/null || true
 rm -f "${STATE_DIR}/permission-gate.log" 2>/dev/null || true
+rm -rf "${STATE_DIR}/pending-done" "${STATE_DIR}/dispatch-queue" "${STATE_DIR}/desk-queue" 2>/dev/null || true
+# watcher 런타임 마커(ack·디바운스·정리 1회) 회수 — 안 지우면 STATE_DIR 에 단조 누적돼 아래 rmdir
+# 이 실패(STATE_DIR 잔존)한다. .verdict-ack/.verdict-fired/.dispatch-fired/.review-cleared 전부.
+rm -f "${STATE_DIR}"/.verdict-ack.* "${STATE_DIR}"/.verdict-fired.* \
+      "${STATE_DIR}"/.review-cleared.* 2>/dev/null || true
 # .watcher-seen 은 deprecated(pending-asks ack 큐화로 watcher 가 더는 생성 안 함, 2026-06-07).
 # 과거 실행본이 남긴 잔존 파일 청소용으로만 유지.
 rm -f "${STATE_DIR}/.watcher-seen" 2>/dev/null || true

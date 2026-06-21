@@ -123,24 +123,25 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
     #   못 잡아 컨텍스트가 쌓이고 CLI auto-compact 가 task 중간에 끼어들어 흐름 절단(라이브 관측).
     #   → ORCH 능동 행위를 watcher 로 이관. cleanup 필드(orch 가 json 에 명시):
     #     "clear"=완전 리셋 / "compact"=요약 보존 / "skip"=정리 금지(VIOLATION 재작업 — orch.md ⓒ:47).
-    #   필드 없으면 기본 compact(보수적 — orch 가 까먹어도 무조건 정리). busy pane 엔 무산되나
-    #   무해(다음 dispatch 의 ready 폴링이 안전망). codex pane 도 동일 — 정리 무산은 치명적 아님.
+    #   ★ 기본 clear(2026-06-21): compact 요약본이 tool_use 형식을 뭉개 claude 도구호출 누출
+    #   (#63604)을 유발한다는 가설(라이브: compact 후 누출 급증, clear 상태선 0). clear 는 히스토리를
+    #   통째 비워 뭉개진 tool_use 가 안 남고 초기 세팅(시스템프롬프트)의 정상 형식만 남아 누출↓.
+    #   워커는 self-contained 분해(plan+results 로 복원)가 전제라 clear 손실 없음 — 맥락 의존 task 만
+    #   orch 가 compact 명시. busy pane 엔 무산되나 무해(다음 dispatch 의 ready 폴링이 안전망).
+    #   codex pane 도 동일 — 정리 무산은 치명적 아님.
     #   재발화 가드: dispatch 가 exit 3(유실 의심)로 .json 을 소비 안 하고 재발화하면 이 블록도
     #   매 폴링 재실행된다 — 정리는 task당 1회면 되므로 .dispatch-fired 마커(아래 (a)에서 생성)가
     #   이미 있으면(=재발화 중) 정리 스킵(이미 1회 시도함, /clear 중복 송신 방지).
     _dq_clean="$(jq -r '.cleanup // empty' "$f" 2>/dev/null)"
-    [ -n "$_dq_clean" ] || _dq_clean="compact"
+    [ -n "$_dq_clean" ] || _dq_clean="clear"
     if [ "$_dq_clean" != "skip" ] \
        && [ ! -f "$STATE_DIR/dispatch-queue/.dispatch-fired.$(_pd_sanitize "$dq_worker")__$(_pd_sanitize "$dq_task")" ]; then
-      # 워커 pane 탐색(dispatch.sh 와 동형: window 0·1, pane_title=worker명).
+      # 워커 pane 탐색(dispatch.sh 와 동형: 세션 전 window 스캔 -s, pane_title=worker명).
+      # window 인덱스 하드코딩 금지 — review window 가 2 에 오는 레이아웃에서 못 찾는다(dispatch.sh 동일 버그).
       _cl_pane=""
-      for _clw in 0 1; do
-        tmux list-windows -t "$SESSION" -F '#{window_index}' 2>/dev/null | grep -qx "$_clw" || continue
-        while IFS=$'\t' read -r _clidx _cltitle; do
-          [ "$_cltitle" = "$dq_worker" ] && { _cl_pane="$SESSION:$_clw.$_clidx"; break; }
-        done < <(tmux list-panes -t "$SESSION:$_clw" -F $'#{pane_index}\t#{pane_title}' 2>/dev/null)
-        [ -n "$_cl_pane" ] && break
-      done
+      while IFS=$'\t' read -r _cltarget _cltitle; do
+        [ "$_cltitle" = "$dq_worker" ] && { _cl_pane="$_cltarget"; break; }
+      done < <(tmux list-panes -s -t "$SESSION" -F $'#{session_name}:#{window_index}.#{pane_index}\t#{pane_title}' 2>/dev/null)
       # idle 마커 있을 때만 send(busy 면 큐잉 유실 — 조용히 스킵). send_prompt 경유(-l+Enter 분리).
       if [ -n "$_cl_pane" ] && _pane_idle "$_cl_pane"; then
         send_prompt "$_cl_pane" "/$_dq_clean" 2>/dev/null
@@ -353,6 +354,40 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
         done
         debounced_rev="$_rw_now"
       fi
+    fi
+  fi
+
+  # 3d) reviewer task-경계 컨텍스트 정리(2026-06-21) — 리뷰어는 dispatch 가 없어 자동정리 대상
+  #     밖이라 세션 내내 컨텍스트 누적(컨텍스트 오염 → 누출/판단저하). "task 경계"=모든 리뷰어가
+  #     현재까지 검토 완료하고 다음 done 을 기다리는 idle 구간. 그때 /clear 송신(워커 기본과 동일
+  #     이유 — compact 누출 가설 회피, cursor·verdict 가 파일 영속이라 clear 손실 없음). 3c 와 대칭:
+  #     3c=cursor 뒤처짐→재깨움 / 3d=cursor 따라잡음(검토완료)→정리. 안전 불변식 4겹:
+  #     ① 모든 cursor == 현재 events.log 줄수(검토 완료) ② cursor 파일 수 == N ③ 각 pane idle
+  #     (검토 중 clear=verdict race 차단) ④ .review-cleared.<줄수> 마커로 같은 줄수 1회만(폭주 차단).
+  #     race 나도 verdict 손실 없음(cursor 영속 → 다음 깨움이 재처리), 검토 지연만. codex=P17 무산 무해.
+  # 발동은 events 가 REVIEW_CLEAR_IDLE(기본 90초) 무증가일 때만 — 새 done 이 곧 올 상황(검토 임박)에
+  # 정리하는 낭비·race 차단. last_activity_ts 는 events 증가 시 리셋(전역).
+  _rc_now="$(date +%s)"
+  if [ "$EXPECTED_VOTERS" -gt 0 ] && [ "$cur" -gt 0 ] \
+     && [ "$((_rc_now - last_activity_ts))" -ge "${REVIEW_CLEAR_IDLE:-90}" ]; then
+    _rc_hdir="$(dirname "$EVENTS")"
+    _rc_cnt=0; _rc_all_caught=1
+    for cf in "$_rc_hdir"/.review-cursor.reviewer-*; do
+      [ -f "$cf" ] || continue
+      _rcv="$(cat "$cf" 2>/dev/null)"; case "$_rcv" in ''|*[!0-9]*) _rcv=0 ;; esac
+      _rc_cnt=$((_rc_cnt+1))
+      [ "$_rcv" -lt "$cur" ] && _rc_all_caught=0   # 한 명이라도 뒤처지면 검토 미완
+    done
+    # 전원 검토완료(모든 cursor==cur) + 리뷰어 수 충족 + 이 줄수에서 아직 clear 안 함.
+    _rc_marker="$STATE_DIR/.review-cleared.$cur"
+    if [ "$_rc_cnt" -ge "$EXPECTED_VOTERS" ] && [ "$_rc_all_caught" = 1 ] && [ ! -f "$_rc_marker" ]; then
+      for rp in $REVIEWER_PANES; do
+        pane_alive "$rp" || continue
+        [ "$rp" = "$REVIEW_MANAGER_PANE" ] && continue
+        _pane_idle "$rp" || continue            # idle 일 때만(검토 중이면 다음 사이클로 미룸)
+        send_prompt "$rp" "/clear" 2>/dev/null
+      done
+      : > "$_rc_marker" 2>/dev/null || true       # 이 줄수에서 1회 정리함(중복 차단)
     fi
   fi
 
