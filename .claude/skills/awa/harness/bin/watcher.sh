@@ -118,6 +118,34 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
       rm -f "$f" 2>/dev/null
       continue
     fi
+    # ★ task 경계 컨텍스트 정리 강제(2026-06-21): dispatch *직전* 워커 pane 에 /clear|/compact 를
+    #   watcher 가 직접 send 한다. 구설계는 ORCH 가 능동 send 했으나(orch.md ⓒ) 누락 시 아무도
+    #   못 잡아 컨텍스트가 쌓이고 CLI auto-compact 가 task 중간에 끼어들어 흐름 절단(라이브 관측).
+    #   → ORCH 능동 행위를 watcher 로 이관. cleanup 필드(orch 가 json 에 명시):
+    #     "clear"=완전 리셋 / "compact"=요약 보존 / "skip"=정리 금지(VIOLATION 재작업 — orch.md ⓒ:47).
+    #   필드 없으면 기본 compact(보수적 — orch 가 까먹어도 무조건 정리). busy pane 엔 무산되나
+    #   무해(다음 dispatch 의 ready 폴링이 안전망). codex pane 도 동일 — 정리 무산은 치명적 아님.
+    #   재발화 가드: dispatch 가 exit 3(유실 의심)로 .json 을 소비 안 하고 재발화하면 이 블록도
+    #   매 폴링 재실행된다 — 정리는 task당 1회면 되므로 .dispatch-fired 마커(아래 (a)에서 생성)가
+    #   이미 있으면(=재발화 중) 정리 스킵(이미 1회 시도함, /clear 중복 송신 방지).
+    _dq_clean="$(jq -r '.cleanup // empty' "$f" 2>/dev/null)"
+    [ -n "$_dq_clean" ] || _dq_clean="compact"
+    if [ "$_dq_clean" != "skip" ] \
+       && [ ! -f "$STATE_DIR/dispatch-queue/.dispatch-fired.$(_pd_sanitize "$dq_worker")__$(_pd_sanitize "$dq_task")" ]; then
+      # 워커 pane 탐색(dispatch.sh 와 동형: window 0·1, pane_title=worker명).
+      _cl_pane=""
+      for _clw in 0 1; do
+        tmux list-windows -t "$SESSION" -F '#{window_index}' 2>/dev/null | grep -qx "$_clw" || continue
+        while IFS=$'\t' read -r _clidx _cltitle; do
+          [ "$_cltitle" = "$dq_worker" ] && { _cl_pane="$SESSION:$_clw.$_clidx"; break; }
+        done < <(tmux list-panes -t "$SESSION:$_clw" -F $'#{pane_index}\t#{pane_title}' 2>/dev/null)
+        [ -n "$_cl_pane" ] && break
+      done
+      # idle 마커 있을 때만 send(busy 면 큐잉 유실 — 조용히 스킵). send_prompt 경유(-l+Enter 분리).
+      if [ -n "$_cl_pane" ] && _pane_idle "$_cl_pane"; then
+        send_prompt "$_cl_pane" "/$_dq_clean" 2>/dev/null
+      fi
+    fi
     # dispatch.sh 가 has-session/list-panes/send_prompt(tmux) 를 watcher(sandbox 밖)에서
     # 정상 실행. --project 로 PROJECT_ROOT 명시(watcher cwd=본체라 git toplevel 오인 방지).
     _dq_rc=0
@@ -281,10 +309,19 @@ while tmux has-session -t "$SESSION" 2>/dev/null; do
   #     무한 재발화 루프였다(scan_verdict_quorum 헤더 참조).
   if [ -n "$STATE_DIR" ] && [ "$EXPECTED_VOTERS" -gt 0 ]; then
     _review_dir="$(dirname "$EVENTS")/review"
+    # emit = "<wid>	<재발화횟수>". 횟수가 VERDICT_STALL_MAX 도달 = ORCH 가 누적 K회(=K×REQUEUE_AGE
+    # 초) 집계를 안 한 정체 → @verdict-arrived 무한 재발화로 두지 말고 @verdict-stall 로 격상해
+    # ORCH 가 사용자에게 push 하도록 한다(orch.md ⓒ). 미격상 시 results 존재 워커는 stall
+    # watchdog 의 '완료-idle' 제외(L347)에 걸려 사용자에게 영영 안 닿는 사각이었다.
     scan_verdict_quorum "$_review_dir" "$STATE_DIR" "$EXPECTED_VOTERS" "$REQUEUE_AGE" 2>/dev/null \
-      | while IFS= read -r wid; do
+      | while IFS=$'\t' read -r wid vcnt; do
           [ -n "$wid" ] || continue
-          notify_orch "@verdict-arrived: $wid 투표 ${EXPECTED_VOTERS}종 전원 도착. review/ 재종합 후 ack 필수: touch .agent-harness/state/.verdict-ack.$wid (review/ 파일 이동·삭제 금지)."
+          case "$vcnt" in ''|*[!0-9]*) vcnt=0 ;; esac
+          if [ "$vcnt" -ge "${VERDICT_STALL_MAX:-6}" ]; then
+            notify_orch "@verdict-stall: $wid 투표 ${EXPECTED_VOTERS}종 전원 도착했으나 ${vcnt}회($((vcnt * REQUEUE_AGE))초) 집계 안 됨 — ORCH 점유/정체 의심. 즉시 review/ 집계하고 ack(touch .agent-harness/state/.verdict-ack.$wid). 집계 불가하면 사용자에게 push 하라."
+          else
+            notify_orch "@verdict-arrived: $wid 투표 ${EXPECTED_VOTERS}종 전원 도착. review/ 재종합 후 ack 필수: touch .agent-harness/state/.verdict-ack.$wid (review/ 파일 이동·삭제 금지)."
+          fi
         done
   fi
 

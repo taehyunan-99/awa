@@ -123,7 +123,12 @@ scan_verdict_quorum() {
   [ -n "$quorum_wids" ] || return 0
 
   # 3) 발화 대상 wid emit. ack 검사 → fired 디바운스 → emit + fired touch.
-  local w maxmt ack ackmt marker mt now
+  # emit 형식: "<wid>	<재발화횟수>" — watcher.sh 가 횟수로 정체 상한(@verdict-stall) 판정.
+  #   `.verdict-fired.<wid>` 파일 *내용*=누적 발화 횟수, *mtime*=마지막 발화 시각(디바운스).
+  #   ORCH 가 ack 하면(아래 ack 검사 통과) 더는 발화 안 하므로 카운터는 자연 리셋(파일이
+  #   다음 라운드에 다시 0부터)되지 않지만, 재판정 라운드는 verdict mtime>ackmt 로 재개되며
+  #   카운터는 그대로 누적된다 — 상한 도달=이 wid 가 누적 K회 무시됐다는 신호라 의도된 동작.
+  local w maxmt ack ackmt marker mt now cnt
   now="$(date +%s)"
   printf '%s\n' "$quorum_wids" | while IFS=$'\t' read -r w maxmt; do
     [ -n "$w" ] || continue
@@ -136,13 +141,16 @@ scan_verdict_quorum() {
       [ "$ackmt" -ge "$maxmt" ] && continue
     fi
     marker="$sd/.verdict-fired.$(_pd_sanitize "$w")"
+    cnt=0
     if [ -f "$marker" ]; then
+      cnt="$(cat "$marker" 2>/dev/null || echo 0)"; case "$cnt" in ''|*[!0-9]*) cnt=0 ;; esac
       [ "$age_thresh" -gt 0 ] || continue     # 1회성 모드 — 재발화 차단
       mt="$(stat -f %m "$marker" 2>/dev/null || stat -c %Y "$marker" 2>/dev/null || echo 0)"
       case "$mt" in ''|*[!0-9]*) mt=0 ;; esac
       [ $(( now - mt )) -ge "$age_thresh" ] || continue   # 디바운스(폭주 방지)
     fi
-    : > "$marker" 2>/dev/null || true         # fired touch(다음 재발화 디바운스)
-    printf '%s\n' "$w"
+    cnt=$((cnt+1))
+    echo "$cnt" > "$marker" 2>/dev/null || true   # 누적 발화 횟수 기록(내용) + mtime 갱신(디바운스)
+    printf '%s\t%s\n' "$w" "$cnt"
   done
 }
