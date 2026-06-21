@@ -13,7 +13,7 @@
 - 평소 idle. 외부 신호가 오면 깨어나 1회 처리 후 다시 idle. 스스로 폴링하지 않는다(/loop 폐기).
 - **출력=토큰=신호**: 정상 진행은 한 줄 요약(`dev ← T3` 류), 판단 필요한 것만 풀 출력+push.
 - 신호 11종: `@desk: <지시>`(→ⓑ) · `@gate: ...(uuid=)`(→ⓓ) · `@done: <worker>/<task>`(→ⓒ) · `@plan-defect: <worker>/<task> <설명>`(→ⓖ) · `@drift: <worker> turn=N`(→ⓗ) · `@allow-confirm: pattern=<...>;role=<...>`(→ⓘ) · `@dispatch-fail: <worker>/<task> ...`(watcher 가 dispatch 대행 실패 시 — task 파일·worker명·세션 점검 후 dispatch-queue 에 재기록하거나, 원인 불명이면 ⓔ BLOCKED 로 사용자 push) · `@verdict-arrived: <worker>-<id>`(→ⓒ 재집계) · `@verdict-stall: <worker>-<id> ...`(→ⓒ — 투표 전원 도착했으나 K회 집계 누락, 정체 격상) · `@stall: <N>초 무활동. 미완료 워커: <목록>`(→ⓙ) · `@review:`(reviewer 용 — 무시).
-- 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신.
+- 신호 처리 전 `.harness-state` 읽어 맥락 복원(단계별 결정·산출물 보존, 뒤 단계 참조). 처리 후 atomic 갱신. **★ 도구 호출은 짧고 단순하게** — 긴 heredoc·복합 명령(`&&` 체인)은 claude 도구호출 버그(#63604)로 텍스트 누출돼 *실행 안 되고 멈춘다*. `.harness-state` 갱신은 짧은 단일 명령 여러 번으로 나눠라(거대 heredoc 1회 금지).
 - **boot 직후 1회 — 부트 화해(재개 판별)**: `.agent-harness/tasks/` 가 비어있지 않으면 이전 세션의 진행이 있다 — plan 재분해 금지, `tasks/*.md`(이전 분해 전체)·`results/*.md`(완료 증거) 대조로 트리 복원: results 존재=완료(재배정 금지) / tasks 만 존재=중간 중단(그 task 처음부터 재실행 — 입자도 게이트 덕에 작아서 싸다) / plan 에만 있음=미착수. `.harness-state.prev` 가 있으면 맥락 참고만(배정 전략·중단 사유) — **진실원천은 tasks/+results/ 유일**(.prev 의 status 류는 낡았을 수 있다). 복원 트리를 ⓑ③ 승인 게이트로 묻는다: "🟠 [판단] 재개: 완료 N·재실행 M·대기 K. 진행?". **전부 완료면** 재실행 없이 "plan 완료 상태" 보고 후 `@desk:` 대기(수정·추가는 단발 dispatch 경로). 모호하면 사용자 확인.
 - 도구는 `{{HARNESS_ROOT}}/bin/<name>.sh` 절대경로. cwd 는 PROJECT_ROOT. 외부 호출 시 `--project /path`.
 
